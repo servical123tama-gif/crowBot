@@ -8,6 +8,7 @@ import pandas as pd
 
 from app.services.sheets_service import SheetsService
 from app.utils.formatters import Formatter
+from app.utils.week_calculator import WeekCalculator
 from app.config.constants import *
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,8 @@ class ReportService:
         try:
             logger.info("Initializing ReportService...")
             self.sheets = SheetsService()
+           
+            self.week_calc = WeekCalculator()  # ← NEW
             logger.info("ReportService initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ReportService: {e}", exc_info=True)
@@ -46,6 +49,179 @@ class ReportService:
         logger.info(f"Week range: {monday.strftime('%Y-%m-%d')} to {sunday.strftime('%Y-%m-%d')}")
         
         return monday, sunday
+    
+    def generate_weekly_breakdown(self, year: int = None, month: int = None, is_owner: bool = False) -> str:
+        """
+        Generate weekly breakdown report for a month
+        Shows Week 1, Week 2, Week 3, Week 4 with totals
+        """
+        logger.info(f"Generating weekly breakdown, owner={is_owner}")
+        
+        try:
+            if year is None or month is None:
+                now = datetime.now()
+                year = now.year
+                month = now.month
+            
+            month_name = datetime(year, month, 1).strftime('%B %Y')
+            
+            # Get all weeks in month
+            weeks = self.week_calc.get_weeks_in_month(year, month)
+            
+            if not weeks:
+                return f"📊 Tidak ada data minggu untuk {month_name}"
+            
+            # Get all transactions for the month
+            df = self.sheets.get_transactions_dataframe()
+            
+            if df.empty:
+                return f"📊 Tidak ada transaksi pada {month_name}"
+            
+            # Filter by month
+            month_str = f"{year:04d}-{month:02d}"
+            monthly = df[df['Date'].dt.strftime('%Y-%m') == month_str]
+            
+            if monthly.empty:
+                return f"📊 Tidak ada transaksi pada {month_name}"
+            
+            # Generate report
+            report = f"{REPORT_WEEKLY_BREAKDOWN_HEADER.format(month=month_name)}\n"
+            report += f"⏰ Generated: {datetime.now().strftime('%d %b %Y, %H:%M')}\n\n"
+            
+            total_month_revenue = 0
+            total_month_transactions = 0
+            
+            # Process each week
+            for week in weeks:
+                week_num = week['week_num']
+                start_date = week['start_date']
+                end_date = week['end_date']
+                
+                # Filter transactions for this week
+                week_df = monthly[
+                    (monthly['Date'] >= start_date) & 
+                    (monthly['Date'] <= end_date)
+                ]
+                
+                
+                week_revenue = week_df['Price'].sum() if not week_df.empty else 0
+                week_count = len(week_df)
+                
+                total_month_revenue += week_revenue
+                total_month_transactions += week_count
+                
+                # Week header
+                report += f"📅 MINGGU {week_num} ({week['start_str']} - {week['end_str']})\n"
+                report += f"{'─' * 40}\n"
+                
+                if week_df.empty:
+                    report += "Tidak ada transaksi\n\n"
+                    continue
+                
+                report += f"Transaksi: {week_count}\n"
+                
+                
+                # Per branch
+                if 'Branch' in week_df.columns:
+                    by_branch = week_df.groupby('Branch')['Price'].sum()
+                    report += "\nPer Cabang:\n"
+                    for branch, amount in by_branch.items():
+                        report += f"  🏢 {branch}: {Formatter.format_currency(amount)}\n"
+                
+                report += "\n"
+            
+            # Month summary
+            report += "=" * 40 + "\n"
+            report += f"📊 TOTAL BULAN {month_name.upper()}\n"
+            report += "=" * 40 + "\n"
+            report += f"Total Transaksi: {total_month_transactions}\n"
+            
+            return report
+            
+        except Exception as e:
+            logger.error(f"Failed to generate weekly breakdown: {e}", exc_info=True)
+            return f"❌ Gagal membuat laporan mingguan: {str(e)}"
+    
+    def generate_week_detail_report(self, year: int, month: int, week_num: int, is_owner: bool = False) -> str:
+        """
+        Generate detailed report for specific week
+        """
+        logger.info(f"Generating week {week_num} detail for {year}-{month}")
+        
+        try:
+            month_name = datetime(year, month, 1).strftime('%B %Y')
+            
+            # Get week range
+            start_date, end_date = self.week_calc.get_week_range(year, month, week_num)
+            
+            if start_date is None:
+                return f"❌ Minggu {week_num} tidak valid untuk {month_name}"
+            
+            # Get transactions
+            df = self.sheets.get_transactions_by_range(start_date, end_date)
+            
+            if df.empty:
+                return f"📈 Tidak ada transaksi pada Minggu {week_num}\n({start_date.strftime('%d %b')} - {end_date.strftime('%d %b')})"
+            
+            gross_profit = df['Price'].sum()
+            count = len(df)
+            
+            # Generate report
+            report = f"{REPORT_WEEK_DETAIL_HEADER.format(week_num=week_num, month=month_name)}\n"
+            report += f"📅 Periode: {start_date.strftime('%d %b')} - {end_date.strftime('%d %b %Y')}\n"
+            report += f"⏰ Generated: {datetime.now().strftime('%H:%M:%S')}\n\n"
+            
+            report += f"Total Transaksi: {count}\n"
+            
+            # Per branch
+            if 'Branch' in df.columns:
+                by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                report += "Per Cabang:\n"
+                
+                for branch, row in by_branch.iterrows():
+                    count_branch = int(row['count'])
+                    sum_branch = row['sum']
+                    report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
+                
+                report += "\n"
+            
+            # Top casters
+            
+            top_casters = df.groupby('Caster')['Price'].sum().sort_values(ascending=False).head(5)
+            report += "Top Caster:\n"
+            for idx, (caster, amount) in enumerate(top_casters.items(), 1):
+                caster_count = df[df['Caster'] == caster].shape[0]
+                report += f"  {idx}. {caster}: {caster_count} layanan ({Formatter.format_currency(amount)})\n"
+            
+            # Top services
+            top_services = df['Service'].value_counts().head(5)
+            report += "\nLayanan Terpopuler:\n"
+            for idx, (service, count) in enumerate(top_services.items(), 1):
+                report += f"  {idx}. {service}: {count}x\n"
+            
+            # Daily breakdown
+            daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
+            report += "\nPer Hari:\n"
+            for date, row in daily_totals.iterrows():
+                day_name = pd.Timestamp(date).strftime('%A')
+                day_name_id = self._translate_day(day_name)
+                count_day = int(row['count'])
+                sum_day = row['sum']
+                report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
+                # Per capster breakdown for this day
+                day_df = df[df['Date'].dt.date == date]
+                by_capster = day_df.groupby('Caster')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                for capster, capster_row in by_capster.iterrows():
+                    capster_count = int(capster_row['count'])
+                    capster_sum = capster_row['sum']
+                    report += f"-{capster}: {capster_count} layanan ({Formatter.format_currency(capster_sum)})\n"
+                report += "\n"
+            logger.info("Weekly report generated successfully")
+            return report
+            
+        except Exception as e:
+            logger.error(f"Failed to generate week detail: {e}", exc_info=True)
+            return f"❌ Gagal membuat laporan detail minggu: {str(e)}"
     
     def generate_daily_report(self, date: Optional[datetime] = None) -> str:
         """Generate daily report"""

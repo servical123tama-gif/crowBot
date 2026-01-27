@@ -23,11 +23,34 @@ class KeyboardBuilder:
         if user_id and AuthService.is_owner_or_admin(user_id):
             keyboard = (
                 [InlineKeyboardButton("📊 Laporan Harian", callback_data=CB_REPORT_DAILY)],
-                [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY)],
+                [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY_BREAKDOWN)],
                 [InlineKeyboardButton("📅 Laporan Bulanan 👑", callback_data=CB_REPORT_MONTHLY)],
                 
             )
         
+        return InlineKeyboardMarkup(keyboard)
+    
+    @staticmethod
+    def week_selection_menu(year: int, month: int) -> InlineKeyboardMarkup:
+        """Week selection keyboard for monthly breakdown"""
+        from app.utils.week_calculator import WeekCalculator
+        
+        weeks = WeekCalculator.get_weeks_in_month(year, month)
+        keyboard = []
+        
+        for week in weeks:
+            week_num = week['week_num']
+            start_str = week['start_str']
+            end_str = week['end_str']
+            
+            button_text = f"Minggu {week_num} ({start_str} - {end_str})"
+            callback_data = f"{CB_WEEK_SELECT}_{year}_{month}_{week_num}"
+            
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+        # Back button
+        keyboard.append([InlineKeyboardButton("🔙 Kembali ke Menu", callback_data=CB_BACK_MAIN)])
+    
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod

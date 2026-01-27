@@ -52,6 +52,11 @@ CB_PAYMENT = 'payment'
 CB_BRANCH = 'branch'
 CB_CHANGE_BRANCH = 'change_branch'
 
+#repot weekly
+CB_REPORT_WEEKLY_BREAKDOWN = 'report_weekly_breakdown'
+CB_WEEK_SELECT = 'week_select'
+CB_BACK_WEKKLY_MENU = 'back_weekly_menu'
+
 #callback for capster
 CB_REPORT_DAILY_CAPSTER = 'report_daily_capter'
 CB_REPORT_WEEKLY_CAPSTER = 'report_weekly_capter'
@@ -117,6 +122,9 @@ Silakan pilih metode pembayaran:"""
 REPORT_DAILY_HEADER = "📊 LAPORAN HARIAN - {date}"
 REPORT_WEEKLY_HEADER = "📈 LAPORAN MINGGUAN (7 Hari Terakhir)"
 REPORT_MONTHLY_HEADER = "📅 LAPORAN BULANAN - {month}"
+
+REPORT_WEEKLY_BREAKDOWN_HEADER = 'LAPORAN MINGGUAN - {month}'
+REPORT_WEEK_DETAIL_HEADER = 'MINGGU {week_num} - {month}'
 
 REPORT_DAILY_HEADERS_CAPSTER = "📊 LAPORAN HARIAN CAPSTER {username} - {date}"
 REPORT_WEEKLY_HEADERS_CAPSTER = "📈 LAPORAN MINGGUAN CAPSTER {username} (7 Hari Terakhir)"

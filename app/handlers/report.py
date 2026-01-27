@@ -4,12 +4,73 @@ Report Handlers
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from datetime import datetime
 
 from app.utils.decorators import require_auth, require_owner_or_admin, handle_errors
 from app.utils.keyboards import KeyboardBuilder
 from app.utils.helpers import safe_edit_message
 
 logger = logging.getLogger(__name__)
+
+
+@handle_errors
+@require_owner_or_admin
+async def handle_weekly_breakdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle weekly breakdown request - Owner only"""
+    from app.services.report_service import ReportService
+    
+    query = update.callback_query
+    await query.answer()
+    
+    await safe_edit_message(query, "⏳ Memuat laporan per minggu...")
+    
+    try:
+        report_service = ReportService()
+        report = report_service.generate_weekly_breakdown(is_owner=True)
+        
+        # Show week selection menu
+        now = datetime.now()
+        keyboard = KeyboardBuilder.week_selection_menu(now.year, now.month)
+        
+        # Add summary + menu
+        message = report + "\n\n📋 Pilih minggu untuk detail:"
+        
+    except Exception as e:
+        logger.error(f"Failed to generate weekly breakdown: {e}", exc_info=True)
+        message = "❌ Gagal membuat laporan per minggu."
+        keyboard = KeyboardBuilder.back_button()
+    
+    await safe_edit_message(query, message, reply_markup=keyboard)
+
+@handle_errors
+@require_owner_or_admin
+async def handle_week_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, year: int, month: int, week_num: int):
+    """Handle specific week detail request - Owner only"""
+    from app.services.report_service import ReportService
+    
+    query = update.callback_query
+    await query.answer()
+    
+    await safe_edit_message(query, f"⏳ Memuat detail Minggu {week_num}...")
+    
+    try:
+        report_service = ReportService()
+        report = report_service.generate_week_detail_report(year, month, week_num, is_owner=True)
+    except Exception as e:
+        logger.error(f"Failed to generate week detail: {e}", exc_info=True)
+        report = "❌ Gagal membuat laporan detail minggu."
+    
+    # Back to weekly breakdown menu
+    keyboard = [[
+        InlineKeyboardButton("🔙 Kembali ke Daftar Minggu", callback_data='report_weekly_breakdown'),
+        InlineKeyboardButton("🏠 Menu Utama", callback_data='back_main')
+    ]]
+    
+    from telegram import InlineKeyboardMarkup
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await safe_edit_message(query, report, reply_markup=reply_markup)
 
 @handle_errors
 @require_owner_or_admin

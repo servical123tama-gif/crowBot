@@ -17,7 +17,9 @@ from app.handlers.report import (
     handle_monthly_report,
     handle_capster_weekly_report,
     handle_capster_daily_report,
-    handle_capster_monthly_report
+    handle_capster_monthly_report,
+    handle_week_detail,
+    handle_weekly_breakdown,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,6 +120,16 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = KeyboardBuilder.main_menu(user_id=user_id)
         await query.edit_message_text("Silakan pilih menu:", reply_markup=keyboard)
     
+    elif data == CB_REPORT_WEEKLY_BREAKDOWN:
+        await handle_weekly_breakdown(update, context)
+    
+    # Week detail selection
+    elif data.startswith(CB_WEEK_SELECT):
+        # Format: week_select_YYYY_MM_W
+        parts = data.replace(f"{CB_WEEK_SELECT}_", "").split("_")
+        if len(parts) == 3:
+            year, month, week_num = int(parts[0]), int(parts[1]), int(parts[2])
+            await handle_week_detail(update, context, year, month, week_num)
     
     else:
         await query.answer("⚠️ Aksi tidak dikenal")
