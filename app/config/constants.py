@@ -149,7 +149,7 @@ MSG_CURRENT_BRANCH = """📍 Cabang Saat Ini
 
 🏢 {branch}
 📅 {date}
-👤 {capsster}
+👤 {capster}
 
 Ingin ganti cabang?"""
 
