@@ -49,7 +49,7 @@ async def handle_service_selection(update: Update, context: ContextTypes.DEFAULT
 @require_auth
 async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, service_id: str, payment_id: str):
     """Handle payment method selection - Save transaction"""
-    from app.services.sheets_service import SheetsService
+    # from app.services.sheets_service import SheetsService # No longer need to import here
     from app.services.branch_service import BranchService
     
     query = update.callback_query
@@ -59,7 +59,7 @@ async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT
     
     # Validate service and payment
     if service_id not in ALL_SERVICES or payment_id not in PAYMENT_METHODS:
-        await query.edit_message_text("❌ Data tidak valid")
+        await query.edit_message_text(f"{service_id}  {payment_id}❌ Data tidak valid")
         return
     
     # Get branch
@@ -81,7 +81,7 @@ async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT
     # Create transaction - PASTIKAN URUTAN PARAMETER SESUAI MODEL
     caster_name = query.from_user.first_name
     transaction = Transaction(
-        caster=caster_name,
+        capster=caster_name,
         service=service_name,
         price=price,
         branch=branch_name,
@@ -95,7 +95,7 @@ async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT
     # Save
     try:
         logger.info(f"Saving transaction: {transaction}")
-        sheets_service = SheetsService()
+        sheets_service = context.bot_data['sheets_service'] # Retrieve the SheetsService instance
         success = sheets_service.add_transaction(transaction)
         logger.info(f"Save result: {success}")
     except Exception as e:
@@ -109,7 +109,7 @@ async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT
             'price': price,
             'payment_method': payment_name,
             'branch': branch_name,
-            'caster': caster_name,
+            'capster': caster_name,
             'time': datetime.now()
         })
     else:

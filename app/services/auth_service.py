@@ -3,7 +3,7 @@ Authentication Service
 """
 import logging
 from typing import List
-from app.config.constants import ROLE_OWNER, ROLE_ADMIN, ROLE_CASTER
+from app.config.constants import ROLE_OWNER, ROLE_ADMIN, ROLE_CAPSTER
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class AuthService:
         elif cls.is_admin(user_id):
             return ROLE_ADMIN
         elif cls.is_authorized(user_id):
-            return ROLE_CASTER
+            return ROLE_CAPSTER
         else:
             return None
     

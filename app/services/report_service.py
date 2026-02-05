@@ -13,19 +13,62 @@ from app.config.constants import *
 
 logger = logging.getLogger(__name__)
 
+"""
+Saat ini, setiap permintaan laporan (/monthly_report, /profit_report) memicu panggilan ke get_transactions_dataframe() yang membaca semua data dari Google Sheets. Ini lambat.
+
+  Solusinya adalah membuat cache sederhana di ReportService. Kita akan menyimpan data transaksi dalam variabel _transactions_cache dan waktu pembaruan di _cache_timestamp.
+
+  Saya akan membuat fungsi _get_or_fetch_transactions() yang akan:
+   1. Memeriksa _cache_timestamp untuk melihat apakah cache kedaluwarsa (misalnya >5 menit).
+   2. Jika cache baru, kembalikan data dari _transactions_cache secara instan.
+   3. Jika kedaluwarsa, ambil data baru dari Google Sheets, perbarui cache dan timestamp, lalu kembalikan datanya.
+
+  Fungsi generate_monthly_report dan generate_monthly_profit_report akan diubah untuk menggunakan fungsi _get_or_fetch_transactions(). Ini akan membuat laporan kedua dan seterusnya jauh lebih
+  cepat.
+"""
+
 class ReportService:
     """Generate reports"""
     
-    def __init__(self):
+    def __init__(self, sheets_service: SheetsService):
         try:
             logger.info("Initializing ReportService...")
-            self.sheets = SheetsService()
-           
-            self.week_calc = WeekCalculator()  # ← NEW
+            self.sheets = sheets_service
+            self.week_calc = WeekCalculator()
+            
+            # --- CACHE ---
+            self._transactions_cache = None
+            self._cache_timestamp = None
+            self.CACHE_DURATION = timedelta(minutes=5)
+            # --- END CACHE ---
+
             logger.info("ReportService initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ReportService: {e}", exc_info=True)
             raise
+
+    def _get_or_fetch_transactions(self) -> pd.DataFrame:
+        """
+        Fetches the transactions DataFrame from cache if available and not expired,
+        otherwise fetches from the source and updates the cache.
+        """
+        now = datetime.now()
+        
+        # Check if cache is valid
+        if self._transactions_cache is not None and self._cache_timestamp is not None:
+            if now - self._cache_timestamp < self.CACHE_DURATION:
+                logger.info("Fetching transactions from CACHE.")
+                return self._transactions_cache
+
+        # Fetch from source if cache is invalid or expired
+        logger.info("Cache expired or empty. Fetching transactions from Google Sheets.")
+        df = self.sheets.get_transactions_dataframe()
+        
+        # Update cache
+        self._transactions_cache = df
+        self._cache_timestamp = now
+        
+        return df
     
     def _get_week_range(self) -> tuple:
         """
@@ -72,7 +115,7 @@ class ReportService:
                 return f"📊 Tidak ada data minggu untuk {month_name}"
             
             # Get all transactions for the month
-            df = self.sheets.get_transactions_dataframe()
+            df = self._get_or_fetch_transactions()
             
             if df.empty:
                 return f"📊 Tidak ada transaksi pada {month_name}"
@@ -185,13 +228,13 @@ class ReportService:
                 
                 report += "\n"
             
-            # Top casters
+            # Top capsters
             
-            top_casters = df.groupby('Caster')['Price'].sum().sort_values(ascending=False).head(5)
-            report += "Top Caster:\n"
-            for idx, (caster, amount) in enumerate(top_casters.items(), 1):
-                caster_count = df[df['Caster'] == caster].shape[0]
-                report += f"  {idx}. {caster}: {caster_count} layanan ({Formatter.format_currency(amount)})\n"
+            top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
+            report += "Top Capster:\n"
+            for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
+                capster_count = df[df['Capster'] == capster].shape[0]
+                report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
             
             # Top services
             top_services = df['Service'].value_counts().head(5)
@@ -200,22 +243,36 @@ class ReportService:
                 report += f"  {idx}. {service}: {count}x\n"
             
             # Daily breakdown
-            daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
             report += "\nPer Hari:\n"
+            
+            # --- OPTIMIZATION START ---
+            # Group by both date and capster once to get all aggregates.
+            daily_capster_agg = df.groupby([df['Date'].dt.date, 'Capster'])['Price'].agg(['sum', 'count']).sort_values(by=['Date', 'sum'], ascending=[True, False])
+            
+            # Group by just date to get daily totals.
+            daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
+
+            # Iterate through the daily totals to build the report string.
             for date, row in daily_totals.iterrows():
                 day_name = pd.Timestamp(date).strftime('%A')
                 day_name_id = self._translate_day(day_name)
                 count_day = int(row['count'])
                 sum_day = row['sum']
+                
                 report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
-                # Per capster breakdown for this day
-                day_df = df[df['Date'].dt.date == date]
-                by_capster = day_df.groupby('Caster')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
-                for capster, capster_row in by_capster.iterrows():
-                    capster_count = int(capster_row['count'])
-                    capster_sum = capster_row['sum']
-                    report += f"-{capster}: {capster_count} layanan ({Formatter.format_currency(capster_sum)})\n"
-                report += "\n"
+                
+                # Filter the pre-aggregated data for the current day.
+                # This is much faster than grouping inside a loop.
+                if date in daily_capster_agg.index:
+                    day_capster_data = daily_capster_agg.loc[date]
+                    
+                    for capster, capster_row in day_capster_data.iterrows():
+                        capster_count = int(capster_row['count'])
+                        capster_sum = capster_row['sum']
+                        report += f"  - {capster}: {capster_count} layanan ({Formatter.format_currency(capster_sum)})\n"
+                    report += "\n"
+            # --- OPTIMIZATION END ---
+            
             logger.info("Weekly report generated successfully")
             return report
             
@@ -264,15 +321,15 @@ class ReportService:
                 
                 report += "\n"
             
-            # Per caster breakdown
-            logger.debug("Generating per-caster breakdown...")
-            by_caster = df.groupby('Caster')['Price'].agg(['sum', 'count'])
-            report += "Per Caster:\n"
+            # Per capster breakdown
+            logger.debug("Generating per-capster breakdown...")
+            by_capster = df.groupby('Capster')['Price'].agg(['sum', 'count'])
+            report += "Per Capster:\n"
             
-            for caster, row in by_caster.iterrows():
-                count_caster = int(row['count'])
-                sum_caster = row['sum']
-                report += f"  ✂️ {caster}: {count_caster} layanan ({Formatter.format_currency(sum_caster)})\n"
+            for capster, row in by_capster.iterrows():
+                count_capster = int(row['count'])
+                sum_capster = row['sum']
+                report += f"  ✂️ {capster}: {count_capster} layanan ({Formatter.format_currency(sum_capster)})\n"
             
             # Top services
             logger.debug("Finding top services...")
@@ -353,13 +410,13 @@ class ReportService:
             for idx, (service, count) in enumerate(top_services.items(), 1):
                 report += f"  {idx}. {service}: {count}x\n"
             
-            # Top casters
-            top_casters = df.groupby('Caster')['Price'].sum().sort_values(ascending=False).head(5)
-            report += "\nTop Caster:\n"
-            for idx, (caster, amount) in enumerate(top_casters.items(), 1):
-                # Count transactions per caster
-                caster_count = df[df['Caster'] == caster].shape[0]
-                report += f"  {idx}. {caster}: {caster_count} layanan ({Formatter.format_currency(amount)})\n"
+            # Top capsters
+            top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
+            report += "\nTop Capster:\n"
+            for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
+                # Count transactions per capster
+                capster_count = df[df['Capster'] == capster].shape[0]
+                report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
             
             # Daily breakdown
             daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
@@ -391,24 +448,30 @@ class ReportService:
         }
         return translation.get(english_day, english_day)
     
-    def generate_monthly_report(self) -> str:
-        """Generate monthly report"""
-        logger.info("Generating monthly report")
+    def generate_monthly_report(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
+        """Generate monthly report for a specific month and year"""
+        logger.info(f"Generating monthly report for {month}/{year}")
         
         try:
-            now = datetime.now()
-            month_str = now.strftime('%Y-%m')
-            month_display = now.strftime('%B %Y')
+            current_date = datetime.now()
+            if year is None:
+                year = current_date.year
+            if month is None:
+                month = current_date.month
+
+            report_date = datetime(year, month, 1)
+            month_str = report_date.strftime('%Y-%m')
+            month_display = report_date.strftime('%B %Y')
             
             logger.debug("Fetching all transactions...")
-            df = self.sheets.get_transactions_dataframe()
+            df = self._get_or_fetch_transactions()
             logger.info(f"Total transactions in sheet: {len(df)}")
             
             if df.empty:
                 logger.info("No transactions found in sheet")
-                return "📅 Tidak ada transaksi bulan ini"
+                return f"📅 Tidak ada transaksi pada {month_display}"
             
-            # Filter by current month
+            # Filter by specific month and year
             logger.debug(f"Filtering for month: {month_str}")
             monthly = df[df['Date'].dt.strftime('%Y-%m') == month_str]
             logger.info(f"Transactions this month: {len(monthly)}")
@@ -418,11 +481,18 @@ class ReportService:
             
             total = monthly['Price'].sum()
             count = len(monthly)
-            days = now.day
+            
+            # Calculate days for the given month, up to the current day if it's the current month
+            if year == current_date.year and month == current_date.month:
+                days = current_date.day
+            else:
+                # For past months, use total days in that month
+                days = (datetime(year, month % 12 + 1, 1) - datetime(year, month, 1)).days
+
             avg_per_day = total / days
             
             report = f"{REPORT_MONTHLY_HEADER.format(month=month_display)}\n"
-            report += f"⏰ Generated: {now.strftime('%d %b %Y, %H:%M:%S')}\n\n"
+            report += f"⏰ Generated: {current_date.strftime('%d %b %Y, %H:%M:%S')}\n\n"
             
             report += f"Total Transaksi: {count}\n"
             report += f"Total Pendapatan: {Formatter.format_currency(total)}\n"
@@ -439,17 +509,17 @@ class ReportService:
                     report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)}) - {pct:.1f}%\n"
                 report += "\n"
             
-            # Ranking caster
-            by_caster = monthly.groupby('Caster').agg({
+            # Ranking capster
+            by_capster = monthly.groupby('Capster').agg({
                 'Price': 'sum',
                 'Service': 'count'
             }).sort_values('Price', ascending=False)
             
-            report += "Ranking Caster:\n"
-            for idx, (caster, row) in enumerate(by_caster.iterrows(), 1):
+            report += "Ranking Capster:\n"
+            for idx, (capster, row) in enumerate(by_capster.iterrows(), 1):
                 amount = row['Price']
-                count_caster = int(row['Service'])
-                report += f"  {idx}. {caster}: {count_caster} layanan ({Formatter.format_currency(amount)})\n"
+                count_capster = int(row['Service'])
+                report += f"  {idx}. {capster}: {count_capster} layanan ({Formatter.format_currency(amount)})\n"
             
             # Service breakdown
             service_breakdown = monthly.groupby('Service').agg({
@@ -470,14 +540,168 @@ class ReportService:
                     pct = (amount / total * 100) if total > 0 else 0
                     report += f"  {method}: {Formatter.format_currency(amount)} ({pct:.1f}%)\n"
             
-            logger.info("Monthly report generated successfully")
+            logger.info(f"Monthly report for {month_display} generated successfully")
             return report
             
         except Exception as e:
-            logger.error(f"Failed to generate monthly report: {e}", exc_info=True)
+            logger.error(f"Failed to generate monthly report for {month}/{year}: {e}", exc_info=True)
             return f"❌ Gagal membuat laporan bulanan: {str(e)}"
-    """""
 
+    def generate_monthly_profit_report(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
+        """Generate monthly profit report with per-branch breakdown for a specific month and year."""
+        logger.info(f"Generating monthly profit report with per-branch breakdown for {month}/{year}")
+        
+        try:
+            now = datetime.now()
+            if year is None:
+                year = now.year
+            if month is None:
+                month = now.month
+
+            report_date = datetime(year, month, 1)
+            month_display = report_date.strftime('%B %Y')
+            
+            profit_data_df = self.generate_monthly_profit_dataframe(year, month)
+
+            if profit_data_df.empty:
+                 return f"💰 Tidak ada data transaksi atau kolom 'Branch' tidak ditemukan untuk {month_display}."
+
+            # Extract data from the DataFrame for formatting
+            total_revenue = profit_data_df.loc['Overall', 'Revenue']
+            total_operational_cost = profit_data_df.loc['Overall', 'Operational Cost']
+            total_net_profit = profit_data_df.loc['Overall', 'Net Profit']
+
+            revenue_a = profit_data_df.loc['Cabang A', 'Revenue']
+            total_costs_a = profit_data_df.loc['Cabang A', 'Operational Cost']
+            profit_a = profit_data_df.loc['Cabang A', 'Net Profit']
+
+            revenue_b = profit_data_df.loc['Cabang B', 'Revenue']
+            fixed_costs_b = profit_data_df.loc['Cabang B', 'Fixed Cost']
+            commission_cost_b = profit_data_df.loc['Cabang B', 'Commission Cost']
+            total_costs_b = profit_data_df.loc['Cabang B', 'Operational Cost']
+            profit_b = profit_data_df.loc['Cabang B', 'Net Profit']
+
+
+            # --- Report Formatting ---
+            
+            report = f"{REPORT_PROFIT_HEADER.format(month=month_display)}\n"
+            report += f"⏰ Generated: {now.strftime('%d %b %Y, %H:%M:%S')}\n"
+            
+            # Overall Summary
+            report += "\n" + "="*40 + "\n"
+            report += "RINGKASAN KESELURUHAN\n"
+            report += "="*40 + "\n"
+            report += f"Total Pendapatan: {Formatter.format_currency(total_revenue)}\n"
+            report += f"Total Biaya Operasional: {Formatter.format_currency(total_operational_cost)}\n"
+            profit_emoji = "✅" if total_net_profit >= 0 else "❌"
+            report += f"{profit_emoji} Profit Bersih Total: {Formatter.format_currency(total_net_profit)}\n"
+
+            # Branch A Details
+            report += "\n" + "-"*40 + "\n"
+            report += f"DETAIL PROFIT CABANG A\n"
+            report += "-"*40 + "\n"
+            report += f"  - Pendapatan: {Formatter.format_currency(revenue_a)}\n"
+            report += f"  - Biaya Operasional (Fixed): {Formatter.format_currency(total_costs_a)}\n"
+            profit_emoji_a = "✅" if profit_a >= 0 else "❌"
+            report += f"  {profit_emoji_a} Profit Bersih Cabang A: {Formatter.format_currency(profit_a)}\n"
+
+            # Branch B Details
+            report += "\n" + "-"*40 + "\n"
+            report += f"DETAIL PROFIT CABANG B\n"
+            report += "-"*40 + "\n"
+            report += f"  - Pendapatan: {Formatter.format_currency(revenue_b)}\n"
+            report += "  - Biaya Operasional:\n"
+            report += f"    - Fixed: {Formatter.format_currency(fixed_costs_b)}\n"
+            report += f"    - Komisi: {Formatter.format_currency(commission_cost_b)}\n"
+            report += f"    - Total Biaya: {Formatter.format_currency(total_costs_b)}\n"
+            profit_emoji_b = "✅" if profit_b >= 0 else "❌"
+            report += f"  {profit_emoji_b} **Profit Bersih Cabang B:** {Formatter.format_currency(profit_b)}\n"
+            
+            logger.info("Monthly profit report with breakdown generated successfully")
+            return report
+
+        except Exception as e:
+            logger.error(f"Failed to generate monthly profit report: {e}", exc_info=True)
+            return f"❌ Gagal membuat laporan profit bulanan: {str(e)}"
+    
+    def generate_monthly_profit_dataframe(self, year: int, month: int) -> pd.DataFrame:
+        """
+        Generate monthly profit data as a pandas DataFrame for a specific year and month.
+        Includes revenue, costs, and profit per branch and overall.
+        """
+        logger.info(f"Generating monthly profit DataFrame for {month}/{year}")
+
+        try:
+            # Get all transactions
+            df = self._get_or_fetch_transactions()
+            
+            # Filter for the specific month and year
+            month_str = f"{year:04d}-{month:02d}"
+            monthly_df = df[df['Date'].dt.strftime('%Y-%m') == month_str]
+
+            if monthly_df.empty or 'Branch' not in monthly_df.columns:
+                logger.info(f"No transactions or 'Branch' column missing for {month_str}. Returning empty DataFrame.")
+                return pd.DataFrame()
+
+            # Prepare results dictionary
+            results = {}
+
+            # --- Calculations for Branch A ---
+            branch_a_df = monthly_df[monthly_df['Branch'] == 'Cabang A']
+            revenue_a = branch_a_df['Price'].sum()
+            costs_a_config = BRANCHES['cabang_a']['oprational_cost']
+            total_fixed_costs_a = sum(costs_a_config.values())
+            profit_a = revenue_a - total_fixed_costs_a
+            
+            results['Cabang A'] = {
+                'Revenue': revenue_a,
+                'Fixed Cost': total_fixed_costs_a,
+                'Commission Cost': 0, # Branch A doesn't seem to have commission based on the profit report
+                'Operational Cost': total_fixed_costs_a,
+                'Net Profit': profit_a
+            }
+
+            # --- Calculations for Branch B ---
+            branch_b_df = monthly_df[monthly_df['Branch'] == 'Cabang B']
+            revenue_b = branch_b_df['Price'].sum()
+            costs_b_config = BRANCHES['cabang_b']['oprational_cost']
+            fixed_costs_b = sum(costs_b_config.values())
+            commission_cost_b = revenue_b * OPRATIONAL_CONFIG['commision_rate']
+            total_costs_b = fixed_costs_b + commission_cost_b
+            profit_b = revenue_b - total_costs_b
+
+            results['Cabang B'] = {
+                'Revenue': revenue_b,
+                'Fixed Cost': fixed_costs_b,
+                'Commission Cost': commission_cost_b,
+                'Operational Cost': total_costs_b,
+                'Net Profit': profit_b
+            }
+            
+            # --- Overall Totals ---
+            total_revenue_overall = revenue_a + revenue_b
+            total_operational_cost_overall = total_fixed_costs_a + total_costs_b # Total_costs_b already includes commission
+            total_net_profit_overall = total_revenue_overall - total_operational_cost_overall
+
+            results['Overall'] = {
+                'Revenue': total_revenue_overall,
+                'Fixed Cost': total_fixed_costs_a + fixed_costs_b, # Sum of fixed costs
+                'Commission Cost': commission_cost_b, # Only Branch B has commission
+                'Operational Cost': total_operational_cost_overall,
+                'Net Profit': total_net_profit_overall
+            }
+            
+            # Convert results to DataFrame
+            profit_df = pd.DataFrame.from_dict(results, orient='index')
+            profit_df.index.name = 'Category'
+            
+            return profit_df
+
+        except Exception as e:
+            logger.error(f"Failed to generate monthly profit DataFrame for {month}/{year}: {e}", exc_info=True)
+            return pd.DataFrame()
+
+    """""
     ## 🎯 **Contoh Output Laporan Mingguan Baru**
 
     ### **Sebelum (7 hari mundur dari hari ini):**
@@ -531,24 +755,21 @@ class ReportService:
             date = datetime.now()
             df = self.sheets.get_transactions_by_date(date)
             
-            if df.empty:
-                return f"📊 Tidak ada transaksi pada {Formatter.format_date(date)}"
-            
-            # Filter by caster
-            df_caster = df[df['Caster'] == user]
-            if df_caster.empty:
+            # Filter by capster
+            df_capster = df[df['Capster'] == user]
+            if df_capster.empty:
                 return f"📊 Tidak ada transaksi untuk {user} pada {Formatter.format_date(date)}"
             
-            total = df_caster['Price'].sum()
-            count = len(df_caster)
+            total = df_capster['Price'].sum()
+            count = len(df_capster)
             
             report = f"{REPORT_DAILY_HEADERS_CAPSTER.format(date=Formatter.format_date(date), username=user)}\n\n"
-            report += f"Caster: {user}\n"
+            report += f"Capster: {user}\n"
             report += f"Total Transaksi: {count}\n"
             report += f"Total Pendapatan: {Formatter.format_currency(total)}\n\n"
             
             # Top services
-            top_services = df_caster['Service'].value_counts().head(3)
+            top_services = df_capster['Service'].value_counts().head(3)
             if not top_services.empty:
                 report += "Layanan Terpopuler:\n"
                 for service, count in top_services.items():
@@ -577,7 +798,7 @@ class ReportService:
                 week_str = f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b %Y')}"
                 return f"📈 Tidak ada transaksi minggu ini\n({week_str})"
             
-            df_capster = df[df['Caster'] == user]
+            df_capster = df[df['Capster'] == user]
             total = df_capster['Price'].sum()
             count = len(df_capster)
             
@@ -639,23 +860,23 @@ class ReportService:
             now = datetime.now()
             month_str = now.strftime('%Y-%m')
             
-            df = self.sheets.get_transactions_dataframe()
+            df = self._get_or_fetch_transactions()
             
             if df.empty:
                 return "📅 Tidak ada transaksi bulan ini"
             
-            # Filter by caster
-            df_caster = df[df['Caster'] == user]
-            if df_caster.empty:
+            # Filter by capster
+            df_capster = df[df['Capster'] == user]
+            if df_capster.empty:
                 return f"📅 Tidak ada transaksi untuk {user} bulan ini"
             
-            total = df_caster['Price'].sum()
-            count = len(df_caster)
+            total = df_capster['Price'].sum()
+            count = len(df_capster)
             days = now.day
             avg_per_day = total / days
             
             report = f"{REPORT_MONTHLY_HEADERS_CAPSTER.format(month=month_str, username=user)}\n\n"
-            report += f"Caster: {user}\n"
+            report += f"Capster: {user}\n"
             report += f"Total Transaksi: {count}\n"
             report += f"Total Pendapatan: {Formatter.format_currency(total)}\n" 
             report += f"Rata-rata/hari: {Formatter.format_currency(avg_per_day)}\n\n"

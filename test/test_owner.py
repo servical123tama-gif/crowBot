@@ -15,12 +15,12 @@ from app.config.settings import settings
 from app.services.auth_service import AuthService
 
 print(f"\n📋 Configuration:")
-print(f"   AUTHORIZED_CASTERS: {settings.AUTHORIZED_CASTERS}")
+print(f"   AUTHORIZED_CAPSTERS: {settings.AUTHORIZED_CAPSTERS}")
 print(f"   OWNER_IDS: {settings.OWNER_IDS}")
 
 # Initialize
 AuthService.initialize(
-    authorized_users=settings.AUTHORIZED_CASTERS,
+    authorized_users=settings.AUTHORIZED_CAPSTERS,
     owner_ids=settings.OWNER_IDS
 )
 

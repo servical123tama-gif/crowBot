@@ -26,7 +26,7 @@ except Exception as e:
 print("\n2️⃣  Creating test transaction...")
 try:
     transaction = Transaction(
-        caster="Test User",
+        capster="Test User",
         service="✂️ Potong Rambut",
         price=35000,
         date=datetime.now()
@@ -61,7 +61,7 @@ try:
     headers = worksheet.row_values(1)
     print(f"   📋 Headers: {headers}")
     
-    expected_headers = ['Date', 'Caster', 'Service', 'Price']
+    expected_headers = ['Date', 'Capster', 'Service', 'Price']
     if headers != expected_headers:
         print(f"   ⚠️  Headers mismatch!")
         print(f"      Expected: {expected_headers}")
@@ -88,7 +88,7 @@ try:
             last_record = all_records[-1]
             print(f"   📄 Last record in sheet:")
             print(f"      Date: {last_record.get('Date')}")
-            print(f"      Caster: {last_record.get('Caster')}")
+            print(f"      Capster: {last_record.get('Capster')}")
             print(f"      Service: {last_record.get('Service')}")
             print(f"      Price: {last_record.get('Price')}")
         else:

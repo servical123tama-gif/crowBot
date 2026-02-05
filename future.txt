@@ -1,0 +1,130 @@
+ Ide Prioritas (Berdasarkan Struktur Baru)
+
+   1. Laporan Profit Lintas Bulan & Tahunan:
+       * Apa: Buat perintah baru (misal: /laporan_tahunan) yang mengakumulasi pendapatan dan biaya dari semua sheet bulanan di tahun tertentu untuk menghasilkan laporan profit tahunan.       
+       * Kenapa: Ini memberikan gambaran performa bisnis dalam skala besar (makro) dan sangat berguna untuk perencanaan strategis.
+
+   2. Navigasi Laporan Antar Bulan:[V]
+       * Apa: Saat melihat laporan bulanan (pendapatan atau profit), tambahkan tombol panah ⬅️ Sebelumnya dan Berikutnya ➡️ untuk berpindah dan melihat laporan bulan lain tanpa harus kembali 
+         ke menu utama.
+       * Kenapa: Meningkatkan pengalaman pengguna (UX) secara drastis, membuat bot terasa lebih interaktif dan cepat digunakan.
+
+        *Answer :* 
+        Berikut adalah rencana langkah-langkah untuk mengimplementasikan navigasi laporan bulanan (pendapatan dan profit):
+
+
+        1. Tambahkan Konstanta Callback Baru:
+            * Di app/config/constants.py, tambahkan konstanta baru untuk callback "bulan sebelumnya" dan "bulan berikutnya" untuk laporan bulanan pendapatan dan laporan profit bulanan. Ini akan   
+                memungkinkan kita untuk mengidentifikasi aksi navigasi dari tombol.
+
+
+        2. Modifikasi Metode Laporan di `ReportService`:
+            * Ubah generate_monthly_report dan generate_monthly_profit_report di app/services/report_service.py agar dapat menerima parameter year dan month. Saat ini, mereka selalu menggunakan   
+                bulan dan tahun sekarang.
+
+
+        3. Buat Keyboard Navigasi di `KeyboardBuilder`:
+            * Buat metode baru di app/utils/keyboards.py yang akan menghasilkan InlineKeyboardMarkup dengan tombol "⬅️ Sebelumnya", "🏠 Menu Utama", dan "Berikutnya ➡️". Callback data untuk tombol
+                "Sebelumnya" dan "Berikutnya" akan menyertakan bulan dan tahun yang relevan.
+
+
+        4. Perbarui Handler Laporan di `app/handlers/report.py`:
+            * Modifikasi handle_monthly_report dan handle_profit_report untuk:
+                * Mengambil parameter year dan month dari callback query (jika ada). Jika tidak ada, gunakan bulan dan tahun saat ini.
+                * Memanggil metode ReportService yang sudah diperbarui dengan year dan month tersebut.
+                * Menggunakan metode KeyboardBuilder yang baru untuk menampilkan tombol navigasi bersama laporan.
+            * Kita juga perlu penanganan khusus untuk callback navigasi (misal: CB_MONTHLY_PREV, CB_PROFIT_NEXT) yang akan mengurai year dan month dari callback data, lalu memanggil ulang handler 
+                laporan dengan parameter tersebut.
+
+
+        5. Perbarui `callback_router` di `app/handlers/callback.py`:
+            * Tambahkan logika untuk mengarahkan callback data baru (untuk navigasi bulan) ke handler handle_monthly_report atau handle_profit_report yang sesuai, dengan mengurai year dan month   
+                dari callback data tersebut.
+
+        Ringkasan perubahan:
+            1. `app/config/constants.py`: Ditambahkan CB_MONTHLY_NAV dan CB_PROFIT_NAV untuk callback navigasi.
+            2. `app/services/report_service.py`:
+                * generate_monthly_report dan generate_monthly_profit_report sekarang menerima parameter year dan month.
+                * Logika di dalamnya disesuaikan untuk menghasilkan laporan berdasarkan year dan month yang diberikan.
+            3. `app/utils/keyboards.py`: Ditambahkan metode monthly_navigation_keyboard untuk membuat tombol navigasi "Sebelumnya" / "Berikutnya" / "Menu Utama".
+            4. `app/handlers/report.py`:
+                * handle_monthly_report dan handle_profit_report sekarang menerima parameter year dan month opsional.
+                * Kedua handler ini sekarang menggunakan monthly_navigation_keyboard untuk menampilkan tombol navigasi bersama laporannya.
+            5. `app/handlers/callback.py`: callback_router diperbarui untuk mengenali callback CB_MONTHLY_NAV dan CB_PROFIT_NAV, mengurai tahun dan bulan dari data callback, lalu memanggil handler
+                laporan yang sesuai dengan parameter tersebut.
+
+       
+
+
+   3. Perbandingan Performa Bulanan:
+       * Apa: Di dalam laporan bulanan, tambahkan ringkasan performa dibandingkan bulan sebelumnya. Contoh: "Pendapatan naik 15% dari bulan lalu", "Profit turun 5% dari bulan lalu".
+       * Kenapa: Memberikan konteks instan terhadap data. Owner bisa langsung tahu apakah performa bulan ini lebih baik atau lebih buruk.
+
+  Ide Pengembangan Umum (Tingkat Menengah)
+
+   4. Manajemen & Laporan Inventaris:
+       * Apa: Buat fitur untuk mencatat pemakaian produk (pomade, sampo, dll.) dan memantau stok. Bisa ada perintah /stok untuk melihat sisa dan /pakai <produk> <jumlah>.
+       * Kenapa: Membantu mengelola biaya variabel selain gaji dan sewa, serta mencegah kehabisan produk penting.
+
+   5. Analisis Performa Capster (Karyawan):
+       * Apa: Buat laporan khusus yang merangking capster berdasarkan total pendapatan, jumlah layanan, atau rata-rata pendapatan per layanan dalam periode tertentu (misal, bulan ini atau 3  
+         bulan terakhir).
+       * Kenapa: Membantu dalam memberikan bonus, evaluasi kinerja, dan mengidentifikasi capster mana yang paling produktif atau butuh pelatihan.
+
+  Ide Pengembangan (Tingkat Lanjut)
+
+   6. Dashboard Web Visual:
+       * Apa: Membuat halaman web sederhana yang membaca data dari Google Sheet dan menampilkannya dalam bentuk grafik (grafik garis untuk tren pendapatan/profit, diagram lingkaran untuk     
+         kontribusi per cabang, dll).
+       * Kenapa: Visualisasi data jauh lebih mudah dipahami daripada teks. Ini bisa menjadi tool analisis utama bagi owner.
+
+  Jika ada ide yang Anda minati, kita bisa langsung merencanakan langkah-langkah implementasinya.
+
+
+
+  Kategori: Peningkatan Efisiensi & Operasional
+
+   1. Sistem Notifikasi Cerdas:
+       * Ide: Bot secara proaktif mengirimkan rangkuman harian setiap malam (misal, jam 9 malam) kepada Owner/Admin. Isinya: total pendapatan hari itu, jumlah transaksi, dan perbandingan     
+         dengan rata-rata harian.
+       * Manfaat: Owner tidak perlu proaktif meminta laporan, informasi penting datang secara otomatis.
+
+   2. Manajemen Pengeluaran Lain-lain:
+       * Ide: Tambahkan perintah /belanja <jumlah> <deskripsi> untuk mencatat pengeluaran di luar biaya operasional tetap (misal: /belanja 50000 Beli gunting baru). Pengeluaran ini akan      
+         langsung diperhitungkan dalam laporan profit.
+       * Manfaat: Membuat laporan profit lebih akurat karena semua pengeluaran tercatat secara real-time.
+
+   3. Absensi Karyawan Sederhana:
+       * Ide: Fitur /hadir dan /pulang untuk capster. Bot akan mencatat jam kerja mereka. Nanti bisa dikembangkan untuk menghitung total jam kerja dalam sebulan.
+       * Manfaat: Memudahkan rekapitulasi kehadiran tanpa perlu buku absensi manual.
+
+  Kategori: Peningkatan Layanan Pelanggan (Customer-Facing)
+
+   4. Bot Khusus Pelanggan (Terpisah):
+       * Ide: Membuat bot kedua yang khusus untuk pelanggan. Fiturnya bisa berupa: melihat daftar layanan & harga, melihat profil capster, dan melakukan booking.
+       * Manfaat: Meningkatkan citra barbershop menjadi lebih modern dan memudahkan pelanggan untuk berinteraksi.
+
+   5. Sistem Booking & Reservasi:
+       * Ide: Pelanggan bisa memilih layanan, capster, tanggal, dan jam yang tersedia. Bot akan menyimpan jadwal dan mengirim notifikasi pengingat H-1 sebelum jadwal potong rambut.
+       * Manfaat: Mengurangi antrian, memberikan kepastian bagi pelanggan, dan membantu capster mengatur jadwal kerja.
+
+   6. Program Loyalitas & Feedback:
+       * Ide: Setelah transaksi, bot (melalui WhatsApp atau SMS) mengirim pesan terima kasih kepada pelanggan dan meminta rating/feedback. Setiap transaksi dicatat, dan setelah 10 kali       
+         potong, pelanggan otomatis mendapat notifikasi untuk 1x potong gratis.
+       * Manfaat: Meningkatkan retensi pelanggan dan mendapatkan masukan berharga untuk kualitas layanan.
+
+  Kategori: Analisis & Strategi Bisnis (Data-Driven)
+
+   7. Analisis Jam Sibuk (Peak Hours):
+       * Ide: Bot menganalisis data transaksi untuk menemukan pola jam, hari, atau tanggal (misal: awal bulan) paling ramai. Laporan ini bisa diakses dengan perintah /jam_sibuk.
+       * Manfaat: Membantu owner dalam membuat jadwal shift karyawan, merencanakan promo di jam sepi, atau mempersiapkan stok lebih di jam ramai.
+
+   8. Analisis Layanan Paling Profitabel:
+       * Ide: Selain layanan terpopuler (paling sering dipesan), buat laporan yang menganalisis layanan mana yang menghasilkan profit terbesar (setelah dikurangi biaya produk jika ada).      
+       * Manfaat: Memberi wawasan untuk strategi marketing. Mungkin layanan yang jarang dipesan ternyata sangat profitabel dan perlu dipromosikan lebih gencar.
+
+   9. Prediksi Pendapatan Sederhana:
+       * Ide: Berdasarkan data 3-6 bulan terakhir, bot dapat memberikan estimasi pendapatan untuk bulan berikutnya dengan perintah /prediksi.
+       * Manfaat: Membantu dalam penetapan target dan perencanaan keuangan.
+
+  Pilihlah ide yang paling sesuai dengan prioritas bisnis Anda saat ini. Apakah ada yang ingin Anda diskusikan lebih detail?

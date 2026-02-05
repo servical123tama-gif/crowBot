@@ -50,12 +50,12 @@ def validate_environment():
     
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '')
     sheet_id = os.getenv('GOOGLE_SHEET_ID', '')
-    authorized = os.getenv('AUTHORIZED_CASTERS', '')
+    authorized = os.getenv('AUTHORIZED_CAPSTERS', '')
     
     logger.info(f"📋 Configuration:")
     logger.info(f"   BOT_TOKEN: {'✅ Set' if bot_token else '❌ Empty'}")
     logger.info(f"   SHEET_ID: {'✅ Set' if sheet_id else '❌ Empty'}")
-    logger.info(f"   AUTHORIZED_CASTERS: {'✅ Set' if authorized else '❌ Empty'}")
+    logger.info(f"   AUTHORIZED_CAPSTERS: {'✅ Set' if authorized else '❌ Empty'}")
     
     if not bot_token:
         logger.error("❌ TELEGRAM_BOT_TOKEN is empty in .env")
@@ -66,7 +66,7 @@ def validate_environment():
         return False
     
     if not authorized:
-        logger.error("❌ AUTHORIZED_CASTERS is empty in .env")
+        logger.error("❌ AUTHORIZED_CAPSTERS is empty in .env")
         return False
     
     logger.info("✅ All environment variables configured")
@@ -114,7 +114,7 @@ def main():
         logger.info("\n" + "=" * 60)
         logger.info("✅ Bot initialized successfully!")
         logger.info(f"📝 Bot Name: {settings.BOT_NAME}")
-        logger.info(f"👥 Authorized Users: {len(settings.AUTHORIZED_CASTERS)}")
+        logger.info(f"👥 Authorized Users: {len(settings.AUTHORIZED_CAPSTERS)}")
         logger.info("🔄 Starting polling...")
         logger.info("=" * 60)
         logger.info("\n💡 Bot is now running! Press Ctrl+C to stop.\n")

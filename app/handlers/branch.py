@@ -83,7 +83,7 @@ async def handle_change_branch(update: Update, context: ContextTypes.DEFAULT_TYP
         message = MSG_CURRENT_BRANCH.format(
             branch=branch_name,
             date=today,
-            caster=caster_name
+            capster=caster_name
         )
     else:
         message = "🏢 Anda belum memilih cabang hari ini.\n\nSilakan pilih cabang:"

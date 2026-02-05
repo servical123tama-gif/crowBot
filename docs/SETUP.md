@@ -65,7 +65,7 @@ python run.py
 ```env
 TELEGRAM_BOT_TOKEN=123456789:ABCdef...
 GOOGLE_SHEET_ID=1AbCdEfG...
-AUTHORIZED_CASTERS=123456789,987654321
+AUTHORIZED_CAPSTERS=123456789,987654321
 DEBUG=False
 LOG_LEVEL=INFO
 ```
@@ -75,7 +75,7 @@ LOG_LEVEL=INFO
 1. Chat ke bot **@userinfobot**
 2. Kirim pesan apa saja
 3. Bot akan reply dengan User ID Anda
-4. Tambahkan ke `AUTHORIZED_CASTERS`
+4. Tambahkan ke `AUTHORIZED_CAPSTERS`
 
 ## Testing
 ```bash
@@ -91,7 +91,7 @@ python run.py
 **Bot tidak merespon?**
 - Cek TOKEN benar
 - Pastikan bot running
-- Cek User ID di AUTHORIZED_CASTERS
+- Cek User ID di AUTHORIZED_CAPSTERS
 
 **Error Google Sheets?**
 - Pastikan credentials.json ada

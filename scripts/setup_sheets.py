@@ -15,6 +15,7 @@ from app.config.constants import *
 def setup_sheets():
     """Setup Google Sheets with proper structure"""
     print("=" * 70)
+    print(settings.BOT_NAME)
     print("🔧 SETTING UP GOOGLE SHEETS")
     print("=" * 70)
     
@@ -59,15 +60,15 @@ def setup_sheets():
             # Check if headers exist
             try:
                 headers = transactions_sheet.row_values(1)
-                if headers == ['Date', 'Capster', 'Service', 'Cabang', 'Pembayaran','Jenis_Customer','Price']:
+                if headers == ['Date', 'Capster', 'Service','Price', 'Payment_Method','Branch']:
                     print(f"   ✅ Headers already correct")
                 else:
                     print(f"   ⚠️  Updating headers...")
-                    transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service', 'Cabang', 'Pembayaran','Jenis_Customer','Price']])
+                    transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service','Price', 'Payment_Method','Branch']])
                     print(f"   ✅ Headers updated")
             except:
                 print(f"   ⚠️  Adding headers...")
-                transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service', 'Cabang', 'Pembayaran','Jenis_Customer','Price']])
+                transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service','Price', 'Payment_Method','Branch']])
                 print(f"   ✅ Headers added")
                 
         except gspread.exceptions.WorksheetNotFound:
@@ -78,36 +79,36 @@ def setup_sheets():
                 cols=10
             )
             # Add headers
-            transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service', 'Cabang', 'Pembayaran','Jenis_Customer','Price']])
+            transactions_sheet.update('A1:F1', [['Date', 'Capster', 'Service','Price', 'Payment_Method','Branch']])
             print(f"   ✅ Sheet created with headers")
         
-        # Setup Casters sheet
-        print(f"\n5️⃣  Setting up '{SHEET_CASTERS}' sheet...")
+        # Setup Capsters sheet
+        print(f"\n5️⃣  Setting up '{SHEET_CAPSTERS}' sheet...")
         try:
-            casters_sheet = sheet.worksheet(SHEET_CASTERS)
+            capsters_sheet = sheet.worksheet(SHEET_CAPSTERS)
             print(f"   ℹ️  Sheet already exists")
             
             try:
-                headers = casters_sheet.row_values(1)
+                headers = capsters_sheet.row_values(1)
                 if headers == ['Name', 'Telegram_ID', 'Status', 'Join_Date']:
                     print(f"   ✅ Headers already correct")
                 else:
                     print(f"   ⚠️  Updating headers...")
-                    casters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
+                    capsters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
                     print(f"   ✅ Headers updated")
             except:
                 print(f"   ⚠️  Adding headers...")
-                casters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
+                capsters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
                 print(f"   ✅ Headers added")
                 
         except gspread.exceptions.WorksheetNotFound:
             print(f"   📝 Creating new sheet...")
-            casters_sheet = sheet.add_worksheet(
-                title=SHEET_CASTERS,
+            capsters_sheet = sheet.add_worksheet(
+                title=SHEET_CAPSTERS,
                 rows=100,
                 cols=5
             )
-            casters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
+            capsters_sheet.update('A1:D1', [['Name', 'Telegram_ID', 'Status', 'Join_Date']])
             print(f"   ✅ Sheet created with headers")
         
         # Setup Summary sheet
@@ -139,6 +140,35 @@ def setup_sheets():
             )
             summary_sheet.update('A1:E1', [['Period', 'Type', 'Total_Transactions', 'Total_Revenue', 'Generated_Date']])
             print(f"   ✅ Sheet created with headers")
+
+        # Setup Customers sheet
+        print(f"\n7️⃣  Setting up '{SHEET_CUSTOMERS}' sheet...")
+        try:
+            customers_sheet = sheet.worksheet(SHEET_CUSTOMERS)
+            print(f"   ℹ️  Sheet already exists")
+            
+            try:
+                headers = customers_sheet.row_values(1)
+                if headers == ['Name', 'Phone']:
+                    print(f"   ✅ Headers already correct")
+                else:
+                    print(f"   ⚠️  Updating headers...")
+                    customers_sheet.update('A1:B1', [['Name', 'Phone']])
+                    print(f"   ✅ Headers updated")
+            except:
+                print(f"   ⚠️  Adding headers...")
+                customers_sheet.update('A1:B1', [['Name', 'Phone']])
+                print(f"   ✅ Headers added")
+                
+        except gspread.exceptions.WorksheetNotFound:
+            print(f"   📝 Creating new sheet...")
+            customers_sheet = sheet.add_worksheet(
+                title=SHEET_CUSTOMERS,
+                rows=1000,
+                cols=5
+            )
+            customers_sheet.update('A1:B1', [['Name', 'Phone']])
+            print(f"   ✅ Sheet created with headers")
         
         # Summary
         print("\n" + "=" * 70)
@@ -149,9 +179,10 @@ def setup_sheets():
         print(f"   Sheet Name: {sheet.title}")
         print(f"   URL: https://docs.google.com/spreadsheets/d/{settings.GOOGLE_SHEET_ID}")
         print(f"\n📋 Worksheets created:")
-        print(f"   1. {SHEET_TRANSACTIONS} (Date, Caster, Service, Price)")
-        print(f"   2. {SHEET_CASTERS} (Name, Telegram_ID, Status, Join_Date)")
+        print(f"   1. {SHEET_TRANSACTIONS} (Date, Capster, Service, Price)")
+        print(f"   2. {SHEET_CAPSTERS} (Name, Telegram_ID, Status, Join_Date)")
         print(f"   3. {SHEET_SUMMARY} (Period, Type, Total_Transactions, Total_Revenue, Generated_Date)")
+        print(f"   4. {SHEET_CUSTOMERS} (Name, Phone)")
         print("\n💡 Your bot is now ready to save transactions!")
         print("=" * 70)
         

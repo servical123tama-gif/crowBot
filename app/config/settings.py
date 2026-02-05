@@ -3,10 +3,11 @@ Configuration Management
 """
 import os
 from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Settings:
-    """Application settings"""
-    
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv('TELEGRAM_BOT_TOKEN', '')
     BOT_NAME: str = os.getenv('BOT_NAME', 'BarbershopBot')
@@ -17,17 +18,17 @@ class Settings:
     CREDENTIALS_FILE: str = 'credentials.json'
     
     # Authorization - All users
-    _authorized_casters_raw = os.getenv('AUTHORIZED_CASTERS', '')
-    AUTHORIZED_CASTERS: List[int] = []
+    _authorized_capsters_raw = os.getenv('AUTHORIZED_CAPSTERS', '')
+    AUTHORIZED_CAPSTERS: List[int] = []
     
-    if _authorized_casters_raw:
+    if _authorized_capsters_raw:
         try:
-            AUTHORIZED_CASTERS = [
-                int(uid.strip()) for uid in _authorized_casters_raw.split(',') 
+            AUTHORIZED_CAPSTERS = [
+                int(uid.strip()) for uid in _authorized_capsters_raw.split(',') 
                 if uid.strip()
             ]
         except ValueError as e:
-            print(f"Warning: Error parsing AUTHORIZED_CASTERS: {e}")
+            logger.warning(f"Error parsing AUTHORIZED_CAPSTERS: {e}")
     
     # Owner IDs - Full access
     _owner_ids_raw = os.getenv('OWNER_IDS', '')
@@ -40,7 +41,7 @@ class Settings:
                 if uid.strip()
             ]
         except ValueError as e:
-            print(f"Warning: Error parsing OWNER_IDS: {e}")
+            logger.warning(f"Error parsing OWNER_IDS: {e}")
     
     # Admin IDs - Can view all reports
     _admin_ids_raw = os.getenv('ADMIN_IDS', '')
@@ -53,7 +54,7 @@ class Settings:
                 if uid.strip()
             ]
         except ValueError as e:
-            print(f"Warning: Error parsing ADMIN_IDS: {e}")
+            logger.warning(f"Error parsing ADMIN_IDS: {e}")
     
     # Application
     DEBUG: bool = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -71,8 +72,8 @@ class Settings:
         if not self.GOOGLE_SHEET_ID:
             raise ValueError("GOOGLE_SHEET_ID is required!")
         
-        if not self.AUTHORIZED_CASTERS:
-            raise ValueError("No authorized casters configured!")
+        if not self.AUTHORIZED_CAPSTERS:
+            raise ValueError("No authorized capsters configured!")
         
         if not os.path.exists(self.CREDENTIALS_FILE):
             raise FileNotFoundError(f"{self.CREDENTIALS_FILE} not found!")

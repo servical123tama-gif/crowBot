@@ -24,8 +24,8 @@ class ReportSummary:
         }
 
 @dataclass
-class CasterPerformance:
-    """Caster performance data"""
+class CapsterPerformance:
+    """Capster performance data"""
     name: str
     total_services: int
     total_revenue: float

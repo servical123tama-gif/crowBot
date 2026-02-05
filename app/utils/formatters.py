@@ -33,7 +33,7 @@ class Formatter:
             price=data['price'],
             payment_method=data['payment_method'],
             branch=data['branch'],
-            caster=data['caster'],
+            capster=data['capster'],
             time=Formatter.format_time(data['time'])
         )
     

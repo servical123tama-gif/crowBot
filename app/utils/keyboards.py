@@ -2,8 +2,17 @@
 Keyboard Builders
 """
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from app.config.constants import *
+from app.config.constants import (
+    CB_ADD_TRANSACTION, CB_CHANGE_BRANCH, CB_CUSTOMER_MENU, CB_REPORT_DAILY_CAPSTER,
+    CB_REPORT_WEEKLY_CAPSTER, CB_REPORT_MONTHLY_CAPSTER, CB_REPORT_DAILY,
+    CB_REPORT_WEEKLY_BREAKDOWN, CB_REPORT_MONTHLY, CB_REPORT_PROFIT,
+    CB_LIST_CUSTOMERS, CB_ADD_CUSTOMER, CB_BRANCH, CB_SERVICE_MAIN,
+    CB_COLORING_MENU, CB_SERVICE_COLORING, CB_PAYMENT, CB_BACK_SERVICE,
+    CB_BACK_MAIN, CB_WEEK_SELECT,
+    BRANCHES, SERVICES_MAIN, SERVICES_COLORING, PAYMENT_METHODS
+)
 from app.services.auth_service import AuthService
+from datetime import datetime, timedelta
 
 class KeyboardBuilder:
     """Build inline keyboards"""
@@ -14,6 +23,7 @@ class KeyboardBuilder:
         keyboard = [
             [InlineKeyboardButton("➕ Tambah Transaksi", callback_data=CB_ADD_TRANSACTION)],
             [InlineKeyboardButton("🔄 Ganti Cabang", callback_data=CB_CHANGE_BRANCH)],
+            [InlineKeyboardButton("👤 Menu Pelanggan", callback_data=CB_CUSTOMER_MENU)],
             [InlineKeyboardButton("📋 Lihat Laporan", callback_data=CB_REPORT_DAILY_CAPSTER)],
             [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY_CAPSTER)],
             [InlineKeyboardButton("📅 Laporan Bulanan", callback_data=CB_REPORT_MONTHLY_CAPSTER)]
@@ -24,7 +34,9 @@ class KeyboardBuilder:
             keyboard = (
                 [InlineKeyboardButton("📊 Laporan Harian", callback_data=CB_REPORT_DAILY)],
                 [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY_BREAKDOWN)],
-                [InlineKeyboardButton("📅 Laporan Bulanan 👑", callback_data=CB_REPORT_MONTHLY)],
+                [InlineKeyboardButton("📅 Laporan Bulanan ", callback_data=CB_REPORT_MONTHLY)],
+                [InlineKeyboardButton("💰 Laporan Profit", callback_data=CB_REPORT_PROFIT)],
+                [InlineKeyboardButton("👤 Menu Pelanggan", callback_data=CB_CUSTOMER_MENU)],
                 
             )
         
@@ -74,6 +86,7 @@ class KeyboardBuilder:
         for service_id, service_data in SERVICES_MAIN.items():
             name = service_data['name']
             price = service_data['price']
+            service_id = service_id
             callback = f"{CB_SERVICE_MAIN}_{service_id}"
             
             button_text = f"{name} - Rp {price:,}"
@@ -127,4 +140,52 @@ class KeyboardBuilder:
     def back_button() -> InlineKeyboardMarkup:
         """Back to main menu button"""
         keyboard = [[InlineKeyboardButton("🔙 Kembali ke Menu", callback_data=CB_BACK_MAIN)]]
+        return InlineKeyboardMarkup(keyboard)
+
+    @staticmethod
+    def customer_menu(user_id: int) -> InlineKeyboardMarkup:
+        """Customer menu keyboard - Dynamic based on user role"""
+        keyboard = []
+        if AuthService.is_owner_or_admin(user_id):
+            keyboard.append([InlineKeyboardButton("👥 Daftar Pelanggan", callback_data=CB_LIST_CUSTOMERS)])
+        else:
+            keyboard.append([InlineKeyboardButton("➕ Tambah Pelanggan", callback_data=CB_ADD_CUSTOMER)])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Kembali ke Menu Utama", callback_data=CB_BACK_MAIN)])
+        
+        return InlineKeyboardMarkup(keyboard)
+
+    @staticmethod
+    def monthly_navigation_keyboard(current_year: int, current_month: int, report_type_prefix: str) -> InlineKeyboardMarkup:
+        """
+        Generates navigation buttons for monthly reports (Previous/Main Menu/Next).
+        report_type_prefix should be CB_MONTHLY_NAV or CB_PROFIT_NAV.
+        """
+        
+        # Calculate previous month
+        prev_month_date = datetime(current_year, current_month, 1) - timedelta(days=1)
+        prev_year = prev_month_date.year
+        prev_month = prev_month_date.month
+        
+        # Calculate next month
+        if current_month == 12:
+            next_month_date = datetime(current_year + 1, 1, 1)
+        else:
+            next_month_date = datetime(current_year, current_month + 1, 1)
+        next_year = next_month_date.year
+        next_month = next_month_date.month
+        
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "⬅️ Sebelumnya", 
+                    callback_data=f"{report_type_prefix}_{prev_year}_{prev_month}"
+                ),
+                InlineKeyboardButton("🏠 Menu Utama", callback_data=CB_BACK_MAIN),
+                InlineKeyboardButton(
+                    "Berikutnya ➡️", 
+                    callback_data=f"{report_type_prefix}_{next_year}_{next_month}"
+                )
+            ]
+        ]
         return InlineKeyboardMarkup(keyboard)

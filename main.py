@@ -4,13 +4,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from app.config.settings import settings
+
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
 
 # Setup logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
+    level=settings.LOG_LEVEL.upper(),
     handlers=[
         logging.FileHandler('logs/bot.log', encoding='utf-8'),
         logging.StreamHandler()

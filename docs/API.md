@@ -10,7 +10,7 @@ sheets = SheetsService()
 
 # Add transaction
 transaction = Transaction(
-    caster="John",
+    capster="John",
     service="Potong Rambut",
     price=35000
 )
@@ -55,7 +55,7 @@ from app.models.transaction import Transaction
 from datetime import datetime
 
 trans = Transaction(
-    caster="Jane",
+    capster="Jane",
     service="Styling",
     price=50000,
     date=datetime.now()

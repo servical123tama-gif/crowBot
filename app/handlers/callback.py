@@ -15,12 +15,14 @@ from app.handlers.report import (
     handle_daily_report,
     handle_weekly_report,
     handle_monthly_report,
+    handle_profit_report,
     handle_capster_weekly_report,
     handle_capster_daily_report,
     handle_capster_monthly_report,
     handle_week_detail,
     handle_weekly_breakdown,
 )
+from app.handlers.customer import customer_menu_handler, list_customers_handler
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"Callback from user {user_id}: {data}")
     
-    #Branch selection
+    # Branch selection
     if data.startswith(CB_BRANCH):
         branch_id = data.replace(f"{CB_BRANCH}_", "")
         await handle_branch_selection(update, context, branch_id)
@@ -42,6 +44,13 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Change branch
     elif data == CB_CHANGE_BRANCH:
         await handle_change_branch(update, context)
+
+    # Customer Menu
+    elif data == CB_CUSTOMER_MENU:
+        await customer_menu_handler(update, context)
+
+    elif data == CB_LIST_CUSTOMERS:
+        await list_customers_handler(update, context)
     
     # Add transaction - Show service menu
     elif data == CB_ADD_TRANSACTION:
@@ -104,7 +113,28 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == CB_REPORT_MONTHLY:
         await handle_monthly_report(update, context)
-        
+    
+    elif data == CB_REPORT_PROFIT:
+        await handle_profit_report(update, context)
+    
+    elif data.startswith(CB_MONTHLY_NAV):
+        # Format: CB_MONTHLY_NAV_YYYY_MM
+        parts = data.replace(f"{CB_MONTHLY_NAV}_", "").split("_")
+        if len(parts) == 2:
+            year, month = int(parts[0]), int(parts[1])
+            await handle_monthly_report(update, context, year, month)
+        else:
+            await query.answer("⚠️ Format navigasi bulanan tidak valid")
+    
+    elif data.startswith(CB_PROFIT_NAV):
+        # Format: CB_PROFIT_NAV_YYYY_MM
+        parts = data.replace(f"{CB_PROFIT_NAV}_", "").split("_")
+        if len(parts) == 2:
+            year, month = int(parts[0]), int(parts[1])
+            await handle_profit_report(update, context, year, month)
+        else:
+            await query.answer("⚠️ Format navigasi profit bulanan tidak valid")
+    
     elif data == CB_REPORT_DAILY_CAPSTER:
         await handle_capster_daily_report(update, context)
     

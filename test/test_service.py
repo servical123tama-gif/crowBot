@@ -9,12 +9,12 @@ from app.services.auth_service import AuthService
 def test_transaction_creation():
     """Test transaction model creation"""
     trans = Transaction(
-        caster="John",
+        capster="John",
         service="Potong Rambut",
         price=35000
     )
     
-    assert trans.caster == "John"
+    assert trans.capster == "John"
     assert trans.service == "Potong Rambut"
     assert trans.price == 35000
     assert trans.date is not None
@@ -27,14 +27,14 @@ def test_auth_service():
 def test_transaction_to_dict():
     """Test transaction conversion to dict"""
     trans = Transaction(
-        caster="Jane",
+        capster="Jane",
         service="Styling",
         price=50000,
         date=datetime.now()
     )
     
     data = trans.to_dict()
-    assert 'caster' in data
+    assert 'capster' in data
     assert 'service' in data
     assert 'price' in data
-    assert data['caster'] == "Jane"
+    assert data['capster'] == "Jane"

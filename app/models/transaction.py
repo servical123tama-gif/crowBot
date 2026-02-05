@@ -8,7 +8,7 @@ from typing import Optional
 @dataclass
 class Transaction:
     """Transaction data model"""
-    caster: str
+    capster: str
     service: str
     price: float
     payment_method : Optional[str] = "Cash"
@@ -22,7 +22,7 @@ class Transaction:
     def to_dict(self):
         """Convert to dictionary"""
         return {
-            'caster': self.caster,
+            'capster': self.capster,
             'service': self.service,
             'price': self.price,
             'date': self.date,
@@ -31,4 +31,4 @@ class Transaction:
         }
     
     def __str__(self):
-        return f"Transaction({self.caster}, {self.service}, {self.price}, {self.branch}, {self.payment_method}, {self.date})"
+        return f"Transaction({self.capster}, {self.service}, {self.price}, {self.branch}, {self.payment_method}, {self.date})"

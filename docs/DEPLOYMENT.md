@@ -61,7 +61,7 @@ sudo systemctl status barbershop-bot
 4. Setup Secrets:
    - `TELEGRAM_BOT_TOKEN`
    - `GOOGLE_SHEET_ID`
-   - `AUTHORIZED_CASTERS`
+   - `AUTHORIZED_CAPSTERS`
 5. Upload `credentials.json` via Files
 6. Klik Run
 
