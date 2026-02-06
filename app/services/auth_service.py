@@ -50,7 +50,9 @@ class AuthService:
     @classmethod
     def is_owner_or_admin(cls, user_id: int) -> bool:
         """Check if user is owner or admin"""
-        return cls.is_owner(user_id) or cls.is_admin(user_id)
+        is_owner_admin = user_id in cls._owner_ids or user_id in cls._admin_ids
+        logger.debug(f"Checking role for user_id: {user_id}. Is Owner/Admin: {is_owner_admin}. Owners: {cls._owner_ids}, Admins: {cls._admin_ids}")
+        return is_owner_admin
     
     @classmethod
     def get_user_role(cls, user_id: int) -> str:

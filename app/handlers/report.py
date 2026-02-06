@@ -172,6 +172,26 @@ async def handle_profit_report(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard = KeyboardBuilder.back_button()
         
     await safe_edit_message(query, report, reply_markup=keyboard)
+
+
+@handle_errors
+@require_owner_or_admin
+async def handle_stock_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle stock report request - Owner/Admin only"""
+    query = update.callback_query
+    await query.answer()
+
+    await safe_edit_message(query, "⏳ Memuat laporan stok produk...")
+
+    try:
+        report_service = context.bot_data['report_service']
+        report = report_service.generate_stock_report()
+    except Exception as e:
+        logger.error(f"Failed to generate stock report: {e}", exc_info=True)
+        report = "❌ Gagal membuat laporan stok. Silakan coba lagi."
+        
+    keyboard = KeyboardBuilder.back_button() # Assuming a back button is sufficient for stock report
+    await safe_edit_message(query, report, reply_markup=keyboard)
     
     
 # REPORT FOR CAPSTER 

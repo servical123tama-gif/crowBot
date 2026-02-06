@@ -1,5 +1,5 @@
  Ide Prioritas (Berdasarkan Struktur Baru)
-
+5e2bb1eb-0f15-4973-9b19-e00184d62965
    1. Laporan Profit Lintas Bulan & Tahunan:
        * Apa: Buat perintah baru (misal: /laporan_tahunan) yang mengakumulasi pendapatan dan biaya dari semua sheet bulanan di tahun tertentu untuk menghasilkan laporan profit tahunan.       
        * Kenapa: Ini memberikan gambaran performa bisnis dalam skala besar (makro) dan sangat berguna untuk perencanaan strategis.
@@ -12,21 +12,17 @@
         *Answer :* 
         Berikut adalah rencana langkah-langkah untuk mengimplementasikan navigasi laporan bulanan (pendapatan dan profit):
 
-
         1. Tambahkan Konstanta Callback Baru:
             * Di app/config/constants.py, tambahkan konstanta baru untuk callback "bulan sebelumnya" dan "bulan berikutnya" untuk laporan bulanan pendapatan dan laporan profit bulanan. Ini akan   
                 memungkinkan kita untuk mengidentifikasi aksi navigasi dari tombol.
-
 
         2. Modifikasi Metode Laporan di `ReportService`:
             * Ubah generate_monthly_report dan generate_monthly_profit_report di app/services/report_service.py agar dapat menerima parameter year dan month. Saat ini, mereka selalu menggunakan   
                 bulan dan tahun sekarang.
 
-
         3. Buat Keyboard Navigasi di `KeyboardBuilder`:
             * Buat metode baru di app/utils/keyboards.py yang akan menghasilkan InlineKeyboardMarkup dengan tombol "⬅️ Sebelumnya", "🏠 Menu Utama", dan "Berikutnya ➡️". Callback data untuk tombol
                 "Sebelumnya" dan "Berikutnya" akan menyertakan bulan dan tahun yang relevan.
-
 
         4. Perbarui Handler Laporan di `app/handlers/report.py`:
             * Modifikasi handle_monthly_report dan handle_profit_report untuk:
@@ -35,7 +31,6 @@
                 * Menggunakan metode KeyboardBuilder yang baru untuk menampilkan tombol navigasi bersama laporan.
             * Kita juga perlu penanganan khusus untuk callback navigasi (misal: CB_MONTHLY_PREV, CB_PROFIT_NEXT) yang akan mengurai year dan month dari callback data, lalu memanggil ulang handler 
                 laporan dengan parameter tersebut.
-
 
         5. Perbarui `callback_router` di `app/handlers/callback.py`:
             * Tambahkan logika untuk mengarahkan callback data baru (untuk navigasi bulan) ke handler handle_monthly_report atau handle_profit_report yang sesuai, dengan mengurai year dan month   
@@ -53,10 +48,8 @@
             5. `app/handlers/callback.py`: callback_router diperbarui untuk mengenali callback CB_MONTHLY_NAV dan CB_PROFIT_NAV, mengurai tahun dan bulan dari data callback, lalu memanggil handler
                 laporan yang sesuai dengan parameter tersebut.
 
-       
 
-
-   3. Perbandingan Performa Bulanan:
+   3. Perbandingan Performa Bulanan:[]
        * Apa: Di dalam laporan bulanan, tambahkan ringkasan performa dibandingkan bulan sebelumnya. Contoh: "Pendapatan naik 15% dari bulan lalu", "Profit turun 5% dari bulan lalu".
        * Kenapa: Memberikan konteks instan terhadap data. Owner bisa langsung tahu apakah performa bulan ini lebih baik atau lebih buruk.
 

@@ -6,8 +6,8 @@ SHEET_CUSTOMERS = 'Customers'
 
 # Services & Prices - Main Services
 SERVICES_MAIN = {
-    'potong': {'name': 'Potong Rambut', 'price': 25000},
-    'potongcuci': {'name': 'Potong + Cuci', 'price': 30000},
+    'Potong': {'name': 'Potong Rambut', 'price': 25000},
+    'PotongCuci': {'name': 'Potong + Cuci', 'price': 30000},
     'PotongAnak' : {'name': 'Potong Anak', 'price': 20000},
     'PotongAnakCuci' : {'name': 'Potong & Cuci Anak', 'price': 25000},
     'PotongBapakAnak': {'name': 'Potong Bapak & Anak', 'price': 40000},
@@ -15,10 +15,10 @@ SERVICES_MAIN = {
 
 # Coloring Services - Sub Menu
 SERVICES_COLORING = {
-    'coloring_highlights': {'name': 'Highlights', 'price': 60000},
-    'coloring_full': {'name': 'Full Color', 'price': 200000},
-    'clack_color': {'name': 'Black', 'price': 40000},
-    'coloring_bleaching': {'name': 'Bleaching', 'price': 45000},
+    'ColoringHighlights': {'name': 'Highlights', 'price': 60000},
+    'ColoringFull': {'name': 'Full Color', 'price': 200000},
+    'BlackColor': {'name': 'Black', 'price': 40000},
+    'ColoringBleaching': {'name': 'Bleaching', 'price': 45000},
 }
 
 METHOD_PAY = {
@@ -57,6 +57,8 @@ CB_BRANCH = 'branch'
 CB_CHANGE_BRANCH = 'change_branch'
 CB_MONTHLY_NAV = 'monthly_nav'
 CB_PROFIT_NAV = 'profit_nav'
+
+
 
 #repot weekly
 CB_REPORT_WEEKLY_BREAKDOWN = 'report_weekly_breakdown'

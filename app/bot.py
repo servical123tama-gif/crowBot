@@ -12,6 +12,7 @@ from app.handlers.start import start_handler
 from app.handlers.callback import callback_router
 from app.handlers.customer import add_customer_conv_handler
 
+
 logger = logging.getLogger(__name__)
 
 class BarbershopBot:

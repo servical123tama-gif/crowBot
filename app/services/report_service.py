@@ -448,6 +448,10 @@ class ReportService:
         }
         return translation.get(english_day, english_day)
     
+
+
+
+    
     def generate_monthly_report(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
         """Generate monthly report for a specific month and year"""
         logger.info(f"Generating monthly report for {month}/{year}")
@@ -701,6 +705,8 @@ class ReportService:
             logger.error(f"Failed to generate monthly profit DataFrame for {month}/{year}: {e}", exc_info=True)
             return pd.DataFrame()
 
+
+
     """""
     ## 🎯 **Contoh Output Laporan Mingguan Baru**
 
@@ -834,7 +840,6 @@ class ReportService:
             report += "Layanan Terpopuler:\n"
             for idx, (service, count) in enumerate(top_services.items(), 1):
                 report += f"  {idx}. {service}: {count}x\n"
-            
             
             # Daily breakdown
             daily_totals = df_capster.groupby(df_capster['Date'].dt.date)['Price'].agg(['sum', 'count'])

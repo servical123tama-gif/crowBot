@@ -4,6 +4,8 @@ Helper Functions
 import logging
 from telegram import Update
 from telegram.error import BadRequest
+from typing import Optional
+from telegram.ext import ContextTypes # Add this import at the top
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +80,7 @@ def get_kapster_info(username):
     print("DEBUG get_kapster_info: normalized username =", username_clean)
 
     return username_clean
+
+def get_current_branch_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+    """Retrieves the current branch ID for a user from context.user_data."""
+    return context.user_data.get('branch_id')

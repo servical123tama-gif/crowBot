@@ -20,27 +20,28 @@ class KeyboardBuilder:
     @staticmethod
     def main_menu(user_id: int = None) -> InlineKeyboardMarkup:
         """Main menu keyboard - Dynamic based on user role"""
-        keyboard = [
+        # Base keyboard for all authenticated users (capsters)
+        keyboard_rows = [
             [InlineKeyboardButton("➕ Tambah Transaksi", callback_data=CB_ADD_TRANSACTION)],
             [InlineKeyboardButton("🔄 Ganti Cabang", callback_data=CB_CHANGE_BRANCH)],
             [InlineKeyboardButton("👤 Menu Pelanggan", callback_data=CB_CUSTOMER_MENU)],
-            [InlineKeyboardButton("📋 Lihat Laporan", callback_data=CB_REPORT_DAILY_CAPSTER)],
-            [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY_CAPSTER)],
-            [InlineKeyboardButton("📅 Laporan Bulanan", callback_data=CB_REPORT_MONTHLY_CAPSTER)]
+            [InlineKeyboardButton("📋 Laporan Harian Saya", callback_data=CB_REPORT_DAILY_CAPSTER)],
+            [InlineKeyboardButton("📈 Laporan Mingguan Saya", callback_data=CB_REPORT_WEEKLY_CAPSTER)],
+            [InlineKeyboardButton("📅 Laporan Bulanan Saya", callback_data=CB_REPORT_MONTHLY_CAPSTER)]
         ]
         
-        # Tampilkan laporan bulanan hanya untuk owner/admin
+        # Add owner/admin specific options
         if user_id and AuthService.is_owner_or_admin(user_id):
-            keyboard = (
-                [InlineKeyboardButton("📊 Laporan Harian", callback_data=CB_REPORT_DAILY)],
-                [InlineKeyboardButton("📈 Laporan Mingguan", callback_data=CB_REPORT_WEEKLY_BREAKDOWN)],
-                [InlineKeyboardButton("📅 Laporan Bulanan ", callback_data=CB_REPORT_MONTHLY)],
-                [InlineKeyboardButton("💰 Laporan Profit", callback_data=CB_REPORT_PROFIT)],
-                [InlineKeyboardButton("👤 Menu Pelanggan", callback_data=CB_CUSTOMER_MENU)],
-                
-            )
+            # Append general reports and other admin options
+            keyboard_rows = []
+            keyboard_rows.append([InlineKeyboardButton("📊 Laporan Harian Umum", callback_data=CB_REPORT_DAILY)])
+            keyboard_rows.append([InlineKeyboardButton("📈 Laporan Mingguan Umum", callback_data=CB_REPORT_WEEKLY_BREAKDOWN)])
+            keyboard_rows.append([InlineKeyboardButton("📅 Laporan Bulanan Umum", callback_data=CB_REPORT_MONTHLY)])
+            keyboard_rows.append([InlineKeyboardButton("💰 Laporan Profit", callback_data=CB_REPORT_PROFIT)])
+            # Manajemen Stok Produk akan dihapus karena fiturnya di-revert
+            # keyboard_rows.append([InlineKeyboardButton("📦 Manajemen Stok Produk", callback_data=CB_STOCK_MENU)]) # This button will be removed now
         
-        return InlineKeyboardMarkup(keyboard)
+        return InlineKeyboardMarkup(keyboard_rows)
     
     @staticmethod
     def week_selection_menu(year: int, month: int) -> InlineKeyboardMarkup:

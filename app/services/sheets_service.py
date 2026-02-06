@@ -294,6 +294,8 @@ class SheetsService:
             logger.error(f"Failed to get transactions for month {year}-{month}: {e}")
             return pd.DataFrame()
 
+
+
     def add_customer(self, customer: 'Customer') -> bool:
         """Add a new customer to the Customers sheet."""
         try:
