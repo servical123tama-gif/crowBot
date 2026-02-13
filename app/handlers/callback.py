@@ -29,138 +29,70 @@ logger = logging.getLogger(__name__)
 @handle_errors
 @require_auth
 async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Route callback queries to appropriate handlers"""
+    """Route callback queries to appropriate handlers using a dispatch dictionary."""
     query = update.callback_query
     data = query.data
     user_id = query.from_user.id
     
     logger.info(f"Callback from user {user_id}: {data}")
-    
-    # Branch selection
-    if data.startswith(CB_BRANCH):
-        branch_id = data.replace(f"{CB_BRANCH}_", "")
-        await handle_branch_selection(update, context, branch_id)
-    
-    # Change branch
-    elif data == CB_CHANGE_BRANCH:
-        await handle_change_branch(update, context)
 
-    # Customer Menu
-    elif data == CB_CUSTOMER_MENU:
-        await customer_menu_handler(update, context)
-
-    elif data == CB_LIST_CUSTOMERS:
-        await list_customers_handler(update, context)
-    
-    # Add transaction - Show service menu
-    elif data == CB_ADD_TRANSACTION:
-        # Check if user has set branch today
-        if not BranchService.has_branch_today(user_id):
-            await show_branch_selection(update = update, context=context, is_first_time=True)
-            return
-        
-        await query.answer()
-        keyboard = KeyboardBuilder.service_menu()
-        await query.edit_message_text(
-            "📋 Pilih layanan:",
-            reply_markup=keyboard
-        )
-    
-    # Main service selection → Show payment menu
-    elif data.startswith(CB_SERVICE_MAIN):
-        service_id = data.replace(f"{CB_SERVICE_MAIN}_", "")
-        await handle_service_selection(update, context, service_id)
-    
-    # Show coloring submenu
-    elif data == CB_COLORING_MENU:
-        await query.answer()
-        keyboard = KeyboardBuilder.coloring_menu()
-        await query.edit_message_text(
+    # --- Handler Mappings ---
+    # Exact matches are checked first, then prefixes.
+    EXACT_HANDLERS = {
+        CB_CHANGE_BRANCH: handle_change_branch,
+        CB_CUSTOMER_MENU: customer_menu_handler,
+        CB_LIST_CUSTOMERS: list_customers_handler,
+        CB_COLORING_MENU: lambda u, c: u.callback_query.edit_message_text(
             "🎨 Pilih layanan Coloring:",
-            reply_markup=keyboard
-        )
-    
-    # Coloring service selection → Show payment menu
-    elif data.startswith(CB_SERVICE_COLORING):
-        service_id = data.replace(f"{CB_SERVICE_COLORING}_", "")
-        await handle_service_selection(update, context, service_id)
-    
-    # Payment selection → Save transaction
-    elif data.startswith(CB_PAYMENT):
-        # Format: payment_<service_id>_<payment_id>
-        parts = data.replace(f"{CB_PAYMENT}_", "").split("_", 1)
-        if len(parts) == 2:
-            service_id, payment_id = parts
-            await handle_payment_selection(update, context, service_id, payment_id)
-        else:
-            await query.answer("⚠️ Format callback tidak valid")
-    
-    # Back to service menu
-    elif data == CB_BACK_SERVICE:
-        await query.answer()
-        keyboard = KeyboardBuilder.service_menu()
-        await query.edit_message_text(
+            reply_markup=KeyboardBuilder.coloring_menu()
+        ),
+        CB_BACK_SERVICE: lambda u, c: u.callback_query.edit_message_text(
             "📋 Pilih layanan:",
-            reply_markup=keyboard
-        )
-    
-    # Reports
-    elif data == CB_REPORT_DAILY:
-        await handle_daily_report(update, context)
-    
-    elif data == CB_REPORT_WEEKLY:
-        await handle_weekly_report(update, context)
-    
-    elif data == CB_REPORT_MONTHLY:
-        await handle_monthly_report(update, context)
-    
-    elif data == CB_REPORT_PROFIT:
-        await handle_profit_report(update, context)
-    
-    elif data.startswith(CB_MONTHLY_NAV):
-        # Format: CB_MONTHLY_NAV_YYYY_MM
-        parts = data.replace(f"{CB_MONTHLY_NAV}_", "").split("_")
-        if len(parts) == 2:
-            year, month = int(parts[0]), int(parts[1])
-            await handle_monthly_report(update, context, year, month)
+            reply_markup=KeyboardBuilder.service_menu()
+        ),
+        CB_REPORT_DAILY: handle_daily_report,
+        CB_REPORT_WEEKLY: handle_weekly_report,
+        CB_REPORT_MONTHLY: handle_monthly_report,
+        CB_REPORT_PROFIT: handle_profit_report,
+        CB_REPORT_DAILY_CAPSTER: handle_capster_daily_report,
+        CB_REPORT_WEEKLY_CAPSTER: handle_capster_weekly_report,
+        CB_REPORT_MONTHLY_CAPSTER: handle_capster_monthly_report,
+        CB_REPORT_WEEKLY_BREAKDOWN: handle_weekly_breakdown,
+        CB_BACK_MAIN: lambda u, c: u.callback_query.edit_message_text(
+            "Silakan pilih menu:",
+            reply_markup=KeyboardBuilder.main_menu(user_id=u.effective_user.id)
+        ),
+    }
+
+    PREFIX_HANDLERS = {
+        CB_BRANCH: lambda u, c, d: handle_branch_selection(u, c, d.replace(f"{CB_BRANCH}_", "")),
+        CB_SERVICE_MAIN: lambda u, c, d: handle_service_selection(u, c, d.replace(f"{CB_SERVICE_MAIN}_", "")),
+        CB_SERVICE_COLORING: lambda u, c, d: handle_service_selection(u, c, d.replace(f"{CB_SERVICE_COLORING}_", "")),
+        CB_PAYMENT: lambda u, c, d: handle_payment_selection(u, c, *d.replace(f"{CB_PAYMENT}_", "").split("_", 1)),
+        CB_MONTHLY_NAV: lambda u, c, d: handle_monthly_report(u, c, *map(int, d.replace(f"{CB_MONTHLY_NAV}_", "").split("_"))),
+        CB_PROFIT_NAV: lambda u, c, d: handle_profit_report(u, c, *map(int, d.replace(f"{CB_PROFIT_NAV}_", "").split("_"))),
+        CB_WEEK_SELECT: lambda u, c, d: handle_week_detail(u, c, *map(int, d.replace(f"{CB_WEEK_SELECT}_", "").split("_"))),
+    }
+
+    # --- Special Case: Add Transaction (requires pre-check) ---
+    if data == CB_ADD_TRANSACTION:
+        if not BranchService.has_branch_today(user_id):
+            await show_branch_selection(update=update, context=context, is_first_time=True)
         else:
-            await query.answer("⚠️ Format navigasi bulanan tidak valid")
-    
-    elif data.startswith(CB_PROFIT_NAV):
-        # Format: CB_PROFIT_NAV_YYYY_MM
-        parts = data.replace(f"{CB_PROFIT_NAV}_", "").split("_")
-        if len(parts) == 2:
-            year, month = int(parts[0]), int(parts[1])
-            await handle_profit_report(update, context, year, month)
-        else:
-            await query.answer("⚠️ Format navigasi profit bulanan tidak valid")
-    
-    elif data == CB_REPORT_DAILY_CAPSTER:
-        await handle_capster_daily_report(update, context)
-    
-    elif data == CB_REPORT_WEEKLY_CAPSTER:
-        await handle_capster_weekly_report(update, context)
-        
-    elif data == CB_REPORT_MONTHLY_CAPSTER:
-        await handle_capster_monthly_report(update, context)
-    
-    # Back to main menu
-    elif data == CB_BACK_MAIN:
-        await query.answer()
-        keyboard = KeyboardBuilder.main_menu(user_id=user_id)
-        await query.edit_message_text("Silakan pilih menu:", reply_markup=keyboard)
-    
-    elif data == CB_REPORT_WEEKLY_BREAKDOWN:
-        await handle_weekly_breakdown(update, context)
-    
-    # Week detail selection
-    elif data.startswith(CB_WEEK_SELECT):
-        # Format: week_select_YYYY_MM_W
-        parts = data.replace(f"{CB_WEEK_SELECT}_", "").split("_")
-        if len(parts) == 3:
-            year, month, week_num = int(parts[0]), int(parts[1]), int(parts[2])
-            await handle_week_detail(update, context, year, month, week_num)
-    
-    else:
-        await query.answer("⚠️ Aksi tidak dikenal")
-        logger.warning(f"Unknown callback data: {data}")
+            await query.answer()
+            await query.edit_message_text("📋 Pilih layanan:", reply_markup=KeyboardBuilder.service_menu())
+        return
+
+    # --- Routing Logic ---
+    if data in EXACT_HANDLERS:
+        await EXACT_HANDLERS[data](update, context)
+        return
+
+    for prefix, handler in PREFIX_HANDLERS.items():
+        if data.startswith(prefix):
+            await handler(update, context, data)
+            return
+
+    # --- Fallback for unknown callbacks ---
+    await query.answer("⚠️ Aksi tidak dikenal")
+    logger.warning(f"Unknown callback data: {data}")

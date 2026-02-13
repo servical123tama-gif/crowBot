@@ -208,7 +208,7 @@ async def handle_capster_daily_report(update: Update, context: ContextTypes.DEFA
     
     try:
         report_service = context.bot_data['report_service']
-        report = report_service.generate_daily_report_capster(user=username.first_name)
+        report = report_service.generate_daily_report(user=username.first_name)
     except Exception as e:
         logger.error(f"Failed to generate daily report: {e}")
         report = "❌ Gagal membuat laporan. Silakan coba lagi."
@@ -230,7 +230,7 @@ async def handle_capster_weekly_report(update: Update, context: ContextTypes.DEF
     
     try:
         report_service = context.bot_data['report_service']
-        report = report_service.generate_weekly_report_capster(user=username.first_name)
+        report = report_service.generate_weekly_report(user=username.first_name)
     except Exception as e:
         logger.error(f"Failed to generate weekly report: {e}")
         report = "❌ Gagal membuat laporan. Silakan coba lagi."
@@ -250,9 +250,14 @@ async def handle_capster_monthly_report(update: Update, context: ContextTypes.DE
     
     await safe_edit_message(query, "⏳ Memuat laporan bulanan...")
     
+    now = datetime.now()
     try:
         report_service = context.bot_data['report_service']
-        report = report_service.generate_monthly_report_capster(user=username.first_name)
+        report = report_service.generate_monthly_report(
+            user=username.first_name,
+            year=now.year,
+            month=now.month
+        )
     except Exception as e:
         logger.error(f"Failed to generate monthly report: {e}")
         report = "❌ Gagal membuat laporan. Silakan coba lagi."

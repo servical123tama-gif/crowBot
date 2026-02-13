@@ -37,8 +37,8 @@ class ReportService:
             self.week_calc = WeekCalculator()
             
             # --- CACHE ---
-            self._transactions_cache = None
-            self._cache_timestamp = None
+            self._transactions_cache = {}  # Dict to hold cache per year
+            self._cache_timestamp = {}   # Dict to hold timestamp per year
             self.CACHE_DURATION = timedelta(minutes=5)
             # --- END CACHE ---
 
@@ -47,26 +47,26 @@ class ReportService:
             logger.error(f"Failed to initialize ReportService: {e}", exc_info=True)
             raise
 
-    def _get_or_fetch_transactions(self) -> pd.DataFrame:
+    def _get_or_fetch_transactions(self, year: int) -> pd.DataFrame:
         """
-        Fetches the transactions DataFrame from cache if available and not expired,
-        otherwise fetches from the source and updates the cache.
+        Fetches the transactions DataFrame from cache if available and not expired for a specific year,
+        otherwise fetches from the source and updates the cache for that year.
         """
         now = datetime.now()
         
-        # Check if cache is valid
-        if self._transactions_cache is not None and self._cache_timestamp is not None:
-            if now - self._cache_timestamp < self.CACHE_DURATION:
-                logger.info("Fetching transactions from CACHE.")
-                return self._transactions_cache
+        # Check if cache is valid for the given year
+        if year in self._transactions_cache and year in self._cache_timestamp:
+            if now - self._cache_timestamp[year] < self.CACHE_DURATION:
+                logger.info(f"Fetching transactions for year {year} from CACHE.")
+                return self._transactions_cache[year]
 
         # Fetch from source if cache is invalid or expired
-        logger.info("Cache expired or empty. Fetching transactions from Google Sheets.")
-        df = self.sheets.get_transactions_dataframe()
+        logger.info(f"Cache for year {year} expired or empty. Fetching from Google Sheets.")
+        df = self.sheets.get_transactions_dataframe(year=year)
         
-        # Update cache
-        self._transactions_cache = df
-        self._cache_timestamp = now
+        # Update cache for the specific year
+        self._transactions_cache[year] = df
+        self._cache_timestamp[year] = now
         
         return df
     
@@ -114,8 +114,8 @@ class ReportService:
             if not weeks:
                 return f"📊 Tidak ada data minggu untuk {month_name}"
             
-            # Get all transactions for the month
-            df = self._get_or_fetch_transactions()
+            # Get all transactions for the year
+            df = self._get_or_fetch_transactions(year=year)
             
             if df.empty:
                 return f"📊 Tidak ada transaksi pada {month_name}"
@@ -280,67 +280,68 @@ class ReportService:
             logger.error(f"Failed to generate week detail: {e}", exc_info=True)
             return f"❌ Gagal membuat laporan detail minggu: {str(e)}"
     
-    def generate_daily_report(self, date: Optional[datetime] = None) -> str:
-        """Generate daily report"""
+    def generate_daily_report(self, date: Optional[datetime] = None, user: Optional[str] = None) -> str:
+        """Generate daily report for all or a specific capster."""
         if date is None:
             date = datetime.now()
         
-        logger.info(f"Generating daily report for {date.strftime('%Y-%m-%d')}")
+        logger.info(f"Generating daily report for {date.strftime('%Y-%m-%d')}, user: {user}")
         
         try:
             df = self.sheets.get_transactions_by_date(date)
-            logger.info(f"Fetched {len(df)} transactions")
+            
+            if user:
+                df = df[df['Capster'] == user]
             
             if df.empty:
-                logger.info("No transactions found for this date")
-                return f"📊 Tidak ada transaksi pada {Formatter.format_date(date)}"
+                user_msg = f" untuk {user}" if user else ""
+                return f"📊 Tidak ada transaksi{user_msg} pada {Formatter.format_date(date)}"
             
             total = df['Price'].sum()
             count = len(df)
             
-            logger.info(f"Total: Rp {total:,}, Count: {count}")
-            
             # Generate report header
             now = datetime.now()
-            report = f"{REPORT_DAILY_HEADER.format(date=Formatter.format_date(date))}\n"
-            report += f"⏰ Generated: {now.strftime('%H:%M:%S')}\n\n"
-            
+            if user:
+                report = f"{REPORT_DAILY_HEADERS_CAPSTER.format(date=Formatter.format_date(date), username=user)}\n\n"
+                report += f"Capster: {user}\n"
+            else:
+                report = f"{REPORT_DAILY_HEADER.format(date=Formatter.format_date(date))}\n"
+                report += f"⏰ Generated: {now.strftime('%H:%M:%S')}\n\n"
+
             report += f"Total Transaksi: {count}\n"
             report += f"Total Pendapatan: {Formatter.format_currency(total)}\n\n"
             
-            # Per branch breakdown (if column exists)
-            if 'Branch' in df.columns:
-                logger.debug("Generating per-branch breakdown...")
-                by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count'])
-                report += "Per Cabang:\n"
+            if not user:
+                # Per branch breakdown (if column exists)
+                if 'Branch' in df.columns:
+                    logger.debug("Generating per-branch breakdown...")
+                    by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count'])
+                    report += "Per Cabang:\n"
+                    for branch, row in by_branch.iterrows():
+                        count_branch = int(row['count'])
+                        sum_branch = row['sum']
+                        report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
+                    report += "\n"
                 
-                for branch, row in by_branch.iterrows():
-                    count_branch = int(row['count'])
-                    sum_branch = row['sum']
-                    report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
-                
-                report += "\n"
-            
-            # Per capster breakdown
-            logger.debug("Generating per-capster breakdown...")
-            by_capster = df.groupby('Capster')['Price'].agg(['sum', 'count'])
-            report += "Per Capster:\n"
-            
-            for capster, row in by_capster.iterrows():
-                count_capster = int(row['count'])
-                sum_capster = row['sum']
-                report += f"  ✂️ {capster}: {count_capster} layanan ({Formatter.format_currency(sum_capster)})\n"
-            
+                # Per capster breakdown
+                logger.debug("Generating per-capster breakdown...")
+                by_capster = df.groupby('Capster')['Price'].agg(['sum', 'count'])
+                report += "Per Capster:\n"
+                for capster, row in by_capster.iterrows():
+                    count_capster = int(row['count'])
+                    sum_capster = row['sum']
+                    report += f"  ✂️ {capster}: {count_capster} layanan ({Formatter.format_currency(sum_capster)})\n"
+
             # Top services
             logger.debug("Finding top services...")
             top_services = df['Service'].value_counts().head(3)
             if not top_services.empty:
                 report += "\nLayanan Terpopuler:\n"
-                for service, count in top_services.items():
-                    report += f"  • {service}: {count}x\n"
+                for service, svc_count in top_services.items():
+                    report += f"  • {service}: {svc_count}x\n"
             
-            # Payment methods breakdown (if column exists)
-            if 'Payment_Method' in df.columns:
+            if not user and 'Payment_Method' in df.columns:
                 payment_breakdown = df.groupby('Payment_Method')['Price'].sum()
                 report += "\nMetode Pembayaran:\n"
                 for method, amount in payment_breakdown.items():
@@ -357,9 +358,9 @@ class ReportService:
             logger.error(f"Failed to generate daily report: {e}", exc_info=True)
             return f"❌ Gagal membuat laporan harian: {str(e)}"
     
-    def generate_weekly_report(self) -> str:
-        """Generate weekly report (Monday to Sunday of current week)"""
-        logger.info("Generating weekly report")
+    def generate_weekly_report(self, user: Optional[str] = None) -> str:
+        """Generate weekly report (Monday to Sunday of current week) for all or a specific capster."""
+        logger.info(f"Generating weekly report, user: {user}")
         
         try:
             # Get current week range (Monday to Sunday)
@@ -369,10 +370,13 @@ class ReportService:
             df = self.sheets.get_transactions_by_range(monday, sunday)
             logger.info(f"Fetched {len(df)} transactions")
             
+            if user:
+                df = df[df['Capster'] == user]
+
             if df.empty:
-                logger.info("No transactions this week")
+                user_msg = f" untuk {user}" if user else ""
                 week_str = f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b %Y')}"
-                return f"📈 Tidak ada transaksi minggu ini\n({week_str})"
+                return f"📈 Tidak ada transaksi minggu ini{user_msg}\n({week_str})"
             
             total = df['Price'].sum()
             count = len(df)
@@ -387,6 +391,8 @@ class ReportService:
             
             report = f"{REPORT_WEEKLY_HEADER}\n"
             report += f"📅 Periode: {week_str}\n"
+            if user:
+                report += f"👤 Capster: {user}\n"
             report += f"⏰ Generated: {now.strftime('%H:%M:%S')}\n\n"
             
             report += f"Total Transaksi: {count}\n"
@@ -394,36 +400,37 @@ class ReportService:
             report += f"Hari Operasional: {unique_days} hari\n"
             report += f"Rata-rata/hari: {Formatter.format_currency(avg_per_day)}\n\n"
             
-            # Per branch breakdown (if exists)
-            if 'Branch' in df.columns:
-                by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
-                report += "Per Cabang:\n"
-                for branch, row in by_branch.iterrows():
-                    count_branch = int(row['count'])
-                    sum_branch = row['sum']
-                    report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
-                report += "\n"
-            
+            if not user:
+                # Per branch breakdown (if exists)
+                if 'Branch' in df.columns:
+                    by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                    report += "Per Cabang:\n"
+                    for branch, row in by_branch.iterrows():
+                        count_branch = int(row['count'])
+                        sum_branch = row['sum']
+                        report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
+                    report += "\n"
+
             # Top services
             top_services = df['Service'].value_counts().head(5)
             report += "Layanan Terpopuler:\n"
-            for idx, (service, count) in enumerate(top_services.items(), 1):
-                report += f"  {idx}. {service}: {count}x\n"
+            for idx, (service, svc_count) in enumerate(top_services.items(), 1):
+                report += f"  {idx}. {service}: {svc_count}x\n"
             
-            # Top capsters
-            top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
-            report += "\nTop Capster:\n"
-            for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
-                # Count transactions per capster
-                capster_count = df[df['Capster'] == capster].shape[0]
-                report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
+            if not user:
+                # Top capsters
+                top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
+                report += "\nTop Capster:\n"
+                for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
+                    capster_count = df[df['Capster'] == capster].shape[0]
+                    report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
             
             # Daily breakdown
             daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
             report += "\nPer Hari:\n"
             for date, row in daily_totals.iterrows():
-                day_name = pd.Timestamp(date).strftime('%A')  # Monday, Tuesday, etc
-                day_name_id = self._translate_day(day_name)  # Senin, Selasa, etc
+                day_name = pd.Timestamp(date).strftime('%A')
+                day_name_id = self._translate_day(day_name)
                 count_day = int(row['count'])
                 sum_day = row['sum']
                 report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
@@ -447,14 +454,11 @@ class ReportService:
             'Sunday': 'Minggu'
         }
         return translation.get(english_day, english_day)
-    
-
-
 
     
-    def generate_monthly_report(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
-        """Generate monthly report for a specific month and year"""
-        logger.info(f"Generating monthly report for {month}/{year}")
+    def generate_monthly_report(self, year: Optional[int] = None, month: Optional[int] = None, user: Optional[str] = None) -> str:
+        """Generate monthly report for a specific month and year, for all or a specific capster."""
+        logger.info(f"Generating monthly report for {month}/{year}, user: {user}")
         
         try:
             current_date = datetime.now()
@@ -467,8 +471,8 @@ class ReportService:
             month_str = report_date.strftime('%Y-%m')
             month_display = report_date.strftime('%B %Y')
             
-            logger.debug("Fetching all transactions...")
-            df = self._get_or_fetch_transactions()
+            logger.debug(f"Fetching transactions for year {year}...")
+            df = self._get_or_fetch_transactions(year=year)
             logger.info(f"Total transactions in sheet: {len(df)}")
             
             if df.empty:
@@ -479,9 +483,13 @@ class ReportService:
             logger.debug(f"Filtering for month: {month_str}")
             monthly = df[df['Date'].dt.strftime('%Y-%m') == month_str]
             logger.info(f"Transactions this month: {len(monthly)}")
-            
+
+            if user:
+                monthly = monthly[monthly['Capster'] == user]
+
             if monthly.empty:
-                return f"📅 Tidak ada transaksi pada {month_display}"
+                user_msg = f" untuk {user}" if user else ""
+                return f"📅 Tidak ada transaksi{user_msg} pada {month_display}"
             
             total = monthly['Price'].sum()
             count = len(monthly)
@@ -490,28 +498,32 @@ class ReportService:
             if year == current_date.year and month == current_date.month:
                 days = current_date.day
             else:
-                # For past months, use total days in that month
                 days = (datetime(year, month % 12 + 1, 1) - datetime(year, month, 1)).days
 
-            avg_per_day = total / days
+            avg_per_day = total / days if days > 0 else 0
             
-            report = f"{REPORT_MONTHLY_HEADER.format(month=month_display)}\n"
-            report += f"⏰ Generated: {current_date.strftime('%d %b %Y, %H:%M:%S')}\n\n"
-            
+            if user:
+                report = f"{REPORT_MONTHLY_HEADERS_CAPSTER.format(month=month_display, username=user)}\n\n"
+                report += f"Capster: {user}\n"
+            else:
+                report = f"{REPORT_MONTHLY_HEADER.format(month=month_display)}\n"
+                report += f"⏰ Generated: {current_date.strftime('%d %b %Y, %H:%M:%S')}\n\n"
+
             report += f"Total Transaksi: {count}\n"
             report += f"Total Pendapatan: {Formatter.format_currency(total)}\n"
             report += f"Rata-rata/hari: {Formatter.format_currency(avg_per_day)}\n\n"
             
-            # Per branch (if exists)
-            if 'Branch' in monthly.columns:
-                by_branch = monthly.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
-                report += "Per Cabang:\n"
-                for branch, row in by_branch.iterrows():
-                    count_branch = int(row['count'])
-                    sum_branch = row['sum']
-                    pct = (sum_branch / total * 100) if total > 0 else 0
-                    report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)}) - {pct:.1f}%\n"
-                report += "\n"
+            if not user:
+                # Per branch (if exists)
+                if 'Branch' in monthly.columns:
+                    by_branch = monthly.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                    report += "Per Cabang:\n"
+                    for branch, row in by_branch.iterrows():
+                        count_branch = int(row['count'])
+                        sum_branch = row['sum']
+                        pct = (sum_branch / total * 100) if total > 0 else 0
+                        report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)}) - {pct:.1f}%\n"
+                    report += "\n"
             
             # Ranking capster
             by_capster = monthly.groupby('Capster').agg({
@@ -519,11 +531,12 @@ class ReportService:
                 'Service': 'count'
             }).sort_values('Price', ascending=False)
             
-            report += "Ranking Capster:\n"
-            for idx, (capster, row) in enumerate(by_capster.iterrows(), 1):
-                amount = row['Price']
-                count_capster = int(row['Service'])
-                report += f"  {idx}. {capster}: {count_capster} layanan ({Formatter.format_currency(amount)})\n"
+            if not user:
+                report += "Ranking Capster:\n"
+                for idx, (capster_name, row) in enumerate(by_capster.iterrows(), 1):
+                    amount = row['Price']
+                    count_capster = int(row['Service'])
+                    report += f"  {idx}. {capster_name}: {count_capster} layanan ({Formatter.format_currency(amount)})\n"
             
             # Service breakdown
             service_breakdown = monthly.groupby('Service').agg({
@@ -536,8 +549,7 @@ class ReportService:
                 count_service = int(row[('Price', 'count')])
                 report += f"  • {service}: {count_service}x ({Formatter.format_currency(total_service)})\n"
             
-            # Payment methods breakdown (if exists)
-            if 'Payment_Method' in monthly.columns:
+            if not user and 'Payment_Method' in monthly.columns:
                 payment_breakdown = monthly.groupby('Payment_Method')['Price'].sum().sort_values(ascending=False)
                 report += "\nMetode Pembayaran:\n"
                 for method, amount in payment_breakdown.items():
@@ -636,8 +648,8 @@ class ReportService:
         logger.info(f"Generating monthly profit DataFrame for {month}/{year}")
 
         try:
-            # Get all transactions
-            df = self._get_or_fetch_transactions()
+            # Get all transactions for the specified year
+            df = self._get_or_fetch_transactions(year=year)
             
             # Filter for the specific month and year
             month_str = f"{year:04d}-{month:02d}"
@@ -754,139 +766,7 @@ class ReportService:
     📅 Jumat, 17 Jan: 9 transaksi (Rp 315,000)
     📅 Sabtu, 18 Jan: 3 transaksi (Rp 125,000)
     """""
-    #SERVICE REPORT HANDLER CAPSTER
-    def generate_daily_report_capster(self, user) -> str:
-        """Generate daily report for capster"""
-        try:
-            date = datetime.now()
-            df = self.sheets.get_transactions_by_date(date)
-            
-            # Filter by capster
-            df_capster = df[df['Capster'] == user]
-            if df_capster.empty:
-                return f"📊 Tidak ada transaksi untuk {user} pada {Formatter.format_date(date)}"
-            
-            total = df_capster['Price'].sum()
-            count = len(df_capster)
-            
-            report = f"{REPORT_DAILY_HEADERS_CAPSTER.format(date=Formatter.format_date(date), username=user)}\n\n"
-            report += f"Capster: {user}\n"
-            report += f"Total Transaksi: {count}\n"
-            report += f"Total Pendapatan: {Formatter.format_currency(total)}\n\n"
-            
-            # Top services
-            top_services = df_capster['Service'].value_counts().head(3)
-            if not top_services.empty:
-                report += "Layanan Terpopuler:\n"
-                for service, count in top_services.items():
-                    report += f"  • {service}: {count}x\n"
-            
-            return report
-            
-        except Exception as e:
-            logger.error(f"Failed to generate daily report for capster: {e}")
-            return "❌ Gagal membuat laporan harian untuk capster"
-    
-    def generate_weekly_report_capster(self, user) -> str:
-        """Generate weekly report (Monday to Sunday of current week)"""
-        logger.info("Generating weekly report")
-        
-        try:
-            # Get current week range (Monday to Sunday)
-            monday, sunday = self._get_week_range()
-            
-            logger.info(f"Fetching transactions from {monday} to {sunday}")
-            df = self.sheets.get_transactions_by_range(monday, sunday)
-            logger.info(f"Fetched {len(df)} transactions")
-            
-            if df.empty:
-                logger.info("No transactions this week")
-                week_str = f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b %Y')}"
-                return f"📈 Tidak ada transaksi minggu ini\n({week_str})"
-            
-            df_capster = df[df['Capster'] == user]
-            total = df_capster['Price'].sum()
-            count = len(df_capster)
-            
-            # Calculate days with transactions
-            unique_days = df_capster['Date'].dt.date.nunique()
-            avg_per_day = total / unique_days if unique_days > 0 else 0
-            
-            # Week info
-            week_str = f"{monday.strftime('%d %b')} - {sunday.strftime('%d %b %Y')}"
-            now = datetime.now()
-            
-            report = f"{REPORT_WEEKLY_HEADER}\n"
-            report += f"📅 Periode: {week_str}\n"
-            report += f"⏰ Generated: {now.strftime('%H:%M:%S')}\n\n"
-            
-            report += f"Total Transaksi: {count}\n"
-            report += f"Total Pendapatan: {Formatter.format_currency(total)}\n"
-            report += f"Hari Operasional: {unique_days} hari\n"
-            report += f"Rata-rata/hari: {Formatter.format_currency(avg_per_day)}\n\n"
-            
-            # Per branch breakdown (if exists)
-            if 'Branch' in df_capster.columns:
-                by_branch = df.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
-                report += "Per Cabang:\n"
-                for branch, row in by_branch.iterrows():
-                    count_branch = int(row['count'])
-                    sum_branch = row['sum']
-                    report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
-                report += "\n"
-            
-            # Top services
-            top_services = df_capster['Service'].value_counts().head(5)
-            report += "Layanan Terpopuler:\n"
-            for idx, (service, count) in enumerate(top_services.items(), 1):
-                report += f"  {idx}. {service}: {count}x\n"
-            
-            # Daily breakdown
-            daily_totals = df_capster.groupby(df_capster['Date'].dt.date)['Price'].agg(['sum', 'count'])
-            report += "\nPer Hari:\n"
-            for date, row in daily_totals.iterrows():
-                day_name = pd.Timestamp(date).strftime('%A')  # Monday, Tuesday, etc
-                day_name_id = self._translate_day(day_name)  # Senin, Selasa, etc
-                count_day = int(row['count'])
-                sum_day = row['sum']
-                report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
-            
-            logger.info("Weekly report generated successfully")
-            return report
-            
-        except Exception as e:
-            logger.error(f"Failed to generate weekly report: {e}", exc_info=True)
-            return f"❌ Gagal membuat laporan mingguan: {str(e)}"
-        
 
-    def generate_monthly_report_capster(self, user) -> str:
-        """Generate monthly report for capster"""
-        try:
-            now = datetime.now()
-            month_str = now.strftime('%Y-%m')
-            
-            df = self._get_or_fetch_transactions()
-            
-            if df.empty:
-                return "📅 Tidak ada transaksi bulan ini"
-            
-            # Filter by capster
-            df_capster = df[df['Capster'] == user]
-            if df_capster.empty:
-                return f"📅 Tidak ada transaksi untuk {user} bulan ini"
-            
-            total = df_capster['Price'].sum()
-            count = len(df_capster)
-            days = now.day
-            avg_per_day = total / days
-            
-            report = f"{REPORT_MONTHLY_HEADERS_CAPSTER.format(month=month_str, username=user)}\n\n"
-            report += f"Capster: {user}\n"
-            report += f"Total Transaksi: {count}\n"
-            report += f"Total Pendapatan: {Formatter.format_currency(total)}\n" 
-            report += f"Rata-rata/hari: {Formatter.format_currency(avg_per_day)}\n\n"
-            return report
+    
+
         
-        except Exception as e:
-            logger.error(f"Failed to generate monthly report for capster: {e}")
-            return "❌ Gagal membuat laporan bulanan untuk capster"   

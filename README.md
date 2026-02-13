@@ -1,11 +1,26 @@
-## Fitur
+## Fitur Lengkap
 
-- 📊 Laporan Harian, Mingguan, Bulanan
-- 💰 Analisis Laba Kotor & Laba Bersih
-- 🏢 Support Multi-Cabang
-- 💳 Multi Metode Pembayaran
-- 👤 Manajemen Capster
-- 👑 Dashboard Owner
+Bot ini dirancang untuk membantu manajemen operasional barbershop dengan serangkaian fitur yang komprehensif.
+
+### 💰 Manajemen Transaksi
+- **Pencatatan Transaksi**: Mencatat setiap transaksi pemasukan dan pengeluaran dengan detail.
+- **Detail Komprehensif**: Setiap transaksi mencakup informasi penting seperti tanggal, cabang, nama kapster, pelanggan, jenis layanan, harga, dan metode pembayaran.
+- **Riwayat Transaksi**: Melihat daftar transaksi terkini untuk pemantauan cepat.
+- **Hapus Transaksi**: Admin dan Owner memiliki hak untuk menghapus transaksi jika terjadi kesalahan input.
+
+### 📊 Pelaporan Keuangan
+- **Laporan Fleksibel**: Membuat laporan keuangan secara otomatis dalam berbagai rentang waktu.
+- **Laporan Mingguan & Bulanan**: Menghasilkan rekapitulasi pendapatan mingguan dan bulanan, tersedia untuk semua kapster atau per individu.
+- **Laporan Detail Mingguan**: Memberikan rincian pendapatan harian selama satu minggu penuh untuk analisis yang lebih mendalam.
+- **Analisis Laba Rugi**: Fitur khusus Owner untuk menghasilkan laporan laba rugi (Profit Report) yang memisahkan laba kotor dan laba bersih setelah dipotong biaya operasional.
+
+### 👤 Manajemen Pelanggan & Kapster
+- **Database Pelanggan**: Menambah dan mencari data pelanggan untuk melacak riwayat kunjungan.
+- **Manajemen Kapster**: Sistem mengenali pengguna sebagai `CAPSTER`, `ADMIN`, atau `OWNER` berdasarkan ID Telegram, memberikan akses yang sesuai.
+
+### 🏢 Manajemen Multi-Cabang
+- **Dukungan Multi-Cabang**: Didesain untuk mengelola beberapa cabang barbershop dari satu bot.
+- **Informasi Cabang**: Melihat rekapitulasi dan informasi spesifik untuk setiap cabang.
 
 ## Tech Stack
 
