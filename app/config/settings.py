@@ -16,7 +16,9 @@ class Settings:
         try:
             return [int(uid.strip()) for uid in raw_ids.split(',') if uid.strip()]
         except ValueError as e:
-            logger.warning(f"Error parsing {var_name}: {e}. Contains non-integer values.")
+            msg = f"Error parsing {var_name}: {e}. Contains non-integer values."
+            logger.warning(msg)
+            print(f"WARNING: {msg}")
             return []
 
     # Telegram
@@ -32,6 +34,9 @@ class Settings:
     AUTHORIZED_CAPSTERS: List[int] = _parse_user_ids(os.getenv('AUTHORIZED_CAPSTERS', ''), 'AUTHORIZED_CAPSTERS')
     OWNER_IDS: List[int] = _parse_user_ids(os.getenv('OWNER_IDS', ''), 'OWNER_IDS')
     ADMIN_IDS: List[int] = _parse_user_ids(os.getenv('ADMIN_IDS', ''), 'ADMIN_IDS')
+
+    # Gemini AI
+    GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '')
 
     # Application
     DEBUG: bool = os.getenv('DEBUG', 'False').lower() == 'true'
@@ -54,7 +59,10 @@ class Settings:
         
         if not os.path.exists(self.CREDENTIALS_FILE):
             raise FileNotFoundError(f"{self.CREDENTIALS_FILE} not found!")
-        
+
+        if not self.GEMINI_API_KEY:
+            logger.warning("GEMINI_API_KEY not set - /tanya feature will use fallback mode (no AI)")
+
         return True
 
 # Global settings instance

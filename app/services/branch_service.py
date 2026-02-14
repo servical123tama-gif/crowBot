@@ -54,14 +54,6 @@ class BranchService:
         """Check if user has set branch for today"""
         return cls.get_branch(user_id) is not None
     
-    @classmethod
-    def clear_branch(cls, user_id: int) -> bool:
-        """Clear user's branch (force re-select)"""
-        if user_id in cls._user_branches:
-            del cls._user_branches[user_id]
-            logger.info(f"Cleared branch for user {user_id}")
-            return True
-        return False
     
     @classmethod
     def get_all_branches_today(cls) -> Dict[int, str]:

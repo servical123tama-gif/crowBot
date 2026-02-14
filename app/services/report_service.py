@@ -3,13 +3,14 @@ Report Generation Service
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 import pandas as pd
 
 from app.services.sheets_service import SheetsService
 from app.utils.formatters import Formatter
 from app.utils.week_calculator import WeekCalculator
 from app.config.constants import *
+from app.models.query import QueryResult # Import QueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,22 @@ class ReportService:
             self.CACHE_DURATION = timedelta(minutes=5)
             # --- END CACHE ---
 
+            # Capster alias map: name_lower -> [all known names_lower]
+            self._capster_alias_map = {}
+
             logger.info("ReportService initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ReportService: {e}", exc_info=True)
             raise
+
+    def _filter_by_capster(self, df: pd.DataFrame, capster_name: str) -> pd.DataFrame:
+        """Filter DataFrame by capster name, expanding aliases if available."""
+        name_lower = capster_name.lower()
+        names_to_match = {name_lower}
+        # Expand aliases: e.g. "Zidan" also matches "timingemma"
+        for alias in self._capster_alias_map.get(name_lower, []):
+            names_to_match.add(alias)
+        return df[df['Capster'].str.lower().isin(names_to_match)]
 
     def _get_or_fetch_transactions(self, year: int) -> pd.DataFrame:
         """
@@ -284,14 +297,14 @@ class ReportService:
         """Generate daily report for all or a specific capster."""
         if date is None:
             date = datetime.now()
-        
+
         logger.info(f"Generating daily report for {date.strftime('%Y-%m-%d')}, user: {user}")
-        
+
         try:
             df = self.sheets.get_transactions_by_date(date)
-            
+
             if user:
-                df = df[df['Capster'] == user]
+                df = self._filter_by_capster(df, user)
             
             if df.empty:
                 user_msg = f" untuk {user}" if user else ""
@@ -361,17 +374,17 @@ class ReportService:
     def generate_weekly_report(self, user: Optional[str] = None) -> str:
         """Generate weekly report (Monday to Sunday of current week) for all or a specific capster."""
         logger.info(f"Generating weekly report, user: {user}")
-        
+
         try:
             # Get current week range (Monday to Sunday)
             monday, sunday = self._get_week_range()
-            
+
             logger.info(f"Fetching transactions from {monday} to {sunday}")
             df = self.sheets.get_transactions_by_range(monday, sunday)
             logger.info(f"Fetched {len(df)} transactions")
-            
+
             if user:
-                df = df[df['Capster'] == user]
+                df = self._filter_by_capster(df, user)
 
             if df.empty:
                 user_msg = f" untuk {user}" if user else ""
@@ -485,7 +498,7 @@ class ReportService:
             logger.info(f"Transactions this month: {len(monthly)}")
 
             if user:
-                monthly = monthly[monthly['Capster'] == user]
+                monthly = self._filter_by_capster(monthly, user)
 
             if monthly.empty:
                 user_msg = f" untuk {user}" if user else ""
@@ -563,6 +576,7 @@ class ReportService:
             logger.error(f"Failed to generate monthly report for {month}/{year}: {e}", exc_info=True)
             return f"❌ Gagal membuat laporan bulanan: {str(e)}"
 
+    
     def generate_monthly_profit_report(self, year: Optional[int] = None, month: Optional[int] = None) -> str:
         """Generate monthly profit report with per-branch breakdown for a specific month and year."""
         logger.info(f"Generating monthly profit report with per-branch breakdown for {month}/{year}")
@@ -582,27 +596,15 @@ class ReportService:
             if profit_data_df.empty:
                  return f"💰 Tidak ada data transaksi atau kolom 'Branch' tidak ditemukan untuk {month_display}."
 
-            # Extract data from the DataFrame for formatting
+            # Extract overall data
             total_revenue = profit_data_df.loc['Overall', 'Revenue']
             total_operational_cost = profit_data_df.loc['Overall', 'Operational Cost']
             total_net_profit = profit_data_df.loc['Overall', 'Net Profit']
 
-            revenue_a = profit_data_df.loc['Cabang A', 'Revenue']
-            total_costs_a = profit_data_df.loc['Cabang A', 'Operational Cost']
-            profit_a = profit_data_df.loc['Cabang A', 'Net Profit']
-
-            revenue_b = profit_data_df.loc['Cabang B', 'Revenue']
-            fixed_costs_b = profit_data_df.loc['Cabang B', 'Fixed Cost']
-            commission_cost_b = profit_data_df.loc['Cabang B', 'Commission Cost']
-            total_costs_b = profit_data_df.loc['Cabang B', 'Operational Cost']
-            profit_b = profit_data_df.loc['Cabang B', 'Net Profit']
-
-
             # --- Report Formatting ---
-            
             report = f"{REPORT_PROFIT_HEADER.format(month=month_display)}\n"
             report += f"⏰ Generated: {now.strftime('%d %b %Y, %H:%M:%S')}\n"
-            
+
             # Overall Summary
             report += "\n" + "="*40 + "\n"
             report += "RINGKASAN KESELURUHAN\n"
@@ -612,27 +614,33 @@ class ReportService:
             profit_emoji = "✅" if total_net_profit >= 0 else "❌"
             report += f"{profit_emoji} Profit Bersih Total: {Formatter.format_currency(total_net_profit)}\n"
 
-            # Branch A Details
-            report += "\n" + "-"*40 + "\n"
-            report += f"DETAIL PROFIT CABANG A\n"
-            report += "-"*40 + "\n"
-            report += f"  - Pendapatan: {Formatter.format_currency(revenue_a)}\n"
-            report += f"  - Biaya Operasional (Fixed): {Formatter.format_currency(total_costs_a)}\n"
-            profit_emoji_a = "✅" if profit_a >= 0 else "❌"
-            report += f"  {profit_emoji_a} Profit Bersih Cabang A: {Formatter.format_currency(profit_a)}\n"
+            # Per-branch details (dynamic)
+            for branch_id, branch_config in BRANCHES.items():
+                branch_short = branch_config.get('short', branch_id)
+                if branch_short not in profit_data_df.index:
+                    continue
+                row = profit_data_df.loc[branch_short]
+                revenue = row['Revenue']
+                fixed_cost = row['Fixed Cost']
+                commission_cost = row['Commission Cost']
+                total_costs = row['Operational Cost']
+                net_profit = row['Net Profit']
+                commission_rate = branch_config.get('commission_rate', 0)
 
-            # Branch B Details
-            report += "\n" + "-"*40 + "\n"
-            report += f"DETAIL PROFIT CABANG B\n"
-            report += "-"*40 + "\n"
-            report += f"  - Pendapatan: {Formatter.format_currency(revenue_b)}\n"
-            report += "  - Biaya Operasional:\n"
-            report += f"    - Fixed: {Formatter.format_currency(fixed_costs_b)}\n"
-            report += f"    - Komisi: {Formatter.format_currency(commission_cost_b)}\n"
-            report += f"    - Total Biaya: {Formatter.format_currency(total_costs_b)}\n"
-            profit_emoji_b = "✅" if profit_b >= 0 else "❌"
-            report += f"  {profit_emoji_b} **Profit Bersih Cabang B:** {Formatter.format_currency(profit_b)}\n"
-            
+                report += "\n" + "-"*40 + "\n"
+                report += f"DETAIL PROFIT {branch_short.upper()}\n"
+                report += "-"*40 + "\n"
+                report += f"  - Pendapatan: {Formatter.format_currency(revenue)}\n"
+                if commission_rate > 0:
+                    report += "  - Biaya Operasional:\n"
+                    report += f"    - Fixed: {Formatter.format_currency(fixed_cost)}\n"
+                    report += f"    - Komisi ({commission_rate*100:.0f}%): {Formatter.format_currency(commission_cost)}\n"
+                    report += f"    - Total Biaya: {Formatter.format_currency(total_costs)}\n"
+                else:
+                    report += f"  - Biaya Operasional (Fixed): {Formatter.format_currency(total_costs)}\n"
+                profit_emoji_b = "✅" if net_profit >= 0 else "❌"
+                report += f"  {profit_emoji_b} Profit Bersih {branch_short}: {Formatter.format_currency(net_profit)}\n"
+
             logger.info("Monthly profit report with breakdown generated successfully")
             return report
 
@@ -659,58 +667,49 @@ class ReportService:
                 logger.info(f"No transactions or 'Branch' column missing for {month_str}. Returning empty DataFrame.")
                 return pd.DataFrame()
 
-            # Prepare results dictionary
+            # Prepare results dictionary — loop all branches dynamically
             results = {}
+            overall_revenue = 0
+            overall_fixed = 0
+            overall_commission = 0
 
-            # --- Calculations for Branch A ---
-            branch_a_df = monthly_df[monthly_df['Branch'] == 'Cabang A']
-            revenue_a = branch_a_df['Price'].sum()
-            costs_a_config = BRANCHES['cabang_a']['oprational_cost']
-            total_fixed_costs_a = sum(costs_a_config.values())
-            profit_a = revenue_a - total_fixed_costs_a
-            
-            results['Cabang A'] = {
-                'Revenue': revenue_a,
-                'Fixed Cost': total_fixed_costs_a,
-                'Commission Cost': 0, # Branch A doesn't seem to have commission based on the profit report
-                'Operational Cost': total_fixed_costs_a,
-                'Net Profit': profit_a
-            }
+            for branch_id, branch_config in BRANCHES.items():
+                branch_short = branch_config.get('short', branch_id)
+                branch_df = monthly_df[monthly_df['Branch'] == branch_short]
+                revenue = branch_df['Price'].sum()
 
-            # --- Calculations for Branch B ---
-            branch_b_df = monthly_df[monthly_df['Branch'] == 'Cabang B']
-            revenue_b = branch_b_df['Price'].sum()
-            costs_b_config = BRANCHES['cabang_b']['oprational_cost']
-            fixed_costs_b = sum(costs_b_config.values())
-            commission_cost_b = revenue_b * OPRATIONAL_CONFIG['commision_rate']
-            total_costs_b = fixed_costs_b + commission_cost_b
-            profit_b = revenue_b - total_costs_b
+                costs_config = branch_config.get('operational_cost', {})
+                fixed_costs = sum(costs_config.values())
+                commission_rate = branch_config.get('commission_rate', 0)
+                commission_cost = revenue * commission_rate
+                total_costs = fixed_costs + commission_cost
+                net_profit = revenue - total_costs
 
-            results['Cabang B'] = {
-                'Revenue': revenue_b,
-                'Fixed Cost': fixed_costs_b,
-                'Commission Cost': commission_cost_b,
-                'Operational Cost': total_costs_b,
-                'Net Profit': profit_b
-            }
-            
-            # --- Overall Totals ---
-            total_revenue_overall = revenue_a + revenue_b
-            total_operational_cost_overall = total_fixed_costs_a + total_costs_b # Total_costs_b already includes commission
-            total_net_profit_overall = total_revenue_overall - total_operational_cost_overall
+                results[branch_short] = {
+                    'Revenue': revenue,
+                    'Fixed Cost': fixed_costs,
+                    'Commission Cost': commission_cost,
+                    'Operational Cost': total_costs,
+                    'Net Profit': net_profit,
+                }
 
+                overall_revenue += revenue
+                overall_fixed += fixed_costs
+                overall_commission += commission_cost
+
+            overall_operational = overall_fixed + overall_commission
             results['Overall'] = {
-                'Revenue': total_revenue_overall,
-                'Fixed Cost': total_fixed_costs_a + fixed_costs_b, # Sum of fixed costs
-                'Commission Cost': commission_cost_b, # Only Branch B has commission
-                'Operational Cost': total_operational_cost_overall,
-                'Net Profit': total_net_profit_overall
+                'Revenue': overall_revenue,
+                'Fixed Cost': overall_fixed,
+                'Commission Cost': overall_commission,
+                'Operational Cost': overall_operational,
+                'Net Profit': overall_revenue - overall_operational,
             }
-            
+
             # Convert results to DataFrame
             profit_df = pd.DataFrame.from_dict(results, orient='index')
             profit_df.index.name = 'Category'
-            
+
             return profit_df
 
         except Exception as e:
@@ -719,54 +718,273 @@ class ReportService:
 
 
 
-    """""
-    ## 🎯 **Contoh Output Laporan Mingguan Baru**
+    def _filter_by_timeframe(self, df: pd.DataFrame, timeframe_str: str, now: datetime) -> pd.DataFrame:
+        """Filter DataFrame by timeframe string."""
+        if timeframe_str == "minggu ini":
+            start_date, end_date = self._get_week_range()
+            df = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
+        elif timeframe_str == "bulan ini":
+            month_str = now.strftime('%Y-%m')
+            df = df[df['Date'].dt.strftime('%Y-%m') == month_str]
+        elif timeframe_str == "hari ini":
+            date_str = now.strftime('%Y-%m-%d')
+            df = df[df['Date'].dt.strftime('%Y-%m-%d') == date_str]
+        elif timeframe_str == "kemarin":
+            yesterday = now - timedelta(days=1)
+            date_str = yesterday.strftime('%Y-%m-%d')
+            df = df[df['Date'].dt.strftime('%Y-%m-%d') == date_str]
+        elif timeframe_str == "bulan lalu":
+            first_day_of_current_month = now.replace(day=1)
+            last_day_of_last_month = first_day_of_current_month - timedelta(days=1)
+            month_str = last_day_of_last_month.strftime('%Y-%m')
+            df = df[df['Date'].dt.strftime('%Y-%m') == month_str]
+        elif timeframe_str == "minggu lalu":
+            start_date, _ = self._get_week_range()
+            prev_start = start_date - timedelta(days=7)
+            prev_end = start_date - timedelta(seconds=1)
+            df = df[(df['Date'] >= prev_start) & (df['Date'] <= prev_end)]
+        elif timeframe_str == "3 bulan terakhir":
+            three_months_ago = now - timedelta(days=90)
+            df = df[df['Date'] >= three_months_ago]
+        return df
 
-    ### **Sebelum (7 hari mundur dari hari ini):**
-    ```
-    📈 LAPORAN MINGGUAN (7 Hari Terakhir)
-    ⏰ Generated: 10:30:00
+    def _build_capster_ranking(self, df: pd.DataFrame, limit: int = 10) -> str:
+        """Build capster ranking context string."""
+        if df.empty or 'Capster' not in df.columns:
+            return ""
+        by_capster = df.groupby('Capster').agg(
+            revenue=('Price', 'sum'),
+            count=('Price', 'count')
+        ).sort_values('revenue', ascending=False).head(limit)
 
-    Total Transaksi: 42
-    Total Pendapatan: Rp 1,500,000
-    Rata-rata/hari: Rp 214,285
-    ...
-    ```
+        lines = ["Ranking Capster:"]
+        for idx, (capster, row) in enumerate(by_capster.iterrows(), 1):
+            lines.append(f"  {idx}. {capster}: {int(row['count'])} layanan, pendapatan Rp {row['revenue']:,.0f}")
+        return "\n".join(lines)
 
-    ### **Sesudah (Senin-Minggu minggu ini):**
-    ```
-    📈 LAPORAN MINGGUAN (7 Hari Terakhir)
-    📅 Periode: 13 Jan - 19 Jan 2026
-    ⏰ Generated: 10:30:00
+    def _build_branch_comparison(self, df: pd.DataFrame) -> str:
+        """Build branch comparison context string."""
+        if df.empty or 'Branch' not in df.columns:
+            return ""
+        by_branch = df.groupby('Branch').agg(
+            revenue=('Price', 'sum'),
+            count=('Price', 'count')
+        ).sort_values('revenue', ascending=False)
 
-    Total Transaksi: 38
-    Total Pendapatan: Rp 1,350,000
-    Hari Operasional: 6 hari
-    Rata-rata/hari: Rp 225,000
+        lines = ["Perbandingan Cabang:"]
+        for branch, row in by_branch.iterrows():
+            lines.append(f"  - {branch}: {int(row['count'])} transaksi, pendapatan Rp {row['revenue']:,.0f}")
+        return "\n".join(lines)
 
-    Per Cabang:
-    🏢 Cabang A: 20 transaksi (Rp 700,000)
-    🏢 Cabang B: 18 transaksi (Rp 650,000)
+    def _build_service_popularity(self, df: pd.DataFrame, limit: int = 10) -> str:
+        """Build service popularity context string."""
+        if df.empty or 'Service' not in df.columns:
+            return ""
+        by_service = df.groupby('Service').agg(
+            count=('Price', 'count'),
+            revenue=('Price', 'sum')
+        ).sort_values('count', ascending=False).head(limit)
 
-    Layanan Terpopuler:
-    1. ✂️ Potong Rambut: 25x
-    2. 💇 Potong + Cuci: 8x
-    3. 🎨 Highlights: 5x
+        lines = ["Layanan Terpopuler:"]
+        for idx, (service, row) in enumerate(by_service.iterrows(), 1):
+            lines.append(f"  {idx}. {service}: {int(row['count'])}x, pendapatan Rp {row['revenue']:,.0f}")
+        return "\n".join(lines)
 
-    Top Caster:
-    1. John: 15 layanan (Rp 500,000)
-    2. Jane: 12 layanan (Rp 450,000)
-    3. Mike: 11 layanan (Rp 400,000)
+    def _build_profit_context(self, year: int, month: int, timeframe_str: str) -> str:
+        """Build profit context string using generate_monthly_profit_dataframe."""
+        try:
+            profit_df = self.generate_monthly_profit_dataframe(year, month)
+            if profit_df.empty:
+                return "Data profit tidak tersedia untuk periode ini."
 
-    Per Hari:
-    📅 Senin, 13 Jan: 5 transaksi (Rp 175,000)
-    📅 Selasa, 14 Jan: 8 transaksi (Rp 280,000)
-    📅 Rabu, 15 Jan: 6 transaksi (Rp 210,000)
-    📅 Kamis, 16 Jan: 7 transaksi (Rp 245,000)
-    📅 Jumat, 17 Jan: 9 transaksi (Rp 315,000)
-    📅 Sabtu, 18 Jan: 3 transaksi (Rp 125,000)
-    """""
+            lines = [f"Data Profit (bulan {month}/{year}):"]
+            for category in profit_df.index:
+                row = profit_df.loc[category]
+                lines.append(f"  {category}:")
+                lines.append(f"    Revenue: Rp {row['Revenue']:,.0f}")
+                lines.append(f"    Biaya Operasional: Rp {row['Operational Cost']:,.0f}")
+                lines.append(f"    Net Profit: Rp {row['Net Profit']:,.0f}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Failed to build profit context: {e}")
+            return "Data profit tidak tersedia."
 
-    
+    def _build_daily_breakdown(self, df: pd.DataFrame) -> str:
+        """Build daily breakdown context string."""
+        if df.empty:
+            return ""
+        daily = df.groupby(df['Date'].dt.date).agg(
+            revenue=('Price', 'sum'),
+            count=('Price', 'count')
+        ).sort_index()
+
+        lines = ["Breakdown per Hari:"]
+        for date, row in daily.iterrows():
+            day_name = pd.Timestamp(date).strftime('%A')
+            day_name_id = self._translate_day(day_name)
+            lines.append(f"  {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {int(row['count'])} transaksi, Rp {row['revenue']:,.0f}")
+        return "\n".join(lines)
+
+    def _build_payment_methods(self, df: pd.DataFrame) -> str:
+        """Build payment method breakdown context string."""
+        if df.empty or 'Payment_Method' not in df.columns:
+            return ""
+        by_payment = df.groupby('Payment_Method')['Price'].sum().sort_values(ascending=False)
+        lines = ["Metode Pembayaran:"]
+        for method, amount in by_payment.items():
+            lines.append(f"  - {method}: Rp {amount:,.0f}")
+        return "\n".join(lines)
+
+    def generate_report_from_query(self, query_result: 'QueryResult') -> Optional[str]:
+        """
+        Filters data based on a QueryResult and returns a rich context string
+        for Gemini to generate natural language response.
+        """
+        now = datetime.now()
+
+        # Determine which year(s) data to fetch
+        years_needed = set()
+        if query_result.specific_dates:
+            years_needed = {d.year for d in query_result.specific_dates}
+        elif query_result.specific_date:
+            years_needed.add(query_result.specific_date.year)
+            if query_result.date_end:
+                years_needed.add(query_result.date_end.year)
+        elif query_result.specific_year:
+            years_needed.add(query_result.specific_year)
+        else:
+            years_needed.add(now.year)
+
+        # 1. Fetch base data (merge multiple years if needed)
+        frames = []
+        for y in years_needed:
+            f = self._get_or_fetch_transactions(y)
+            if not f.empty:
+                frames.append(f)
+
+        if not frames:
+            return None
+        df = pd.concat(frames).drop_duplicates() if len(frames) > 1 else frames[0]
+
+        if df.empty:
+            return None
+
+        # 2. Filter by timeframe
+        # Priority: multiple dates > date range > specific date > specific month > relative
+        timeframe_str = query_result.timeframe_str or 'bulan ini'
+
+        if query_result.specific_dates:
+            # Filter to multiple discrete dates
+            date_strs = [d.strftime('%Y-%m-%d') for d in query_result.specific_dates]
+            df = df[df['Date'].dt.strftime('%Y-%m-%d').isin(date_strs)]
+        elif query_result.specific_date and query_result.date_end:
+            # Date range filter
+            start_dt = query_result.specific_date
+            end_dt = query_result.date_end.replace(hour=23, minute=59, second=59)
+            df = df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
+        elif query_result.specific_date:
+            # Filter to exact date
+            target = query_result.specific_date
+            date_str = target.strftime('%Y-%m-%d')
+            df = df[df['Date'].dt.strftime('%Y-%m-%d') == date_str]
+        elif query_result.specific_month and query_result.specific_year:
+            # Filter to specific month
+            month_str = f"{query_result.specific_year:04d}-{query_result.specific_month:02d}"
+            df = df[df['Date'].dt.strftime('%Y-%m') == month_str]
+        else:
+            df = self._filter_by_timeframe(df, timeframe_str, now)
+
+        # 3. Filter by capsters (with alias expansion)
+        if query_result.capsters:
+            capster_filter = set()
+            alias_map = query_result.capster_alias_map or {}
+            for name in query_result.capsters:
+                name_lower = name.lower()
+                capster_filter.add(name_lower)
+                # Expand aliases: e.g. "Zidan" also matches "timingemma"
+                for alias_name in alias_map.get(name_lower, []):
+                    capster_filter.add(alias_name)
+            df = df[df['Capster'].str.lower().isin(capster_filter)]
+
+        # 4. Filter by branches
+        if query_result.branches:
+            branch_filter = [name.lower() for name in query_result.branches]
+            df = df[df['Branch'].str.lower().isin(branch_filter)]
+
+        if df.empty:
+            return f"Data tidak ditemukan untuk periode '{timeframe_str}'."
+
+        # 5. Build context string
+        total_revenue = df['Price'].sum()
+        total_transactions = len(df)
+        report_type = query_result.report_type or 'general'
+        limit = query_result.limit or 10
+
+        context_parts = [
+            f"Periode: {timeframe_str}",
+            f"Total Pendapatan: Rp {total_revenue:,.0f}",
+            f"Jumlah Transaksi: {total_transactions}",
+        ]
+
+        if query_result.capsters:
+            context_parts.append(f"Filter Capster: {', '.join(query_result.capsters)}")
+        if query_result.branches:
+            context_parts.append(f"Filter Cabang: {', '.join(query_result.branches)}")
+
+        # Add report-type specific data
+        if report_type in ('capster_ranking', 'general', 'monthly_summary', 'weekly_summary'):
+            ranking = self._build_capster_ranking(df, limit)
+            if ranking:
+                context_parts.append(ranking)
+
+        if report_type in ('branch_comparison', 'general', 'monthly_summary', 'weekly_summary'):
+            comparison = self._build_branch_comparison(df)
+            if comparison:
+                context_parts.append(comparison)
+
+        if report_type in ('service_popularity', 'general', 'monthly_summary'):
+            popularity = self._build_service_popularity(df, limit)
+            if popularity:
+                context_parts.append(popularity)
+
+        if report_type == 'profit':
+            # Determine month for profit calculation
+            if timeframe_str == 'bulan lalu':
+                first_day = now.replace(day=1)
+                last_month = first_day - timedelta(days=1)
+                profit_context = self._build_profit_context(last_month.year, last_month.month, timeframe_str)
+            else:
+                profit_context = self._build_profit_context(year, now.month, timeframe_str)
+            context_parts.append(profit_context)
+
+        if report_type in ('daily_summary', 'weekly_summary', 'monthly_summary', 'general'):
+            daily = self._build_daily_breakdown(df)
+            if daily:
+                context_parts.append(daily)
+
+        # Always include payment method for summaries
+        if report_type in ('monthly_summary', 'weekly_summary', 'general'):
+            payments = self._build_payment_methods(df)
+            if payments:
+                context_parts.append(payments)
+
+        return "\n\n".join(context_parts)
+
+    def get_dynamic_capster_list(self, year: int = None) -> list:
+        """Get unique capster names from transaction data."""
+        if year is None:
+            year = datetime.now().year
+        try:
+            df = self._get_or_fetch_transactions(year)
+            if df.empty or 'Capster' not in df.columns:
+                return []
+            return sorted(df['Capster'].dropna().unique().tolist())
+        except Exception as e:
+            logger.error(f"Failed to get dynamic capster list: {e}")
+            return []
+
+    def get_branch_list(self) -> list:
+        """Get branch names from constants."""
+        return [branch['name'] for branch_id, branch in BRANCHES.items()]
 
         

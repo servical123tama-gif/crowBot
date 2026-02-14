@@ -42,8 +42,9 @@ def validate_environment():
     load_dotenv()
     
     required_vars = ['TELEGRAM_BOT_TOKEN', 'GOOGLE_SHEET_ID', 'AUTHORIZED_CAPSTERS', 'OWNER_IDS']
+    optional_vars = ['GEMINI_API_KEY']
     all_vars_valid = True
-    
+
     logger.info("📋 Checking required .env variables:")
     for var in required_vars:
         value = os.getenv(var, '')
@@ -52,7 +53,15 @@ def validate_environment():
         else:
             logger.error(f"   - {var}: ❌ Empty or not set!")
             all_vars_valid = False
-            
+
+    logger.info("📋 Checking optional .env variables:")
+    for var in optional_vars:
+        value = os.getenv(var, '')
+        if value:
+            logger.info(f"   - {var}: ✅ Set")
+        else:
+            logger.warning(f"   - {var}: ⚠️ Not set (feature /tanya will use fallback mode)")
+
     if not all_vars_valid:
         logger.error("❌ One or more required environment variables are missing.")
         return False
@@ -126,7 +135,7 @@ def main(dev_mode: bool = False):
         logger.error("=" * 60)
         logger.error(f"❌ Import Error: {e}")
         logger.error("=" * 60)
-        logger.info("\n💡 Have you installed the dependencies? Run: pip install -r requrements.txt")
+        logger.info("\n💡 Have you installed the dependencies? Run: pip install -r requirements.txt")
         if dev_mode:
             input("\nPress Enter to exit...")
             

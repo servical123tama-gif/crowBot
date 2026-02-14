@@ -172,43 +172,23 @@ async def handle_profit_report(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard = KeyboardBuilder.back_button()
         
     await safe_edit_message(query, report, reply_markup=keyboard)
-
-
-@handle_errors
-@require_owner_or_admin
-async def handle_stock_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle stock report request - Owner/Admin only"""
-    query = update.callback_query
-    await query.answer()
-
-    await safe_edit_message(query, "⏳ Memuat laporan stok produk...")
-
-    try:
-        report_service = context.bot_data['report_service']
-        report = report_service.generate_stock_report()
-    except Exception as e:
-        logger.error(f"Failed to generate stock report: {e}", exc_info=True)
-        report = "❌ Gagal membuat laporan stok. Silakan coba lagi."
-        
-    keyboard = KeyboardBuilder.back_button() # Assuming a back button is sufficient for stock report
-    await safe_edit_message(query, report, reply_markup=keyboard)
-    
     
 # REPORT FOR CAPSTER 
 @handle_errors
 @require_auth
 async def handle_capster_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle daily report request - Available for all capsters"""
-    # from app.services.report_service import ReportService # Removed local import
-    username = update.effective_user
+    user = update.effective_user
     query = update.callback_query
     await query.answer()
-    
+
     await safe_edit_message(query, "⏳ Memuat laporan harian...")
-    
+
     try:
+        capster_service = context.bot_data.get('capster_service')
+        capster_name = capster_service.get_real_name(user.id, fallback=user.first_name)
         report_service = context.bot_data['report_service']
-        report = report_service.generate_daily_report(user=username.first_name)
+        report = report_service.generate_daily_report(user=capster_name)
     except Exception as e:
         logger.error(f"Failed to generate daily report: {e}")
         report = "❌ Gagal membuat laporan. Silakan coba lagi."
@@ -221,16 +201,17 @@ async def handle_capster_daily_report(update: Update, context: ContextTypes.DEFA
 @require_auth
 async def handle_capster_weekly_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle weekly report request - Available for all capsters"""
-    # from app.services.report_service import ReportService # Removed local import
-    username = update.effective_user
+    user = update.effective_user
     query = update.callback_query
     await query.answer()
-    
+
     await safe_edit_message(query, "⏳ Memuat laporan mingguan...")
-    
+
     try:
+        capster_service = context.bot_data.get('capster_service')
+        capster_name = capster_service.get_real_name(user.id, fallback=user.first_name)
         report_service = context.bot_data['report_service']
-        report = report_service.generate_weekly_report(user=username.first_name)
+        report = report_service.generate_weekly_report(user=capster_name)
     except Exception as e:
         logger.error(f"Failed to generate weekly report: {e}")
         report = "❌ Gagal membuat laporan. Silakan coba lagi."
@@ -242,19 +223,20 @@ async def handle_capster_weekly_report(update: Update, context: ContextTypes.DEF
 @handle_errors
 @require_auth
 async def handle_capster_monthly_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle monthly report request - Owner/Admin only"""
-    # from app.services.report_service import ReportService # Removed local import
-    username = update.effective_user
+    """Handle monthly report request for capster"""
+    user = update.effective_user
     query = update.callback_query
     await query.answer()
-    
+
     await safe_edit_message(query, "⏳ Memuat laporan bulanan...")
-    
+
     now = datetime.now()
     try:
+        capster_service = context.bot_data.get('capster_service')
+        capster_name = capster_service.get_real_name(user.id, fallback=user.first_name)
         report_service = context.bot_data['report_service']
         report = report_service.generate_monthly_report(
-            user=username.first_name,
+            user=capster_name,
             year=now.year,
             month=now.month
         )

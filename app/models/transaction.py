@@ -11,8 +11,8 @@ class Transaction:
     capster: str
     service: str
     price: float
-    payment_method : Optional[str] = "Cash"
-    date: Optional[datetime] = None,
+    payment_method: Optional[str] = "Cash"
+    date: Optional[datetime] = None
     branch: Optional[str] = None
     
     def __post_init__(self):
@@ -26,7 +26,7 @@ class Transaction:
             'service': self.service,
             'price': self.price,
             'date': self.date,
-            'payment' : self.payment_method,
+            'payment': self.payment_method,
             'branch': self.branch
         }
     

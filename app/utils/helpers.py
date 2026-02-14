@@ -64,11 +64,11 @@ def get_kapster_info(username):
     """
     # Debug & validasi input
     if not username:
-        print("DEBUG get_kapster_info: username is falsy:", username)
+        logger.debug("get_kapster_info: username is falsy: %s", username)
         return None
 
     if not isinstance(username, str):
-        print("DEBUG get_kapster_info: username is not str, converting:", type(username))
+        logger.debug("get_kapster_info: username is not str, converting: %s", type(username))
         try:
             username = str(username)
         except Exception:
@@ -77,10 +77,6 @@ def get_kapster_info(username):
     # Normalisasi: hapus leading @, trim spasi, ubah ke lowercase
     username_clean = username.strip().lstrip("@").lower()
 
-    print("DEBUG get_kapster_info: normalized username =", username_clean)
+    logger.debug("get_kapster_info: normalized username = %s", username_clean)
 
     return username_clean
-
-def get_current_branch_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
-    """Retrieves the current branch ID for a user from context.user_data."""
-    return context.user_data.get('branch_id')

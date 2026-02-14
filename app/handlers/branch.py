@@ -39,7 +39,7 @@ async def handle_branch_selection(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     
     user_id = query.from_user.id
-    caster_name = query.from_user.first_name
+    capster_name = query.from_user.first_name
     
     # Validate branch
     if branch_id not in BRANCHES:
@@ -71,7 +71,7 @@ async def handle_change_branch(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     
     user_id = query.from_user.id
-    caster_name = query.from_user.first_name
+    capster_name = query.from_user.first_name
     
     # Get current branch
     current_branch_id = BranchService.get_branch(user_id)
@@ -83,7 +83,7 @@ async def handle_change_branch(update: Update, context: ContextTypes.DEFAULT_TYP
         message = MSG_CURRENT_BRANCH.format(
             branch=branch_name,
             date=today,
-            capster=caster_name
+            capster=capster_name
         )
     else:
         message = "🏢 Anda belum memilih cabang hari ini.\n\nSilakan pilih cabang:"

@@ -84,45 +84,6 @@ class WeekCalculator:
         return weeks
     
     @staticmethod
-    def get_current_week_info(year: int = None, month: int = None) -> Dict:
-        """
-        Get current week info based on today's date
-        
-        Returns:
-            Dict with 'week_num', 'start_date', 'end_date', 'month', 'year'
-        """
-        if year is None or month is None:
-            today = datetime.now()
-            year = today.year
-            month = today.month
-        else:
-            today = datetime.now()
-        
-        weeks = WeekCalculator.get_weeks_in_month(year, month)
-        
-        # Find which week contains today
-        for week in weeks:
-            if week['start_date'].date() <= today.date() <= week['end_date'].date():
-                return {
-                    **week,
-                    'month': month,
-                    'year': year,
-                    'month_name': datetime(year, month, 1).strftime('%B %Y')
-                }
-        
-        # If today is before first week of month, return None
-        # If today is after last week, return last week
-        if weeks:
-            return {
-                **weeks[-1],
-                'month': month,
-                'year': year,
-                'month_name': datetime(year, month, 1).strftime('%B %Y')
-            }
-        
-        return None
-    
-    @staticmethod
     def get_week_range(year: int, month: int, week_num: int) -> Tuple[datetime, datetime]:
         """
         Get start and end date for specific week number

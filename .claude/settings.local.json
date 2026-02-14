@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s \"D:\\\\Document\\\\barber\\\\bot_barber_2\")",
+      "Bash(del \"D:\\\\Document\\\\barber\\\\bot_barber_2\\\\app\\\\utils\\\\oprational_calculator.py\")"
+    ]
+  }
+}

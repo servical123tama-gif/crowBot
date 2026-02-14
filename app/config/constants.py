@@ -3,13 +3,16 @@ SHEET_TRANSACTIONS = 'Transactions'
 SHEET_CAPSTERS = 'CapsterList'
 SHEET_SUMMARY = 'Summary'
 SHEET_CUSTOMERS = 'Customers'
+SHEET_SERVICES = 'ServiceList'
+SHEET_BRANCHES = 'BranchConfig'
+SHEET_PRODUCTS = 'ProductList'
 
 # Services & Prices - Main Services
 SERVICES_MAIN = {
     'Potong': {'name': 'Potong Rambut', 'price': 25000},
     'PotongCuci': {'name': 'Potong + Cuci', 'price': 30000},
-    'PotongAnak' : {'name': 'Potong Anak', 'price': 20000},
-    'PotongAnakCuci' : {'name': 'Potong & Cuci Anak', 'price': 25000},
+    'PotongAnak': {'name': 'Potong Anak', 'price': 20000},
+    'PotongAnakCuci': {'name': 'Potong & Cuci Anak', 'price': 25000},
     'PotongBapakAnak': {'name': 'Potong Bapak & Anak', 'price': 40000},
 }
 
@@ -29,6 +32,13 @@ METHOD_PAY = {
 PAYMENT_METHODS = {
     'cash': {'name': 'Cash', 'icon': '💵'},
     'qris': {'name': 'QRIS', 'icon': '📱'},
+}
+
+# Products (Pomade, Powder, etc.)
+PRODUCTS = {
+    'Pomade': {'name': 'Pomade', 'price': 55000},
+    'Powder': {'name': 'Powder', 'price': 15000},
+    'HairTonic': {'name': 'Hair Tonic', 'price': 25000},
 }
 
 # Combine all services for easy access
@@ -63,48 +73,87 @@ CB_PROFIT_NAV = 'profit_nav'
 #repot weekly
 CB_REPORT_WEEKLY_BREAKDOWN = 'report_weekly_breakdown'
 CB_WEEK_SELECT = 'week_select'
-CB_BACK_WEKKLY_MENU = 'back_weekly_menu'
+CB_BACK_WEEKLY_MENU = 'back_weekly_menu'
 
 # Customer Menu
 CB_CUSTOMER_MENU = 'customer_menu'
 CB_ADD_CUSTOMER = 'add_customer'
 CB_LIST_CUSTOMERS = 'list_customers'
 
+# Capster Management
+CB_CAPSTER_MENU = 'capster_menu'
+CB_ADD_CAPSTER = 'add_capster'
+CB_LIST_CAPSTERS = 'list_capsters'
+CB_REMOVE_CAPSTER = 'remove_capster'
+CB_CONFIRM_REMOVE_CAPSTER = 'confirm_rm_capster'
+CB_EDIT_CAPSTER = 'edit_capster'
+CB_MIGRATE_CAPSTER_NAMES = 'migrate_capster_names'
+
 #callback for capster
-CB_REPORT_DAILY_CAPSTER = 'report_daily_capter'
-CB_REPORT_WEEKLY_CAPSTER = 'report_weekly_capter'
-CB_REPORT_MONTHLY_CAPSTER = 'report_monthly_capter'
+CB_REPORT_DAILY_CAPSTER = 'report_daily_capster'
+CB_REPORT_WEEKLY_CAPSTER = 'report_weekly_capster'
+CB_REPORT_MONTHLY_CAPSTER = 'report_monthly_capster'
+
+# Config Management Callbacks
+CB_CONFIG_MENU = 'config_menu'
+CB_CONFIG_SERVICES = 'config_services'
+CB_CONFIG_BRANCHES = 'config_branches'
+CB_CONFIG_LIST_SERVICES = 'config_list_svc'
+CB_CONFIG_ADD_SERVICE = 'config_add_svc'
+CB_CONFIG_EDIT_SERVICE = 'config_edit_svc'
+CB_CONFIG_REMOVE_SERVICE = 'config_rm_svc'
+CB_CONFIG_CONFIRM_RM_SVC = 'config_crm_svc'
+CB_CONFIG_LIST_BRANCHES = 'config_list_br'
+CB_CONFIG_EDIT_BRANCH = 'config_edit_br'
+CB_CONFIG_EDIT_BRANCH_COST = 'config_ebc'
+CB_CONFIG_EDIT_BRANCH_COMMISSION = 'config_ebcm'
+
+# Product Config Callbacks (Owner CRUD)
+CB_CONFIG_PRODUCTS = 'config_products'
+CB_CONFIG_LIST_PRODUCTS = 'config_list_prd'
+CB_CONFIG_ADD_PRODUCT = 'config_add_prd'
+CB_CONFIG_EDIT_PRODUCT = 'config_edit_prd'
+CB_CONFIG_REMOVE_PRODUCT = 'config_rm_prd'
+CB_CONFIG_CONFIRM_RM_PRD = 'config_crm_prd'
+
+# Product Transaction Callbacks (Capster)
+CB_SELL_PRODUCT = 'sell_product'
+CB_PRODUCT_SELECT = 'prd_sel'
+CB_PRODUCT_PAYMENT = 'prd_pay'
 
 BRANCHES = {
     'cabang_a': {
-        'name': 'Cabang Denailla', 
-        'location': 'Mojosari', 
+        'name': 'Cabang Denailla',
+        'location': 'Mojosari',
         'short': 'Cabang A',
-        'employees' : 2,
-        'oprational_cost' : {
-            'tempat' : 520000,
-            'listrik air' : 400000,
-            'wifi' : 15000,
-            'karyawan_fixed' : 2500000,
-        }, 
+        'employees': 2,
+        'commission_rate': 0,
+        'operational_cost': {
+            'tempat': 520000,
+            'listrik air': 400000,
+            'wifi': 15000,
+            'karyawan_fixed': 2500000,
+        },
     },
     'cabang_b': {
-        'name': 'Cabang Sumput', 
-        'location': 'Sumput', 
+        'name': 'Cabang Sumput',
+        'location': 'Sumput',
         'short': 'Cabang B',
-        'employees' : 2,
-        'oprational_cost' : {
-            'tempat' : 792000,
-            'listrik air' : 350000,
-            'wifi' : 30000,
+        'employees': 2,
+        'commission_rate': 0.5,
+        'operational_cost': {
+            'tempat': 792000,
+            'listrik air': 350000,
+            'wifi': 30000,
+            'karyawan_fixed': 0,
         }
     },
 }
 
-OPRATIONAL_CONFIG = {
-    'day_per_month' : 30,
-    'week_per_month' : 4.33,
-    'commision_rate' : 0.5
+OPERATIONAL_CONFIG = {
+    'day_per_month': 30,
+    'week_per_month': 4.33,
+    'commission_rate': 0.5
 }
 
 # Messages
@@ -167,9 +216,35 @@ MSG_CURRENT_BRANCH = """📍 Cabang Saat Ini
 
 Ingin ganti cabang?"""
 
+# Capster Messages
+MSG_CAPSTER_MENU = "💈 Menu Kelola Capster\n\nPilih opsi di bawah:"
+MSG_ADD_CAPSTER_NAME = "✍️ Silakan masukkan nama capster:\n\n💡 Ketik /cancel untuk membatalkan."
+MSG_ADD_CAPSTER_ID = "🔢 Silakan masukkan Telegram User ID capster:"
+MSG_ADD_CAPSTER_ALIAS = "📛 Masukkan nama Telegram capster ini (nama di transaksi lama).\nKetik /skip jika tidak ada:"
+MSG_CAPSTER_ADDED = "✅ Capster '{name}' (ID: {telegram_id}) berhasil ditambahkan!"
+MSG_CAPSTER_REMOVED = "✅ Capster '{name}' berhasil dihapus."
+MSG_CAPSTER_LIST_HEADER = "💈 Daftar Capster Terdaftar"
+MSG_CAPSTER_LIST_EMPTY = "📭 Belum ada capster terdaftar.\n\nGunakan menu \"Tambah Capster\" untuk mendaftarkan capster baru."
+MSG_EDIT_CAPSTER_NAME = "✍️ Masukkan nama baru (atau /skip untuk tidak mengubah):"
+MSG_EDIT_CAPSTER_ALIAS = "📛 Masukkan alias baru (atau /skip untuk tidak mengubah):"
+MSG_CAPSTER_UPDATED = "✅ Data capster berhasil diperbarui!"
+
+# Config Messages
+MSG_CONFIG_MENU = "⚙️ Menu Pengaturan\n\nKelola layanan, produk, dan cabang:"
+MSG_CONFIG_SERVICES_MENU = "📋 Menu Layanan\n\nPilih opsi:"
+MSG_CONFIG_BRANCHES_MENU = "🏢 Menu Cabang\n\nPilih cabang untuk edit:"
+MSG_CONFIG_PRODUCTS_MENU = "🧴 Menu Produk\n\nPilih opsi:"
+MSG_SELECT_PRODUCT = "🧴 Pilih Produk untuk Dijual:"
+MSG_PRODUCT_SELECT_PAYMENT = """💰 Pilih Metode Pembayaran
+
+🧴 Produk: {product}
+💵 Total: {currency} {price:,}
+
+Silakan pilih metode pembayaran:"""
+
 # Customer Messages
 MSG_CUSTOMER_MENU = "👤 Menu Pelanggan\n\nPilih opsi di bawah:"
-MSG_ADD_CUSTOMER_NAME = "✍️ Silakan masukkan nama pelanggan:"
+MSG_ADD_CUSTOMER_NAME = "✍️ Silakan masukkan nama pelanggan:\n\n💡 Ketik /cancel untuk membatalkan."
 MSG_ADD_CUSTOMER_PHONE = "📱 Silakan masukkan nomor telepon pelanggan:"
 MSG_CUSTOMER_ADDED = "✅ Pelanggan '{name}' ({phone}) berhasil ditambahkan!"
 MSG_CUSTOMER_LIST_HEADER = "👥 Daftar Pelanggan Terdaftar"

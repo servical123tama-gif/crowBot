@@ -10,7 +10,10 @@ from app.utils.keyboards import KeyboardBuilder
 from app.config.constants import *
 from app.services.branch_service import BranchService
 from app.handlers.branch import show_branch_selection, handle_branch_selection, handle_change_branch
-from app.handlers.transaction import handle_service_selection, handle_payment_selection
+from app.handlers.transaction import (
+    handle_service_selection, handle_payment_selection,
+    handle_sell_product_menu, handle_product_selection, handle_product_payment,
+)
 from app.handlers.report import (
     handle_daily_report,
     handle_weekly_report,
@@ -23,6 +26,18 @@ from app.handlers.report import (
     handle_weekly_breakdown,
 )
 from app.handlers.customer import customer_menu_handler, list_customers_handler
+from app.handlers.capster import (
+    capster_menu_handler, list_capsters_handler, handle_remove_capster,
+    handle_confirm_remove_capster, handle_migrate_names
+)
+from app.handlers.config_handler import (
+    config_menu_handler, config_services_menu_handler,
+    config_list_services_handler, config_branches_menu_handler,
+    handle_remove_service, handle_confirm_remove_service,
+    handle_edit_branch_select,
+    config_products_menu_handler, config_list_products_handler,
+    handle_remove_product, handle_confirm_remove_product,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +57,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         CB_CHANGE_BRANCH: handle_change_branch,
         CB_CUSTOMER_MENU: customer_menu_handler,
         CB_LIST_CUSTOMERS: list_customers_handler,
+        CB_CAPSTER_MENU: capster_menu_handler,
+        CB_LIST_CAPSTERS: list_capsters_handler,
+        CB_MIGRATE_CAPSTER_NAMES: handle_migrate_names,
         CB_COLORING_MENU: lambda u, c: u.callback_query.edit_message_text(
             "🎨 Pilih layanan Coloring:",
             reply_markup=KeyboardBuilder.coloring_menu()
@@ -62,6 +80,13 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Silakan pilih menu:",
             reply_markup=KeyboardBuilder.main_menu(user_id=u.effective_user.id)
         ),
+        CB_CONFIG_MENU: config_menu_handler,
+        CB_CONFIG_SERVICES: config_services_menu_handler,
+        CB_CONFIG_LIST_SERVICES: config_list_services_handler,
+        CB_CONFIG_BRANCHES: config_branches_menu_handler,
+        CB_CONFIG_PRODUCTS: config_products_menu_handler,
+        CB_CONFIG_LIST_PRODUCTS: config_list_products_handler,
+        CB_SELL_PRODUCT: handle_sell_product_menu,
     }
 
     PREFIX_HANDLERS = {
@@ -72,7 +97,21 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         CB_MONTHLY_NAV: lambda u, c, d: handle_monthly_report(u, c, *map(int, d.replace(f"{CB_MONTHLY_NAV}_", "").split("_"))),
         CB_PROFIT_NAV: lambda u, c, d: handle_profit_report(u, c, *map(int, d.replace(f"{CB_PROFIT_NAV}_", "").split("_"))),
         CB_WEEK_SELECT: lambda u, c, d: handle_week_detail(u, c, *map(int, d.replace(f"{CB_WEEK_SELECT}_", "").split("_"))),
+        CB_REMOVE_CAPSTER: lambda u, c, d: handle_remove_capster(u, c, d),
+        CB_CONFIRM_REMOVE_CAPSTER: lambda u, c, d: handle_confirm_remove_capster(u, c, d),
+        CB_CONFIG_REMOVE_SERVICE: lambda u, c, d: handle_remove_service(u, c, d),
+        CB_CONFIG_CONFIRM_RM_SVC: lambda u, c, d: handle_confirm_remove_service(u, c, d),
+        CB_CONFIG_EDIT_BRANCH: lambda u, c, d: handle_edit_branch_select(u, c, d),
+        CB_CONFIG_REMOVE_PRODUCT: lambda u, c, d: handle_remove_product(u, c, d),
+        CB_CONFIG_CONFIRM_RM_PRD: lambda u, c, d: handle_confirm_remove_product(u, c, d),
+        CB_PRODUCT_SELECT: lambda u, c, d: handle_product_selection(u, c, d.replace(f"{CB_PRODUCT_SELECT}_", "")),
+        CB_PRODUCT_PAYMENT: lambda u, c, d: handle_product_payment(u, c, *d.replace(f"{CB_PRODUCT_PAYMENT}_", "").split("_", 1)),
     }
+
+    # --- No-op for section header buttons ---
+    if data == 'noop':
+        await query.answer()
+        return
 
     # --- Special Case: Add Transaction (requires pre-check) ---
     if data == CB_ADD_TRANSACTION:

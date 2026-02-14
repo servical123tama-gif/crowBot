@@ -96,12 +96,17 @@ async def list_customers_handler(update: Update, context: ContextTypes.DEFAULT_T
     customer_service = CustomerService()
     customers = customer_service.get_all_customers()
 
+    keyboard = KeyboardBuilder.customer_menu(user_id)
+
     if not customers:
-        await update.callback_query.edit_message_text("Tidak ada pelanggan terdaftar.")
+        await update.callback_query.edit_message_text(
+            "📭 Belum ada pelanggan terdaftar.\n\nTambahkan pelanggan baru melalui menu di bawah.",
+            reply_markup=keyboard
+        )
         return
 
     report = f"{MSG_CUSTOMER_LIST_HEADER}\n\n"
     for i, customer in enumerate(customers, 1):
         report += f"{i}. {customer.name} - {customer.phone}\n"
 
-    await update.callback_query.edit_message_text(report)
+    await update.callback_query.edit_message_text(report, reply_markup=keyboard)
