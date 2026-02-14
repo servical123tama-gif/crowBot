@@ -1,88 +1,202 @@
-## Fitur Lengkap
+# Barbershop Management Bot
 
-Bot ini dirancang untuk membantu manajemen operasional barbershop dengan serangkaian fitur yang komprehensif.
+Bot Telegram untuk manajemen operasional barbershop multi-cabang. Mencatat transaksi, menghasilkan laporan keuangan, dan mengelola konfigurasi bisnis langsung dari Telegram.
 
-### 💰 Manajemen Transaksi
-- **Pencatatan Transaksi**: Mencatat setiap transaksi pemasukan dan pengeluaran dengan detail.
-- **Detail Komprehensif**: Setiap transaksi mencakup informasi penting seperti tanggal, cabang, nama kapster, pelanggan, jenis layanan, harga, dan metode pembayaran.
-- **Riwayat Transaksi**: Melihat daftar transaksi terkini untuk pemantauan cepat.
-- **Hapus Transaksi**: Admin dan Owner memiliki hak untuk menghapus transaksi jika terjadi kesalahan input.
+## Fitur
 
-### 📊 Pelaporan Keuangan
-- **Laporan Fleksibel**: Membuat laporan keuangan secara otomatis dalam berbagai rentang waktu.
-- **Laporan Mingguan & Bulanan**: Menghasilkan rekapitulasi pendapatan mingguan dan bulanan, tersedia untuk semua kapster atau per individu.
-- **Laporan Detail Mingguan**: Memberikan rincian pendapatan harian selama satu minggu penuh untuk analisis yang lebih mendalam.
-- **Analisis Laba Rugi**: Fitur khusus Owner untuk menghasilkan laporan laba rugi (Profit Report) yang memisahkan laba kotor dan laba bersih setelah dipotong biaya operasional.
+### Pencatatan Transaksi
+- Catat transaksi layanan (potong rambut, coloring, dll) dengan detail lengkap
+- Catat penjualan produk (pomade, powder, hair tonic, dll)
+- Pilih cabang, layanan, dan metode pembayaran via menu interaktif
+- Data tersimpan otomatis ke Google Sheets per bulan
 
-### 👤 Manajemen Pelanggan & Kapster
-- **Database Pelanggan**: Menambah dan mencari data pelanggan untuk melacak riwayat kunjungan.
-- **Manajemen Kapster**: Sistem mengenali pengguna sebagai `CAPSTER`, `ADMIN`, atau `OWNER` berdasarkan ID Telegram, memberikan akses yang sesuai.
+### Laporan Keuangan
+- **Laporan Harian** — ringkasan transaksi hari ini per cabang dan capster
+- **Laporan Mingguan** — rekapitulasi minggu berjalan dengan breakdown per hari
+- **Laporan Bulanan** — rekapitulasi bulanan dengan navigasi antar bulan
+- **Laporan Profit** — laba rugi per cabang (pendapatan - biaya operasional - komisi)
+- **Laporan Per Capster** — laporan harian/mingguan/bulanan per individu capster
+- **Notifikasi Harian Otomatis** — ringkasan harian dikirim ke owner setiap jam 23:00 WIB
 
-### 🏢 Manajemen Multi-Cabang
-- **Dukungan Multi-Cabang**: Didesain untuk mengelola beberapa cabang barbershop dari satu bot.
-- **Informasi Cabang**: Melihat rekapitulasi dan informasi spesifik untuk setiap cabang.
+### RAG (Tanya Jawab AI)
+- Perintah `/tanya` untuk bertanya tentang data bisnis dalam bahasa natural
+- Didukung oleh Google Gemini AI (gemini-2.0-flash) dengan fallback keyword matching
+- Contoh: `/tanya berapa pendapatan minggu ini?`, `/tanya siapa capster terbaik bulan januari?`
+- Mendukung filter per tanggal, cabang, capster, dan rentang waktu
+
+### Manajemen Capster (Owner)
+- Tambah, edit, hapus capster via bot
+- Data capster tersimpan di Google Sheets (sheet `CapsterList`)
+- Merge otomatis dengan data `.env` saat startup
+- Migrasi nama transaksi lama ke nama capster baru
+
+### Pengaturan via Bot (Owner)
+- **Kelola Layanan** — tambah, edit harga, hapus layanan (main & coloring)
+- **Kelola Produk** — tambah, edit harga, hapus produk
+- **Kelola Cabang** — edit biaya operasional dan komisi per cabang
+- Semua konfigurasi tersimpan di Google Sheets dan di-load otomatis saat startup
+
+### Manajemen Pelanggan
+- Tambah dan lihat daftar pelanggan
+
+### Multi-Cabang
+- Capster memilih cabang kerja setiap hari
+- Transaksi otomatis tercatat ke cabang yang dipilih
+- Laporan profit per cabang dengan biaya operasional berbeda
+
+### Sistem Role
+| Role | Akses |
+|------|-------|
+| **Owner** | Semua fitur + pengaturan + laporan profit + kelola capster |
+| **Admin** | Laporan umum + kelola pelanggan |
+| **Capster** | Catat transaksi + laporan pribadi |
 
 ## Tech Stack
 
-- Python 3.11+
-- python-telegram-bot
-- Google Sheets API
-- pandas
+- **Python 3.11+**
+- **python-telegram-bot 20.7** — framework bot Telegram
+- **gspread + oauth2client** — Google Sheets API
+- **pandas** — pemrosesan data dan laporan
+- **google-generativeai** — Google Gemini AI untuk fitur RAG
+- **Flask** — health check server untuk deployment
+- **pytz** — timezone support
 
-## Instalasi dan Menjalankan Bot
+## Struktur Project
+
+```
+app/
+├── config/
+│   ├── constants.py          # Konstanta, callback data, pesan
+│   └── settings.py           # Konfigurasi dari .env
+├── handlers/
+│   ├── start.py              # Handler /start
+│   ├── transaction.py        # Catat transaksi layanan & produk
+│   ├── branch.py             # Pilih/ganti cabang
+│   ├── report.py             # Laporan harian/mingguan/bulanan/profit
+│   ├── callback.py           # Router callback query
+│   ├── capster.py            # CRUD capster
+│   ├── config_handler.py     # CRUD layanan, produk, cabang
+│   ├── customer.py           # Manajemen pelanggan
+│   ├── query_handler.py      # Handler /tanya (RAG)
+│   └── scheduler.py          # Notifikasi harian otomatis
+├── models/
+│   ├── transaction.py        # Model transaksi
+│   ├── capster.py            # Model capster
+│   ├── customer.py           # Model pelanggan
+│   └── query.py              # Model query RAG
+├── services/
+│   ├── sheets_service.py     # CRUD Google Sheets
+│   ├── report_service.py     # Generate laporan
+│   ├── config_service.py     # Load/save konfigurasi
+│   ├── capster_service.py    # Business logic capster
+│   ├── auth_service.py       # Autentikasi & role
+│   ├── branch_service.py     # Manajemen cabang harian
+│   ├── gemini_service.py     # Google Gemini AI
+│   └── query_parser_service.py  # Parser query natural language
+├── utils/
+│   ├── keyboards.py          # Inline keyboard builders
+│   ├── formatters.py         # Format mata uang, tanggal
+│   ├── decorators.py         # @require_auth, @require_owner, dll
+│   ├── helpers.py            # Utility functions
+│   └── week_calculator.py    # Kalkulasi minggu dalam bulan
+├── bot.py                    # Inisialisasi & wiring aplikasi
+└── web_server.py             # Health check untuk deployment
+main.py                       # Entry point
+requirements.txt
+```
+
+## Setup
+
+### 1. Buat Bot Telegram
+- Buka [@BotFather](https://t.me/BotFather) di Telegram
+- Buat bot baru dan catat `TELEGRAM_BOT_TOKEN`
+
+### 2. Setup Google Sheets API
+- Buat project di [Google Cloud Console](https://console.cloud.google.com/)
+- Aktifkan Google Sheets API dan Google Drive API
+- Buat Service Account, download file credentials sebagai `credentials.json`
+- Buat Google Spreadsheet baru, catat `GOOGLE_SHEET_ID` dari URL
+- Share spreadsheet ke email service account (dengan akses Editor)
+
+### 3. (Opsional) Setup Gemini AI
+- Dapatkan API key gratis di [Google AI Studio](https://aistudio.google.com/apikey)
+- Untuk fitur `/tanya` (natural language query)
+
+### 4. Install Dependencies
 
 ```bash
 # Buat virtual environment
 python -m venv venv
-venv\Scripts\activate  # Windows
+
+# Aktivasi (Windows)
+venv\Scripts\activate
+
+# Aktivasi (Linux/Mac)
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
 
-# Setup environment
-copy .env.example .env
-# Edit .env dengan credentials Anda sesuai kebutuhan (lihat bagian Setup)
+### 5. Konfigurasi Environment
 
-# Jalankan bot
-# Untuk pengembangan lokal dengan validasi lingkungan:
-python run.py
+```bash
+copy .env.example .env    # Windows
+cp .env.example .env      # Linux/Mac
+```
 
-# Untuk deployment di platform seperti Render.com:
+Edit file `.env`:
+
+```env
+# Wajib
+TELEGRAM_BOT_TOKEN=your_bot_token
+GOOGLE_SHEET_ID=your_sheet_id
+AUTHORIZED_CAPSTERS=123456,789012       # Telegram User ID capster (koma-separated)
+OWNER_IDS=123456                        # Telegram User ID owner
+ADMIN_IDS=789012                        # Telegram User ID admin
+
+# Opsional
+GEMINI_API_KEY=your_gemini_api_key      # Untuk fitur /tanya AI
+BOT_NAME=BarbershopBot
+BOT_USERNAME=your_bot_username
+DEBUG=False
+LOG_LEVEL=INFO
+CURRENCY=Rp
+TIMEZONE=Asia/Jakarta
+```
+
+### 6. Letakkan credentials.json
+Pastikan file `credentials.json` berada di root project.
+
+### 7. Jalankan Bot
+
+```bash
+# Development (dengan validasi environment)
+python main.py --dev
+
+# Production
 python main.py
 ```
 
-## 🔐 Setup
+## Google Sheets
 
-Ikuti langkah-langkah berikut untuk menyiapkan bot Anda:
+Bot otomatis membuat worksheet yang dibutuhkan saat pertama kali dijalankan:
 
-1.  **Bot Telegram**: Buat bot di [@BotFather](https://t.me/BotFather) dan dapatkan `TELEGRAM_BOT_TOKEN`.
-2.  **Google Cloud**: Siapkan Proyek Google Cloud dan Akun Layanan, lalu unduh `credentials.json`.
-3.  **Google Sheets**: Buat Google Sheets baru untuk data transaksi dan catat `GOOGLE_SHEET_ID` dari URL-nya.
-4.  **Konfigurasi Lingkungan (`.env`)**:
-    *   Salin `.env.example` ke `.env`.
-    *   Isi variabel berikut di file `.env` Anda:
-        *   `TELEGRAM_BOT_TOKEN`: Token bot Telegram Anda.
-        *   `GOOGLE_SHEET_ID`: ID Google Sheet Anda (ini wajib dan tidak memiliki nilai *default*).
-        *   `AUTHORIZED_CAPSTERS`: Daftar ID pengguna Telegram capster yang diizinkan (dipisahkan koma, cth: `12345,67890`).
-        *   `OWNER_IDS`: Daftar ID pengguna Telegram owner (dipisahkan koma).
-        *   `ADMIN_IDS`: Daftar ID pengguna Telegram admin (dipisahkan koma).
-        *   `LOG_LEVEL`: Tingkat *logging* (cth: `INFO`, `DEBUG`).
-        *   `CURRENCY`: Simbol mata uang (cth: `Rp`).
-        *   `TIMEZONE`: Zona waktu (cth: `Asia/Jakarta`).
-5.  **File Kredensial**: Pastikan `credentials.json` berada di direktori *root* proyek.
+| Sheet | Fungsi |
+|-------|--------|
+| `Januari 2026`, `Februari 2026`, ... | Data transaksi per bulan |
+| `CapsterList` | Daftar capster (Name, TelegramID, Alias) |
+| `ServiceList` | Daftar layanan & harga (ServiceID, Name, Category, Price) |
+| `BranchConfig` | Konfigurasi cabang & biaya operasional |
+| `ProductList` | Daftar produk & harga |
+| `Customers` | Data pelanggan |
 
-## ✨ Optimalisasi Performa Bot
+## Deployment
 
-Kami telah mengimplementasikan optimasi berikut untuk memastikan bot berjalan lebih cepat dan lebih efisien:
+Bot mendukung deployment ke platform seperti Render.com:
+- Mode production otomatis menjalankan health check server (Flask)
+- Jalankan dengan `python main.py` (tanpa `--dev`)
 
-*   **Akses Google Sheets Cepat**: Sistem sekarang menggunakan *caching* untuk *worksheet* Google Sheets. Ini berarti bot tidak perlu meminta daftar *worksheet* berulang kali dari Google API, sehingga mempercepat operasi data.
-*   **Bot Responsif**: Layanan utama bot seperti `SheetsService` dan `ReportService` sekarang diinisialisasi hanya sekali saat bot pertama kali dijalankan. Ini mencegah inisialisasi yang memakan waktu dan otorisasi API yang berulang, membuat bot lebih responsif terhadap perintah pengguna.
-*   **Konfigurasi Aman**: Penanganan variabel lingkungan telah ditingkatkan untuk keamanan. Misalnya, `GOOGLE_SHEET_ID` sekarang harus selalu ditentukan, menghindari penggunaan *placeholder* yang tidak disengaja. Pesan kesalahan konfigurasi juga lebih informatif dan terintegrasi dengan sistem *logging*.
+## License
 
-## 🚀 Peningkatan di Masa Depan
-
-*   **Migrasi ke *Database* Khusus**: Untuk bot yang sangat aktif dengan banyak transaksi, memindahkan data dari Google Sheets ke *database* relasional khusus (seperti PostgreSQL atau SQLite) sangat direkomendasikan. Ini akan meningkatkan kecepatan pemrosesan transaksi, mendukung kueri data yang lebih kompleks, dan meningkatkan skalabilitas secara keseluruhan.
-
-## 📄 License
-
-Private Project - © 2026
+Private Project
