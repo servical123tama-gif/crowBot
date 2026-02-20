@@ -16,6 +16,7 @@ Bot Telegram untuk manajemen operasional barbershop multi-cabang. Mencatat trans
 - **Laporan Bulanan** — rekapitulasi bulanan dengan navigasi antar bulan
 - **Laporan Profit** — laba rugi per cabang (pendapatan - biaya operasional - komisi)
 - **Laporan Per Capster** — laporan harian/mingguan/bulanan per individu capster
+- **Breakdown Capster per Cabang** — detail layanan per capster per cabang (mendukung capster yang kerja di 2 cabang di hari yang sama)
 - **Notifikasi Harian Otomatis** — ringkasan harian dikirim ke owner setiap jam 23:00 WIB
 
 ### RAG (Tanya Jawab AI)
@@ -24,8 +25,16 @@ Bot Telegram untuk manajemen operasional barbershop multi-cabang. Mencatat trans
 - Contoh: `/tanya berapa pendapatan minggu ini?`, `/tanya siapa capster terbaik bulan januari?`
 - Mendukung filter per tanggal, cabang, capster, dan rentang waktu
 
+### Sistem Gaji Capster (Owner)
+- **Tipe capster**: Mitra (komisi % dari transaksi) atau Tetap (gaji bulanan fixed)
+- **Ringkasan gaji** — pendapatan per periode (minggu/bulan), saldo kumulatif
+- **Catat pengambilan gaji** — withdrawal tracking dengan keterangan
+- **Riwayat pengambilan** — history 10 transaksi terakhir
+- **Saldo kumulatif** — total komisi sepanjang tahun dikurangi total pengambilan
+
 ### Manajemen Capster (Owner)
 - Tambah, edit, hapus capster via bot
+- Pilih tipe capster (mitra/tetap) dan persentase komisi saat pendaftaran
 - Data capster tersimpan di Google Sheets (sheet `CapsterList`)
 - Merge otomatis dengan data `.env` saat startup
 - Migrasi nama transaksi lama ke nama capster baru
@@ -75,6 +84,7 @@ app/
 │   ├── report.py             # Laporan harian/mingguan/bulanan/profit
 │   ├── callback.py           # Router callback query
 │   ├── capster.py            # CRUD capster
+│   ├── salary_handler.py     # Gaji & pengambilan capster
 │   ├── config_handler.py     # CRUD layanan, produk, cabang
 │   ├── customer.py           # Manajemen pelanggan
 │   ├── query_handler.py      # Handler /tanya (RAG)
@@ -185,7 +195,8 @@ Bot otomatis membuat worksheet yang dibutuhkan saat pertama kali dijalankan:
 | Sheet | Fungsi |
 |-------|--------|
 | `Januari 2026`, `Februari 2026`, ... | Data transaksi per bulan |
-| `CapsterList` | Daftar capster (Name, TelegramID, Alias) |
+| `CapsterList` | Daftar capster (Name, TelegramID, Alias, EmploymentType, CommissionRate) |
+| `SalaryWithdrawal` | Catatan pengambilan gaji capster |
 | `ServiceList` | Daftar layanan & harga (ServiceID, Name, Category, Price) |
 | `BranchConfig` | Konfigurasi cabang & biaya operasional |
 | `ProductList` | Daftar produk & harga |

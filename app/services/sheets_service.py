@@ -12,7 +12,7 @@ import pandas as pd
 from app.config.settings import settings
 from app.config.constants import (
     DATETIME_FORMAT, DATE_FORMAT, SHEET_CUSTOMERS, SHEET_CAPSTERS, MONTHS_ID,
-    SHEET_SERVICES, SHEET_BRANCHES, SHEET_PRODUCTS,
+    SHEET_SERVICES, SHEET_BRANCHES, SHEET_PRODUCTS, SHEET_SALARY,
     SERVICES_MAIN, SERVICES_COLORING, BRANCHES, PRODUCTS,
 )
 from app.models.transaction import Transaction
@@ -264,7 +264,7 @@ class SheetsService:
 
     # --- Capster Management ---
 
-    _CAPSTER_HEADERS = ['Name', 'TelegramID', 'Alias']
+    _CAPSTER_HEADERS = ['Name', 'TelegramID', 'Alias', 'EmploymentType', 'CommissionRate']
 
     def _ensure_capster_sheet(self):
         """Create CapsterList sheet with headers if it doesn't exist."""
@@ -275,7 +275,7 @@ class SheetsService:
                     worksheet = self.sheet.worksheet(SHEET_CAPSTERS)
                 except WorksheetNotFound:
                     logger.info(f"Creating '{SHEET_CAPSTERS}' sheet...")
-                    worksheet = self.sheet.add_worksheet(title=SHEET_CAPSTERS, rows="100", cols="5")
+                    worksheet = self.sheet.add_worksheet(title=SHEET_CAPSTERS, rows="100", cols="10")
                     worksheet.append_row(self._CAPSTER_HEADERS)
                     self._worksheet_cache[SHEET_CAPSTERS] = worksheet
                     return worksheet
@@ -286,9 +286,22 @@ class SheetsService:
                     logger.info(f"'{SHEET_CAPSTERS}' sheet missing headers, adding them...")
                     worksheet.insert_row(self._CAPSTER_HEADERS, index=1)
                 elif len(first_row) < 3 or first_row[2] != 'Alias':
-                    # Upgrade: add Alias column header
                     logger.info(f"Upgrading '{SHEET_CAPSTERS}' headers with Alias column...")
                     worksheet.update_cell(1, 3, 'Alias')
+
+                # Auto-upgrade: add EmploymentType & CommissionRate columns if missing
+                first_row = worksheet.row_values(1)
+                if len(first_row) < 4 or first_row[3] != 'EmploymentType':
+                    logger.info("Upgrading CapsterList headers with EmploymentType & CommissionRate...")
+                    worksheet.update_cell(1, 4, 'EmploymentType')
+                    worksheet.update_cell(1, 5, 'CommissionRate')
+                    # Set defaults for existing rows
+                    all_values = worksheet.get_all_values()
+                    for i in range(1, len(all_values)):
+                        row = all_values[i]
+                        if any(row) and (len(row) < 4 or not row[3]):
+                            worksheet.update_cell(i + 1, 4, 'mitra')
+                            worksheet.update_cell(i + 1, 5, '0.5')
 
                 self._worksheet_cache[SHEET_CAPSTERS] = worksheet
             return worksheet
@@ -340,7 +353,8 @@ class SheetsService:
             logger.error(f"Failed to remove capster: {e}", exc_info=True)
             return False
 
-    def update_capster(self, telegram_id: int, name: str = None, alias: str = None) -> bool:
+    def update_capster(self, telegram_id: int, name: str = None, alias: str = None,
+                       employment_type: str = None, commission_rate: float = None) -> bool:
         """Update capster data by telegram_id."""
         try:
             worksheet = self._ensure_capster_sheet()
@@ -354,7 +368,12 @@ class SheetsService:
                         worksheet.update_cell(i, 1, name)
                     if alias is not None:
                         worksheet.update_cell(i, 3, alias)
-                    logger.info(f"Capster {telegram_id} updated: name={name}, alias={alias}")
+                    if employment_type is not None:
+                        worksheet.update_cell(i, 4, employment_type)
+                    if commission_rate is not None:
+                        worksheet.update_cell(i, 5, str(commission_rate))
+                    logger.info(f"Capster {telegram_id} updated: name={name}, alias={alias}, "
+                                f"employment_type={employment_type}, commission_rate={commission_rate}")
                     return True
 
             logger.warning(f"Capster {telegram_id} not found for update.")
@@ -680,3 +699,73 @@ class SheetsService:
         except Exception as e:
             logger.error(f"Failed to remove product: {e}", exc_info=True)
             return False
+
+    # --- Salary Withdrawal Management ---
+
+    _SALARY_HEADERS = ['Date', 'CapsterName', 'TelegramID', 'Amount',
+                       'PeriodStart', 'PeriodEnd', 'Note']
+
+    def _ensure_salary_sheet(self):
+        """Create SalaryWithdrawal sheet with headers if it doesn't exist."""
+        try:
+            worksheet = self._worksheet_cache.get(SHEET_SALARY)
+            if worksheet is None:
+                try:
+                    worksheet = self.sheet.worksheet(SHEET_SALARY)
+                except WorksheetNotFound:
+                    logger.info(f"Creating '{SHEET_SALARY}' sheet...")
+                    worksheet = self.sheet.add_worksheet(title=SHEET_SALARY, rows="500", cols="10")
+                    worksheet.append_row(self._SALARY_HEADERS)
+                self._worksheet_cache[SHEET_SALARY] = worksheet
+            return worksheet
+        except Exception as e:
+            logger.error(f"Failed to ensure salary sheet: {e}", exc_info=True)
+            raise
+
+    def add_withdrawal(self, capster_name: str, telegram_id: int, amount: int,
+                       period_start: str, period_end: str, note: str = '') -> bool:
+        """Add a salary withdrawal record."""
+        try:
+            worksheet = self._ensure_salary_sheet()
+            now = datetime.now().strftime(DATETIME_FORMAT)
+            row = [now, capster_name, telegram_id, amount, period_start, period_end, note]
+            worksheet.append_row(row)
+            logger.info(f"Withdrawal recorded: {capster_name} - Rp {amount:,}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add withdrawal: {e}", exc_info=True)
+            return False
+
+    def get_withdrawals(self, telegram_id: int, start_date: str = None,
+                        end_date: str = None) -> List[Dict[str, Any]]:
+        """Get withdrawal records for a capster, optionally filtered by period."""
+        try:
+            worksheet = self._ensure_salary_sheet()
+            all_values = worksheet.get_all_values()
+            if len(all_values) <= 1:
+                return []
+            headers = all_values[0]
+            records = [dict(zip(headers, row)) for row in all_values[1:] if any(row)]
+            # Filter by telegram_id
+            result = [r for r in records if str(r.get('TelegramID', '')).strip() == str(telegram_id)]
+            # Filter by period overlap if provided
+            if start_date and end_date:
+                result = [
+                    r for r in result
+                    if r.get('PeriodStart', '') <= end_date and r.get('PeriodEnd', '') >= start_date
+                ]
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get withdrawals: {e}")
+            return []
+
+    def get_total_withdrawn(self, telegram_id: int, start_date: str, end_date: str) -> int:
+        """Get total withdrawn amount for a capster within a period."""
+        records = self.get_withdrawals(telegram_id, start_date, end_date)
+        total = 0
+        for r in records:
+            try:
+                total += int(float(r.get('Amount', 0)))
+            except (ValueError, TypeError):
+                pass
+        return total

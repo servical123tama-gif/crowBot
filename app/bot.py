@@ -16,6 +16,7 @@ from app.handlers.start import start_handler
 from app.handlers.callback import callback_router
 from app.handlers.customer import add_customer_conv_handler
 from app.handlers.capster import add_capster_conv_handler, edit_capster_conv_handler
+from app.handlers.salary_handler import salary_withdraw_conv_handler
 from app.handlers.config_handler import (
     add_service_conv_handler, edit_service_conv_handler,
     edit_branch_cost_conv_handler, edit_branch_commission_conv_handler,
@@ -126,6 +127,7 @@ class BarbershopBot:
         self.app.add_handler(edit_branch_commission_conv_handler)
         self.app.add_handler(add_product_conv_handler)
         self.app.add_handler(edit_product_conv_handler)
+        self.app.add_handler(salary_withdraw_conv_handler)
         self.app.add_handler(CallbackQueryHandler(callback_router))
 
         logger.info("Handlers registered")

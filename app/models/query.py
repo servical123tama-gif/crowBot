@@ -7,7 +7,7 @@ from typing import Dict, Optional, List
 VALID_REPORT_TYPES = [
     'revenue', 'transaction_count', 'capster_ranking', 'branch_comparison',
     'service_popularity', 'profit', 'daily_summary', 'weekly_summary',
-    'monthly_summary', 'general'
+    'monthly_summary', 'payment_breakdown', 'general'
 ]
 
 VALID_TIMEFRAMES = [
@@ -33,6 +33,7 @@ class QueryResult:
         self.capsters: List[str] = []
         self.capster_alias_map: Dict[str, List[str]] = {}  # name_lower -> [all known names]
         self.branches: List[str] = []
+        self.payment_methods: List[str] = []
         self.report_type: Optional[str] = None
         self.sort_by: Optional[str] = None
         self.sort_order: str = 'desc'
@@ -69,5 +70,7 @@ class QueryResult:
         if self.specific_month:
             parts.append(f"specific_month={self.specific_month}, specific_year={self.specific_year}")
         parts.append(f"capsters={self.capsters}, branches={self.branches}")
+        if self.payment_methods:
+            parts.append(f"payment_methods={self.payment_methods}")
         parts.append(f"sort_by='{self.sort_by}', limit={self.limit})")
         return ", ".join(parts)

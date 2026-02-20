@@ -6,6 +6,7 @@ SHEET_CUSTOMERS = 'Customers'
 SHEET_SERVICES = 'ServiceList'
 SHEET_BRANCHES = 'BranchConfig'
 SHEET_PRODUCTS = 'ProductList'
+SHEET_SALARY = 'SalaryWithdrawal'
 
 # Services & Prices - Main Services
 SERVICES_MAIN = {
@@ -120,6 +121,14 @@ CB_CONFIG_CONFIRM_RM_PRD = 'config_crm_prd'
 CB_SELL_PRODUCT = 'sell_product'
 CB_PRODUCT_SELECT = 'prd_sel'
 CB_PRODUCT_PAYMENT = 'prd_pay'
+
+# Salary Management Callbacks
+CB_SALARY_MENU = 'salary_menu'
+CB_SALARY_CAPSTER = 'salary_capster'
+CB_SALARY_WITHDRAW = 'salary_withdraw'
+CB_SALARY_HISTORY = 'salary_history'
+CB_SALARY_PERIOD_WEEK = 'salary_period_week'
+CB_SALARY_PERIOD_MONTH = 'salary_period_month'
 
 BRANCHES = {
     'cabang_a': {
@@ -248,6 +257,9 @@ MSG_ADD_CUSTOMER_NAME = "✍️ Silakan masukkan nama pelanggan:\n\n💡 Ketik /
 MSG_ADD_CUSTOMER_PHONE = "📱 Silakan masukkan nomor telepon pelanggan:"
 MSG_CUSTOMER_ADDED = "✅ Pelanggan '{name}' ({phone}) berhasil ditambahkan!"
 MSG_CUSTOMER_LIST_HEADER = "👥 Daftar Pelanggan Terdaftar"
+
+# Salary Messages
+MSG_SALARY_MENU = "💰 Menu Gaji Capster\n\nPilih capster:"
 
 # Date Formats
 DATE_FORMAT = '%Y-%m-%d'

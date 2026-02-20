@@ -241,50 +241,31 @@ class ReportService:
                 
                 report += "\n"
             
-            # Top capsters
-            
-            top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
-            report += "Top Capster:\n"
-            for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
-                capster_count = df[df['Capster'] == capster].shape[0]
-                report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
-            
+            # Top capsters with branch breakdown
+            report += self._build_capster_branch_detail(df)
+
             # Top services
             top_services = df['Service'].value_counts().head(5)
             report += "\nLayanan Terpopuler:\n"
             for idx, (service, count) in enumerate(top_services.items(), 1):
                 report += f"  {idx}. {service}: {count}x\n"
-            
-            # Daily breakdown
+
+            # Daily breakdown with per-capster branch detail
             report += "\nPer Hari:\n"
-            
-            # --- OPTIMIZATION START ---
-            # Group by both date and capster once to get all aggregates.
-            daily_capster_agg = df.groupby([df['Date'].dt.date, 'Capster'])['Price'].agg(['sum', 'count']).sort_values(by=['Date', 'sum'], ascending=[True, False])
-            
-            # Group by just date to get daily totals.
+
             daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
 
-            # Iterate through the daily totals to build the report string.
             for date, row in daily_totals.iterrows():
                 day_name = pd.Timestamp(date).strftime('%A')
                 day_name_id = self._translate_day(day_name)
                 count_day = int(row['count'])
                 sum_day = row['sum']
-                
+
                 report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
-                
-                # Filter the pre-aggregated data for the current day.
-                # This is much faster than grouping inside a loop.
-                if date in daily_capster_agg.index:
-                    day_capster_data = daily_capster_agg.loc[date]
-                    
-                    for capster, capster_row in day_capster_data.iterrows():
-                        capster_count = int(capster_row['count'])
-                        capster_sum = capster_row['sum']
-                        report += f"  - {capster}: {capster_count} layanan ({Formatter.format_currency(capster_sum)})\n"
-                    report += "\n"
-            # --- OPTIMIZATION END ---
+
+                day_df = df[df['Date'].dt.date == date]
+                report += self._build_capster_branch_detail(day_df, indent="    ", show_header=False)
+                report += "\n"
             
             logger.info("Weekly report generated successfully")
             return report
@@ -336,15 +317,10 @@ class ReportService:
                         sum_branch = row['sum']
                         report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)})\n"
                     report += "\n"
-                
-                # Per capster breakdown
+
+                # Per capster breakdown with branch detail
                 logger.debug("Generating per-capster breakdown...")
-                by_capster = df.groupby('Capster')['Price'].agg(['sum', 'count'])
-                report += "Per Capster:\n"
-                for capster, row in by_capster.iterrows():
-                    count_capster = int(row['count'])
-                    sum_capster = row['sum']
-                    report += f"  ✂️ {capster}: {count_capster} layanan ({Formatter.format_currency(sum_capster)})\n"
+                report += self._build_capster_branch_detail(df)
 
             # Top services
             logger.debug("Finding top services...")
@@ -431,13 +407,16 @@ class ReportService:
                 report += f"  {idx}. {service}: {svc_count}x\n"
             
             if not user:
-                # Top capsters
-                top_capsters = df.groupby('Capster')['Price'].sum().sort_values(ascending=False).head(5)
-                report += "\nTop Capster:\n"
-                for idx, (capster, amount) in enumerate(top_capsters.items(), 1):
-                    capster_count = df[df['Capster'] == capster].shape[0]
-                    report += f"  {idx}. {capster}: {capster_count} layanan ({Formatter.format_currency(amount)})\n"
-            
+                # Top capsters with branch breakdown
+                report += "\n" + self._build_capster_branch_detail(df)
+
+            if not user and 'Payment_Method' in df.columns:
+                payment_breakdown = df.groupby('Payment_Method')['Price'].sum().sort_values(ascending=False)
+                report += "\nMetode Pembayaran:\n"
+                for method, amount in payment_breakdown.items():
+                    pct = (amount / total * 100) if total > 0 else 0
+                    report += f"  {method}: {Formatter.format_currency(amount)} ({pct:.1f}%)\n"
+
             # Daily breakdown
             daily_totals = df.groupby(df['Date'].dt.date)['Price'].agg(['sum', 'count'])
             report += "\nPer Hari:\n"
@@ -447,7 +426,7 @@ class ReportService:
                 count_day = int(row['count'])
                 sum_day = row['sum']
                 report += f"  📅 {day_name_id}, {pd.Timestamp(date).strftime('%d %b')}: {count_day} transaksi ({Formatter.format_currency(sum_day)})\n"
-            
+
             logger.info("Weekly report generated successfully")
             return report
             
@@ -467,6 +446,55 @@ class ReportService:
             'Sunday': 'Minggu'
         }
         return translation.get(english_day, english_day)
+
+    def _build_capster_branch_detail(self, df: pd.DataFrame, indent: str = "  ",
+                                      show_header: bool = True) -> str:
+        """Build per-capster breakdown with branch and service detail.
+
+        Output format:
+          ✂️ Zidan (8 layanan - Rp 240,000)
+            🏢 Cabang A: 5 layanan (Rp 150,000)
+               Potong Rambut 3x, Potong + Cuci 2x
+            🏢 Cabang B: 3 layanan (Rp 90,000)
+               Potong Rambut 2x, Potong Anak 1x
+        """
+        if df.empty or 'Capster' not in df.columns:
+            return ""
+
+        has_branch = 'Branch' in df.columns
+
+        result = ""
+        if show_header:
+            result += f"{indent[:-2] if len(indent) > 2 else ''}Per Capster:\n"
+
+        # Sort capsters by total revenue descending
+        capster_totals = df.groupby('Capster')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+
+        for capster, totals in capster_totals.iterrows():
+            cap_count = int(totals['count'])
+            cap_sum = totals['sum']
+            result += f"{indent}✂️ {capster} ({cap_count} layanan - {Formatter.format_currency(cap_sum)})\n"
+
+            capster_df = df[df['Capster'] == capster]
+
+            if has_branch:
+                by_branch = capster_df.groupby('Branch')['Price'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                for branch, brow in by_branch.iterrows():
+                    b_count = int(brow['count'])
+                    b_sum = brow['sum']
+                    result += f"{indent}  🏢 {branch}: {b_count} layanan ({Formatter.format_currency(b_sum)})\n"
+
+                    # Service breakdown per branch — one per line
+                    branch_services = capster_df[capster_df['Branch'] == branch]['Service'].value_counts()
+                    for svc, cnt in branch_services.items():
+                        result += f"{indent}     - {svc} x{cnt}\n"
+            else:
+                # No branch column — just show services
+                services = capster_df['Service'].value_counts()
+                for svc, cnt in services.items():
+                    result += f"{indent}  - {svc} x{cnt}\n"
+
+        return result
 
     
     def generate_monthly_report(self, year: Optional[int] = None, month: Optional[int] = None, user: Optional[str] = None) -> str:
@@ -538,18 +566,9 @@ class ReportService:
                         report += f"  🏢 {branch}: {count_branch} transaksi ({Formatter.format_currency(sum_branch)}) - {pct:.1f}%\n"
                     report += "\n"
             
-            # Ranking capster
-            by_capster = monthly.groupby('Capster').agg({
-                'Price': 'sum',
-                'Service': 'count'
-            }).sort_values('Price', ascending=False)
-            
+            # Ranking capster with branch breakdown
             if not user:
-                report += "Ranking Capster:\n"
-                for idx, (capster_name, row) in enumerate(by_capster.iterrows(), 1):
-                    amount = row['Price']
-                    count_capster = int(row['Service'])
-                    report += f"  {idx}. {capster_name}: {count_capster} layanan ({Formatter.format_currency(amount)})\n"
+                report += self._build_capster_branch_detail(monthly)
             
             # Service breakdown
             service_breakdown = monthly.groupby('Service').agg({
@@ -911,6 +930,11 @@ class ReportService:
             branch_filter = [name.lower() for name in query_result.branches]
             df = df[df['Branch'].str.lower().isin(branch_filter)]
 
+        # 5. Filter by payment methods
+        if query_result.payment_methods and 'Payment_Method' in df.columns:
+            pm_filter = [name.lower() for name in query_result.payment_methods]
+            df = df[df['Payment_Method'].str.lower().isin(pm_filter)]
+
         if df.empty:
             return f"Data tidak ditemukan untuk periode '{timeframe_str}'."
 
@@ -930,6 +954,8 @@ class ReportService:
             context_parts.append(f"Filter Capster: {', '.join(query_result.capsters)}")
         if query_result.branches:
             context_parts.append(f"Filter Cabang: {', '.join(query_result.branches)}")
+        if query_result.payment_methods:
+            context_parts.append(f"Filter Metode Pembayaran: {', '.join(query_result.payment_methods)}")
 
         # Add report-type specific data
         if report_type in ('capster_ranking', 'general', 'monthly_summary', 'weekly_summary'):
@@ -962,11 +988,10 @@ class ReportService:
             if daily:
                 context_parts.append(daily)
 
-        # Always include payment method for summaries
-        if report_type in ('monthly_summary', 'weekly_summary', 'general'):
-            payments = self._build_payment_methods(df)
-            if payments:
-                context_parts.append(payments)
+        # Always include payment method breakdown
+        payments = self._build_payment_methods(df)
+        if payments:
+            context_parts.append(payments)
 
         return "\n\n".join(context_parts)
 

@@ -20,6 +20,8 @@ from app.config.constants import (
     CB_CONFIG_PRODUCTS, CB_CONFIG_LIST_PRODUCTS, CB_CONFIG_ADD_PRODUCT,
     CB_CONFIG_EDIT_PRODUCT, CB_CONFIG_REMOVE_PRODUCT, CB_CONFIG_CONFIRM_RM_PRD,
     CB_SELL_PRODUCT, CB_PRODUCT_SELECT, CB_PRODUCT_PAYMENT,
+    CB_SALARY_MENU, CB_SALARY_CAPSTER, CB_SALARY_WITHDRAW, CB_SALARY_HISTORY,
+    CB_SALARY_PERIOD_WEEK, CB_SALARY_PERIOD_MONTH,
     BRANCHES, SERVICES_MAIN, SERVICES_COLORING, PAYMENT_METHODS, PRODUCTS
 )
 from app.services.auth_service import AuthService
@@ -49,6 +51,7 @@ class KeyboardBuilder:
             [InlineKeyboardButton("📅 Laporan Bulanan Umum", callback_data=CB_REPORT_MONTHLY)],
             [InlineKeyboardButton("💰 Laporan Profit", callback_data=CB_REPORT_PROFIT)],
             [InlineKeyboardButton("💈 Kelola Capster", callback_data=CB_CAPSTER_MENU)],
+            [InlineKeyboardButton("💰 Gaji Capster", callback_data=CB_SALARY_MENU)],
             [InlineKeyboardButton("👤 Menu Pelanggan", callback_data=CB_CUSTOMER_MENU)],
             [InlineKeyboardButton("⚙️ Pengaturan", callback_data=CB_CONFIG_MENU)],
             ]
@@ -382,6 +385,50 @@ class KeyboardBuilder:
             [InlineKeyboardButton("➕ Tambah Transaksi", callback_data=CB_ADD_TRANSACTION)],
             [InlineKeyboardButton("🔙 Kembali ke Menu", callback_data=CB_BACK_MAIN)],
         ]
+        return InlineKeyboardMarkup(keyboard)
+
+    # --- Salary Keyboards ---
+
+    @staticmethod
+    def salary_menu(capsters) -> InlineKeyboardMarkup:
+        """Salary menu: list all capsters with employment type."""
+        keyboard = []
+        for c in capsters:
+            if c.employment_type == 'mitra':
+                label = f"💰 {c.name} (Mitra {int(c.commission_rate * 100)}%)"
+            else:
+                label = f"📋 {c.name} (Tetap)"
+            keyboard.append([InlineKeyboardButton(
+                label,
+                callback_data=f"{CB_SALARY_CAPSTER}_{c.telegram_id}"
+            )])
+        keyboard.append([InlineKeyboardButton("🔙 Kembali ke Menu", callback_data=CB_BACK_MAIN)])
+        return InlineKeyboardMarkup(keyboard)
+
+    @staticmethod
+    def salary_capster_detail(telegram_id: int, employment_type: str,
+                              current_period: str = 'week') -> InlineKeyboardMarkup:
+        """Salary detail buttons for a capster."""
+        keyboard = []
+        if employment_type == 'mitra':
+            keyboard.append([
+                InlineKeyboardButton("💵 Catat Pengambilan",
+                                     callback_data=f"{CB_SALARY_WITHDRAW}_{telegram_id}"),
+                InlineKeyboardButton("📋 Riwayat",
+                                     callback_data=f"{CB_SALARY_HISTORY}_{telegram_id}"),
+            ])
+        # Period toggle
+        if current_period == 'week':
+            keyboard.append([InlineKeyboardButton(
+                "📅 Lihat Bulan Ini",
+                callback_data=f"{CB_SALARY_PERIOD_MONTH}_{telegram_id}"
+            )])
+        else:
+            keyboard.append([InlineKeyboardButton(
+                "📅 Lihat Minggu Ini",
+                callback_data=f"{CB_SALARY_PERIOD_WEEK}_{telegram_id}"
+            )])
+        keyboard.append([InlineKeyboardButton("🔙 Kembali", callback_data=CB_SALARY_MENU)])
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod

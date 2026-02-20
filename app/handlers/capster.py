@@ -35,7 +35,7 @@ from app.config.constants import (
 logger = logging.getLogger(__name__)
 
 # Conversation states - Add capster
-GET_CAPSTER_NAME, GET_CAPSTER_TELEGRAM_ID, GET_CAPSTER_ALIAS = range(3)
+GET_CAPSTER_NAME, GET_CAPSTER_TELEGRAM_ID, GET_CAPSTER_ALIAS, GET_CAPSTER_TYPE, GET_CAPSTER_COMMISSION = range(5)
 # Conversation states - Edit capster
 EDIT_CAPSTER_NAME, EDIT_CAPSTER_ALIAS = range(10, 12)
 
@@ -70,7 +70,11 @@ async def list_capsters_handler(update: Update, context: ContextTypes.DEFAULT_TY
         text = f"{MSG_CAPSTER_LIST_HEADER}\n\n"
         for i, c in enumerate(capsters, 1):
             alias_part = f" (alias: {c.alias})" if c.alias else ""
-            text += f"{i}. {c.name}{alias_part} - ID: {c.telegram_id}\n"
+            if c.employment_type == 'mitra':
+                type_part = f" | Mitra {int(c.commission_rate * 100)}%"
+            else:
+                type_part = " | Tetap"
+            text += f"{i}. {c.name}{alias_part}{type_part} - ID: {c.telegram_id}\n"
         text += "\n✏️ Klik nama untuk edit | 🗑️ Klik ikon untuk hapus"
         keyboard = KeyboardBuilder.capster_list_keyboard(capsters)
 
@@ -128,15 +132,92 @@ async def get_capster_telegram_id(update: Update, context: ContextTypes.DEFAULT_
 
 @handle_errors
 async def get_capster_alias(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Get alias (Telegram name) and save capster."""
+    """Get alias (Telegram name) and ask for employment type."""
     text = update.message.text.strip()
     alias = '' if text.startswith('/skip') else text
+    context.user_data['capster_alias'] = alias
 
+    await update.message.reply_text(
+        "📋 Pilih tipe capster:\n\n"
+        "1. mitra - Komisi dari transaksi\n"
+        "2. tetap - Gaji bulanan fixed\n\n"
+        "Ketik 'mitra' atau 'tetap' (default: mitra):"
+    )
+    return GET_CAPSTER_TYPE
+
+
+async def skip_alias(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skip alias and ask for employment type."""
+    context.user_data['capster_alias'] = ''
+    await update.message.reply_text(
+        "📋 Pilih tipe capster:\n\n"
+        "1. mitra - Komisi dari transaksi\n"
+        "2. tetap - Gaji bulanan fixed\n\n"
+        "Ketik 'mitra' atau 'tetap' (default: mitra):"
+    )
+    return GET_CAPSTER_TYPE
+
+
+@handle_errors
+async def get_capster_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Get employment type and ask for commission rate if mitra."""
+    text = update.message.text.strip().lower()
+    if text not in ('mitra', 'tetap'):
+        text = 'mitra'
+
+    context.user_data['capster_type'] = text
+
+    if text == 'mitra':
+        await update.message.reply_text(
+            "💰 Masukkan persentase komisi (default: 50):\n"
+            "Contoh: 50 untuk 50%\n\n"
+            "Ketik /skip untuk gunakan default 50%"
+        )
+        return GET_CAPSTER_COMMISSION
+    else:
+        context.user_data['capster_commission'] = 0.0
+        return await _save_new_capster(update, context)
+
+
+@handle_errors
+async def get_capster_commission(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Get commission rate and save capster."""
+    text = update.message.text.strip()
+    if text.startswith('/skip'):
+        commission = 0.5
+    else:
+        try:
+            commission = float(text.replace('%', '')) / 100
+            if commission <= 0 or commission > 1:
+                await update.message.reply_text("❌ Masukkan angka 1-100.\nCoba lagi:")
+                return GET_CAPSTER_COMMISSION
+        except ValueError:
+            await update.message.reply_text("❌ Angka tidak valid.\nCoba lagi:")
+            return GET_CAPSTER_COMMISSION
+
+    context.user_data['capster_commission'] = commission
+    return await _save_new_capster(update, context)
+
+
+async def skip_commission(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skip commission input, use default 50%."""
+    context.user_data['capster_commission'] = 0.5
+    return await _save_new_capster(update, context)
+
+
+async def _save_new_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Save the new capster with all collected data."""
     capster_name = context.user_data.get('capster_name')
     telegram_id = context.user_data.get('capster_telegram_id')
+    alias = context.user_data.get('capster_alias', '')
+    employment_type = context.user_data.get('capster_type', 'mitra')
+    commission_rate = context.user_data.get('capster_commission', 0.5)
+
     capster_service = context.bot_data.get('capster_service')
 
-    if capster_service.add_capster(capster_name, telegram_id, alias=alias):
+    if capster_service.add_capster(capster_name, telegram_id, alias=alias,
+                                    employment_type=employment_type,
+                                    commission_rate=commission_rate):
         # Update query parser so /tanya recognizes the new name + alias
         query_parser = context.bot_data.get('query_parser_service')
         if query_parser:
@@ -146,23 +227,22 @@ async def get_capster_alias(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 query_parser.update_capster_list(current + new_names)
 
         alias_info = f" (alias: {alias})" if alias else ""
+        type_info = f"\nTipe: {employment_type}"
+        if employment_type == 'mitra':
+            type_info += f" ({int(commission_rate * 100)}%)"
+
         await update.message.reply_text(
-            MSG_CAPSTER_ADDED.format(name=capster_name, telegram_id=telegram_id) + alias_info
+            MSG_CAPSTER_ADDED.format(name=capster_name, telegram_id=telegram_id)
+            + alias_info + type_info
         )
     else:
         await update.message.reply_text("❌ Gagal menambahkan capster. Silakan coba lagi.")
 
-    context.user_data.pop('capster_name', None)
-    context.user_data.pop('capster_telegram_id', None)
+    # Cleanup
+    for key in ['capster_name', 'capster_telegram_id', 'capster_alias',
+                'capster_type', 'capster_commission']:
+        context.user_data.pop(key, None)
     return ConversationHandler.END
-
-
-async def skip_alias(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Skip alias and save capster without alias."""
-    context.user_data['_skip_alias'] = True
-    # Reuse get_capster_alias with /skip text
-    update.message.text = '/skip'
-    return await get_capster_alias(update, context)
 
 
 async def cancel_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -180,6 +260,13 @@ add_capster_conv_handler = ConversationHandler(
         GET_CAPSTER_ALIAS: [
             CommandHandler('skip', skip_alias),
             MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_alias),
+        ],
+        GET_CAPSTER_TYPE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_type),
+        ],
+        GET_CAPSTER_COMMISSION: [
+            CommandHandler('skip', skip_commission),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_commission),
         ],
     },
     fallbacks=[CommandHandler('cancel', cancel_capster)],

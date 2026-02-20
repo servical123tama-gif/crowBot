@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Tuple, Union
 from app.models.query import QueryResult
-from app.config.constants import BRANCHES, MONTHS_ID_REV
+from app.config.constants import BRANCHES, MONTHS_ID_REV, PAYMENT_METHODS
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,16 @@ class QueryParserService:
             'cabang b': 'Cabang Sumput',
         }
 
+        # Payment method list and aliases for keyword fallback
+        self._payment_method_list = [pm['name'] for pm in PAYMENT_METHODS.values()]
+        self._payment_aliases = {
+            'cash': 'Cash',
+            'tunai': 'Cash',
+            'tunay': 'Cash',
+            'qris': 'QRIS',
+            'qr': 'QRIS',
+        }
+
     def update_capster_list(self, capster_list: List[str]):
         """Update capster list dynamically."""
         self._capster_list = capster_list
@@ -46,7 +56,8 @@ class QueryParserService:
         if self._gemini_service and self._gemini_service.is_available:
             try:
                 result = await self._gemini_service.parse_query_intent(
-                    user_query, self._capster_list, self._branch_list
+                    user_query, self._capster_list, self._branch_list,
+                    payment_method_list=self._payment_method_list
                 )
                 if result and result.is_valid():
                     logger.info("Query parsed successfully via Gemini AI")
@@ -80,6 +91,9 @@ class QueryParserService:
             query_result.report_type = 'profit'
             query_result.metric = 'profit'
             query_result.metrics = ['revenue', 'profit']
+        elif any(kw in lower_query for kw in ['metode pembayaran', 'payment method', 'cash vs qris', 'qris vs cash', 'breakdown pembayaran']):
+            query_result.report_type = 'payment_breakdown'
+            query_result.metrics = ['revenue', 'transaction_count']
         elif any(kw in lower_query for kw in ['pendapatan', 'revenue', 'omzet', 'omset', 'pemasukan', 'income']):
             query_result.report_type = 'revenue'
             query_result.metric = 'pendapatan'
@@ -161,6 +175,11 @@ class QueryParserService:
         for i, branch_lower in enumerate(self._branch_list_lower):
             if branch_lower in lower_query and self._branch_list[i] not in query_result.branches:
                 query_result.branches.append(self._branch_list[i])
+
+        # --- ENTITIES: Payment Methods (with aliases) ---
+        for alias, method_name in self._payment_aliases.items():
+            if alias in lower_query and method_name not in query_result.payment_methods:
+                query_result.payment_methods.append(method_name)
 
         # Mark validity
         query_result.is_valid_query = query_result.is_valid()

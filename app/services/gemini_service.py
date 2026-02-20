@@ -62,7 +62,8 @@ class GeminiService:
         self,
         user_query: str,
         capster_list: List[str],
-        branch_list: List[str]
+        branch_list: List[str],
+        payment_method_list: List[str] = None
     ) -> Optional[QueryResult]:
         """
         PARSE step: Send user query to Gemini to extract structured intent.
@@ -71,6 +72,9 @@ class GeminiService:
         if not self.is_available:
             return None
 
+        if payment_method_list is None:
+            payment_method_list = ['Cash', 'QRIS']
+
         prompt = f"""Kamu adalah parser query untuk aplikasi barbershop. Analisis pertanyaan user dan ekstrak informasi terstruktur.
 
 Pertanyaan user: "{user_query}"
@@ -78,6 +82,7 @@ Pertanyaan user: "{user_query}"
 Data yang tersedia:
 - Capster (tukang cukur): {json.dumps(capster_list)}
 - Cabang: {json.dumps(branch_list)}
+- Metode Pembayaran: {json.dumps(payment_method_list)}
 
 Kembalikan HANYA JSON (tanpa teks lain) dengan format:
 {{
@@ -91,6 +96,7 @@ Kembalikan HANYA JSON (tanpa teks lain) dengan format:
     "specific_year": <tahun 4 digit atau null>,
     "capsters": ["nama capster yang disebut"] atau [],
     "branches": ["nama cabang yang disebut"] atau [],
+    "payment_methods": ["metode pembayaran yang disebut"] atau [],
     "sort_by": "revenue atau transaction_count atau null",
     "limit": <angka, default 10>
 }}
@@ -110,9 +116,13 @@ Aturan:
 - Jika user bertanya ringkasan/laporan harian → report_type: "daily_summary"
 - Jika user bertanya ringkasan/laporan mingguan → report_type: "weekly_summary"
 - Jika user bertanya ringkasan/laporan bulanan → report_type: "monthly_summary"
+- Jika user bertanya tentang metode pembayaran/cash vs qris/breakdown pembayaran → report_type: "payment_breakdown"
 - Jika tidak jelas → report_type: "general", metrics: ["revenue", "transaction_count"]
 - Cocokkan nama capster dan cabang dengan fuzzy matching dari daftar yang tersedia
 - Untuk cabang, terima alias: "denailla"/"mojosari" = "Cabang Denailla", "sumput" = "Cabang Sumput"
+- Untuk metode pembayaran, terima alias: "tunai"/"cash"/"tunay" = "Cash", "qris"/"qr" = "QRIS"
+- Jika user menyebut metode pembayaran spesifik (misal "revenue dari qris", "transaksi cash") → isi payment_methods
+- Jika user minta perbandingan pembayaran (misal "cash vs qris") → report_type: "payment_breakdown", payment_methods: ["Cash", "QRIS"]
 """
 
         try:
@@ -191,6 +201,7 @@ Aturan:
 
             result.capsters = data.get('capsters', [])
             result.branches = data.get('branches', [])
+            result.payment_methods = data.get('payment_methods', [])
             result.sort_by = data.get('sort_by')
             result.limit = data.get('limit', 10)
 

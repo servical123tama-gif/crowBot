@@ -38,6 +38,10 @@ from app.handlers.config_handler import (
     config_products_menu_handler, config_list_products_handler,
     handle_remove_product, handle_confirm_remove_product,
 )
+from app.handlers.salary_handler import (
+    salary_menu_handler, salary_capster_detail,
+    salary_history_handler, salary_period_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +91,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         CB_CONFIG_PRODUCTS: config_products_menu_handler,
         CB_CONFIG_LIST_PRODUCTS: config_list_products_handler,
         CB_SELL_PRODUCT: handle_sell_product_menu,
+        CB_SALARY_MENU: salary_menu_handler,
     }
 
     PREFIX_HANDLERS = {
@@ -106,6 +111,10 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         CB_CONFIG_CONFIRM_RM_PRD: lambda u, c, d: handle_confirm_remove_product(u, c, d),
         CB_PRODUCT_SELECT: lambda u, c, d: handle_product_selection(u, c, d.replace(f"{CB_PRODUCT_SELECT}_", "")),
         CB_PRODUCT_PAYMENT: lambda u, c, d: handle_product_payment(u, c, *d.replace(f"{CB_PRODUCT_PAYMENT}_", "").split("_", 1)),
+        CB_SALARY_CAPSTER: lambda u, c, d: salary_capster_detail(u, c, d),
+        CB_SALARY_HISTORY: lambda u, c, d: salary_history_handler(u, c, d),
+        CB_SALARY_PERIOD_WEEK: lambda u, c, d: salary_period_handler(u, c, d),
+        CB_SALARY_PERIOD_MONTH: lambda u, c, d: salary_period_handler(u, c, d),
     }
 
     # --- No-op for section header buttons ---
