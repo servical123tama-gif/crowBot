@@ -6,7 +6,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.utils.decorators import require_auth, handle_errors
+from app.utils.decorators import require_auth, handle_errors, prevent_double_submit
 from app.utils.keyboards import KeyboardBuilder
 from app.utils.formatters import Formatter
 from app.models.transaction import Transaction
@@ -50,11 +50,11 @@ async def handle_service_selection(update: Update, context: ContextTypes.DEFAULT
 
 @handle_errors
 @require_auth
+@prevent_double_submit
 async def handle_payment_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, service_id: str, payment_id: str):
     """Handle payment method selection - Save transaction"""
-    # from app.services.sheets_service import SheetsService # No longer need to import here
     from app.services.branch_service import BranchService
-    
+
     query = update.callback_query
     await query.answer()
     
@@ -178,6 +178,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
 
 @handle_errors
 @require_auth
+@prevent_double_submit
 async def handle_product_payment(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id: str, payment_id: str):
     """Handle product payment selection — save transaction."""
     from app.services.branch_service import BranchService

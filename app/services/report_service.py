@@ -66,7 +66,7 @@ class ReportService:
         otherwise fetches from the source and updates the cache for that year.
         """
         now = datetime.now()
-        
+
         # Check if cache is valid for the given year
         if year in self._transactions_cache and year in self._cache_timestamp:
             if now - self._cache_timestamp[year] < self.CACHE_DURATION:
@@ -76,12 +76,38 @@ class ReportService:
         # Fetch from source if cache is invalid or expired
         logger.info(f"Cache for year {year} expired or empty. Fetching from Google Sheets.")
         df = self.sheets.get_transactions_dataframe(year=year)
-        
+
         # Update cache for the specific year
         self._transactions_cache[year] = df
         self._cache_timestamp[year] = now
-        
+
         return df
+
+    def _build_capster_lookup(self) -> dict:
+        """Build lookup dict: any known capster name/alias (lowercase) → {employment_type, commission_rate, monthly_salary, branch_id, name}."""
+        lookup = {}
+        try:
+            for c in self.sheets.get_all_capsters():
+                try:
+                    salary = int(float(c.get('MonthlySalary') or 0))
+                except (ValueError, TypeError):
+                    salary = 0
+                info = {
+                    'employment_type': (c.get('EmploymentType') or 'mitra').lower().strip(),
+                    'commission_rate': float(c.get('CommissionRate') or 0.5),
+                    'monthly_salary': salary,
+                    'branch_id': (c.get('BranchID') or '').strip(),
+                    'name': c.get('Name', ''),
+                }
+                name_lower = (c.get('Name') or '').lower().strip()
+                alias_lower = (c.get('Alias') or '').lower().strip()
+                if name_lower:
+                    lookup[name_lower] = info
+                if alias_lower:
+                    lookup[alias_lower] = info
+        except Exception as e:
+            logger.warning(f"_build_capster_lookup failed: {e}")
+        return lookup
     
     def _get_week_range(self) -> tuple:
         """
@@ -613,7 +639,16 @@ class ReportService:
             profit_data_df = self.generate_monthly_profit_dataframe(year, month)
 
             if profit_data_df.empty:
-                 return f"💰 Tidak ada data transaksi atau kolom 'Branch' tidak ditemukan untuk {month_display}."
+                return f"💰 Tidak ada data transaksi atau kolom 'Branch' tidak ditemukan untuk {month_display}."
+
+            # Fetch monthly transactions for per-capster display
+            _df_all = self._get_or_fetch_transactions(year=year)
+            _month_str = f"{year:04d}-{month:02d}"
+            monthly_df = (
+                _df_all[_df_all['Date'].dt.strftime('%Y-%m') == _month_str]
+                if not _df_all.empty else pd.DataFrame()
+            )
+            capster_lookup = self._build_capster_lookup()
 
             # Extract overall data
             total_revenue = profit_data_df.loc['Overall', 'Revenue']
@@ -644,19 +679,48 @@ class ReportService:
                 commission_cost = row['Commission Cost']
                 total_costs = row['Operational Cost']
                 net_profit = row['Net Profit']
-                commission_rate = branch_config.get('commission_rate', 0)
 
                 report += "\n" + "-"*40 + "\n"
                 report += f"DETAIL PROFIT {branch_short.upper()}\n"
                 report += "-"*40 + "\n"
                 report += f"  - Pendapatan: {Formatter.format_currency(revenue)}\n"
-                if commission_rate > 0:
-                    report += "  - Biaya Operasional:\n"
-                    report += f"    - Fixed: {Formatter.format_currency(fixed_cost)}\n"
-                    report += f"    - Komisi ({commission_rate*100:.0f}%): {Formatter.format_currency(commission_cost)}\n"
-                    report += f"    - Total Biaya: {Formatter.format_currency(total_costs)}\n"
-                else:
-                    report += f"  - Biaya Operasional (Fixed): {Formatter.format_currency(total_costs)}\n"
+                # Hitung gaji tetap untuk branch ini (untuk display)
+                seen_tetap_r: set = set()
+                tetap_lines: list = []
+                tetap_salary_total = 0
+                for info in capster_lookup.values():
+                    if (info['employment_type'] == 'tetap'
+                            and info['branch_id'] == branch_id
+                            and info['name']
+                            and info['name'] not in seen_tetap_r):
+                        tetap_lines.append((info['name'], info['monthly_salary']))
+                        tetap_salary_total += info['monthly_salary']
+                        seen_tetap_r.add(info['name'])
+
+                non_karyawan_fixed = fixed_cost - tetap_salary_total
+
+                report += "  - Biaya Operasional:\n"
+                report += f"    - Fixed (operasional): {Formatter.format_currency(non_karyawan_fixed)}\n"
+
+                # Gaji capster tetap assigned ke branch ini
+                for cap_name, sal in tetap_lines:
+                    report += f"    - Gaji {cap_name} (tetap): {Formatter.format_currency(sal)}\n"
+
+                report += f"    - Total Komisi Mitra: {Formatter.format_currency(commission_cost)}\n"
+
+                # Per-capster mitra commission breakdown
+                if not monthly_df.empty and 'Capster' in monthly_df.columns and 'Branch' in monthly_df.columns:
+                    branch_df_r = monthly_df[monthly_df['Branch'] == branch_short]
+                    if not branch_df_r.empty:
+                        for cap_name, cap_df in branch_df_r.groupby('Capster'):
+                            cap_rev = cap_df['Price'].sum()
+                            info = capster_lookup.get(cap_name.lower().strip())
+                            if info and info['employment_type'] == 'mitra':
+                                rate = info['commission_rate']
+                                cap_com = cap_rev * rate
+                                report += f"      • {cap_name} (mitra {rate*100:.0f}%): {Formatter.format_currency(cap_com)} dari {Formatter.format_currency(cap_rev)}\n"
+
+                report += f"    - Total Biaya: {Formatter.format_currency(total_costs)}\n"
                 profit_emoji_b = "✅" if net_profit >= 0 else "❌"
                 report += f"  {profit_emoji_b} Profit Bersih {branch_short}: {Formatter.format_currency(net_profit)}\n"
 
@@ -686,6 +750,9 @@ class ReportService:
                 logger.info(f"No transactions or 'Branch' column missing for {month_str}. Returning empty DataFrame.")
                 return pd.DataFrame()
 
+            # Build per-capster commission lookup once
+            capster_lookup = self._build_capster_lookup()
+
             # Prepare results dictionary — loop all branches dynamically
             results = {}
             overall_revenue = 0
@@ -698,9 +765,39 @@ class ReportService:
                 revenue = branch_df['Price'].sum()
 
                 costs_config = branch_config.get('operational_cost', {})
-                fixed_costs = sum(costs_config.values())
-                commission_rate = branch_config.get('commission_rate', 0)
-                commission_cost = revenue * commission_rate
+                # cost_karyawan dikecualikan karena dihitung dari monthly_salary capster tetap
+                fixed_costs = sum(v for k, v in costs_config.items() if k != 'karyawan')
+
+                # Gaji capster tetap yang assigned ke branch ini
+                tetap_salary = sum(
+                    info['monthly_salary']
+                    for info in capster_lookup.values()
+                    if info['employment_type'] == 'tetap'
+                    and info['branch_id'] == branch_id
+                    and info['name']  # hindari double count alias
+                    # deduplikasi: hanya hitung sekali per nama unik
+                )
+                # Deduplicate: capster_lookup menyimpan nama + alias, hitung per nama unik saja
+                seen_tetap = set()
+                tetap_salary = 0
+                for info in capster_lookup.values():
+                    if (info['employment_type'] == 'tetap'
+                            and info['branch_id'] == branch_id
+                            and info['name']
+                            and info['name'] not in seen_tetap):
+                        tetap_salary += info['monthly_salary']
+                        seen_tetap.add(info['name'])
+
+                fixed_costs += tetap_salary
+
+                # Per-capster commission: mitra × individual rate, tetap = 0
+                commission_cost = 0.0
+                if not branch_df.empty and 'Capster' in branch_df.columns:
+                    for cap_name, cap_df in branch_df.groupby('Capster'):
+                        info = capster_lookup.get(cap_name.lower().strip())
+                        if info and info['employment_type'] == 'mitra':
+                            commission_cost += cap_df['Price'].sum() * info['commission_rate']
+
                 total_costs = fixed_costs + commission_cost
                 net_profit = revenue - total_costs
 

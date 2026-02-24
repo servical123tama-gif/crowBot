@@ -21,12 +21,15 @@ class CapsterService:
         self._name_cache: Dict[int, str] = {}
 
     def add_capster(self, name: str, telegram_id: int, alias: str = '',
-                    employment_type: str = 'mitra', commission_rate: float = 0.5) -> bool:
+                    employment_type: str = 'mitra', commission_rate: float = 0.5,
+                    monthly_salary: int = 0, branch_id: str = '') -> bool:
         """Add a new capster to sheets and authorize at runtime."""
         try:
             capster = Capster(name=name, telegram_id=telegram_id, alias=alias,
                               employment_type=employment_type,
-                              commission_rate=commission_rate)
+                              commission_rate=commission_rate,
+                              monthly_salary=monthly_salary,
+                              branch_id=branch_id)
             success = self.sheets.add_capster(capster)
             if success:
                 AuthService.add_authorized_user(telegram_id)
@@ -49,12 +52,14 @@ class CapsterService:
             return False
 
     def update_capster(self, telegram_id: int, name: str = None, alias: str = None,
-                       employment_type: str = None, commission_rate: float = None) -> bool:
+                       employment_type: str = None, commission_rate: float = None,
+                       monthly_salary: int = None, branch_id: str = None) -> bool:
         """Update capster name/alias/employment in sheets and refresh cache."""
         try:
             success = self.sheets.update_capster(
                 telegram_id, name=name, alias=alias,
-                employment_type=employment_type, commission_rate=commission_rate
+                employment_type=employment_type, commission_rate=commission_rate,
+                monthly_salary=monthly_salary, branch_id=branch_id,
             )
             if success and name:
                 self._name_cache[telegram_id] = name
@@ -80,12 +85,18 @@ class CapsterService:
                     commission = float(rate) if rate else 0.5
                 except (ValueError, TypeError):
                     commission = 0.5
+                try:
+                    salary = int(float(rec.get('MonthlySalary') or 0))
+                except (ValueError, TypeError):
+                    salary = 0
                 capsters.append(Capster(
                     name=rec['Name'],
                     telegram_id=int(rec['TelegramID']),
                     alias=rec.get('Alias', ''),
                     employment_type=rec.get('EmploymentType', 'mitra') or 'mitra',
                     commission_rate=commission,
+                    monthly_salary=salary,
+                    branch_id=rec.get('BranchID', '') or '',
                 ))
             return capsters
         except Exception as e:

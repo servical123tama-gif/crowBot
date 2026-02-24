@@ -25,3 +25,8 @@ flake8==7.0.0
 # Web Server
 flask==2.3.3
 gunicorn==21.2.0
+
+# Database (SQLite built-in; SQLAlchemy ORM + Alembic migrations)
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9

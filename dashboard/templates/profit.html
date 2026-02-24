@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Profit — Dashboard{% endblock %}
+{% block page_title %}Laporan Profit — {{ month_name }}{% endblock %}
+
+{% block content %}
+<!-- Filter -->
+<div class="card stat-card p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Bulan</label>
+      <select name="month" class="form-select form-select-sm">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Tahun</label>
+      <select name="year" class="form-select form-select-sm">
+        {% for y in years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm" style="background:#e94560; color:#fff;">Tampilkan</button>
+    </div>
+  </form>
+</div>
+
+{% if not data %}
+<div class="alert alert-info">Tidak ada data transaksi untuk {{ month_name }}.</div>
+{% else %}
+
+<!-- Overall Summary Cards -->
+{% set ov = data.overall %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card stat-card p-3 text-center">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fw-bold fs-4 text-primary">{{ ov.revenue|idr }}</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card p-3 text-center">
+      <div class="text-muted small">Total Biaya</div>
+      <div class="fw-bold fs-4 text-danger">{{ ov.total_cost|idr }}</div>
+      <div class="text-muted" style="font-size:.75rem">
+        Fixed: {{ ov.fixed|idr }} | Komisi: {{ ov.commission|idr }}
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card p-3 text-center">
+      <div class="text-muted small">Profit Bersih</div>
+      <div class="fw-bold fs-4 {{ 'text-success' if ov.net_profit >= 0 else 'text-danger' }}">
+        {{ ov.net_profit|idr }}
+      </div>
+      {% if ov.revenue > 0 %}
+      <div class="text-muted" style="font-size:.75rem">
+        Margin {{ ((ov.net_profit / ov.revenue) * 100)|round(1) }}%
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Per-Branch Detail -->
+<div class="row g-3">
+  {% for short, b in data.branches.items() %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <h6 class="fw-bold mb-0">🏢 {{ b.name }}</h6>
+          <small class="text-muted">{{ b.tx_count }} transaksi</small>
+        </div>
+        <span class="badge {{ 'bg-success' if b.net_profit >= 0 else 'bg-danger' }} fs-6">
+          {{ b.net_profit|idr }}
+        </span>
+      </div>
+
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr>
+            <td>💵 Revenue</td>
+            <td class="text-end fw-semibold">{{ b.revenue|idr }}</td>
+          </tr>
+          <tr class="table-light">
+            <td colspan="2" class="fw-semibold text-muted small pt-2">BIAYA</td>
+          </tr>
+          <tr>
+            <td class="ps-3">🏠 Fixed Operasional</td>
+            <td class="text-end">{{ b.fixed_ops|idr }}</td>
+          </tr>
+          {% for t in b.tetap_lines %}
+          <tr>
+            <td class="ps-3">👔 Gaji {{ t.name }} (tetap)</td>
+            <td class="text-end">{{ t.salary|idr }}</td>
+          </tr>
+          {% endfor %}
+          {% if b.mitra_lines %}
+          <tr>
+            <td class="ps-3">💼 Komisi Mitra</td>
+            <td class="text-end">{{ b.commission|idr }}</td>
+          </tr>
+          {% for m in b.mitra_lines %}
+          <tr class="text-muted" style="font-size:.8rem">
+            <td class="ps-5">{{ m.name }} ({{ m.rate }}%)</td>
+            <td class="text-end">{{ m.commission|idr }} <span class="text-muted">/ {{ m.revenue|idr }}</span></td>
+          </tr>
+          {% endfor %}
+          {% endif %}
+          <tr class="fw-semibold">
+            <td>Total Biaya</td>
+            <td class="text-end text-danger">{{ b.total_cost|idr }}</td>
+          </tr>
+          <tr class="fw-bold">
+            <td>{{ '✅' if b.net_profit >= 0 else '❌' }} Profit Bersih</td>
+            <td class="text-end {{ 'text-success' if b.net_profit >= 0 else 'text-danger' }}">
+              {{ b.net_profit|idr }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}

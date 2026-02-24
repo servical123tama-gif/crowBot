@@ -43,5 +43,10 @@ htmlcov/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+
+# Export files
+docs/exports/

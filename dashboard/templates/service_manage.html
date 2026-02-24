@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Kelola Layanan — Dashboard{% endblock %}
+{% block page_title %}Kelola Layanan{% endblock %}
+
+{% block content %}
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+  {{ msg }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span class="text-muted small">{{ total }} layanan terdaftar</span>
+  <button class="btn btn-sm text-white" style="background:#e94560"
+          data-bs-toggle="modal" data-bs-target="#addModal">
+    + Tambah Layanan
+  </button>
+</div>
+
+<!-- ── Layanan Utama (main) ── -->
+<div class="card stat-card mb-4">
+  <div class="p-3 pb-0">
+    <span class="fw-semibold">✂️ Layanan Utama (main)</span>
+    <span class="text-muted small ms-2">{{ main_services|length }} layanan</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama Layanan</th>
+          <th>Service ID</th>
+          <th class="text-end">Harga</th>
+          <th class="text-end">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% if main_services %}
+        {% for s in main_services %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="font-monospace small text-muted">{{ s.service_id }}</td>
+          <td class="text-end fw-semibold text-success">{{ s.price|idr }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
+                    data-bs-toggle="modal" data-bs-target="#editModal"
+                    data-id="{{ s.service_id }}"
+                    data-name="{{ s.name }}"
+                    data-category="{{ s.category }}"
+                    data-price="{{ s.price }}">
+              Edit
+            </button>
+            <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
+                  onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-3">Belum ada layanan utama.</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Layanan Coloring ── -->
+<div class="card stat-card mb-4">
+  <div class="p-3 pb-0">
+    <span class="fw-semibold">🎨 Layanan Coloring</span>
+    <span class="text-muted small ms-2">{{ coloring_services|length }} layanan</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama Layanan</th>
+          <th>Service ID</th>
+          <th class="text-end">Harga</th>
+          <th class="text-end">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% if coloring_services %}
+        {% for s in coloring_services %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="font-monospace small text-muted">{{ s.service_id }}</td>
+          <td class="text-end fw-semibold text-success">{{ s.price|idr }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
+                    data-bs-toggle="modal" data-bs-target="#editModal"
+                    data-id="{{ s.service_id }}"
+                    data-name="{{ s.name }}"
+                    data-category="{{ s.category }}"
+                    data-price="{{ s.price }}">
+              Edit
+            </button>
+            <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
+                  onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-3">Belum ada layanan coloring.</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Tambah Layanan ═══ -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/services/add">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addModalLabel">Tambah Layanan</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Nama Layanan <span class="text-danger">*</span></label>
+            <input name="name" class="form-control form-control-sm"
+                   placeholder="Contoh: Potong Rambut" required>
+            <div class="form-text">Service ID akan dibuat otomatis (PascalCase dari nama).</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Kategori</label>
+            <select name="category" class="form-select form-select-sm">
+              <option value="main">✂️ Main — Layanan Utama</option>
+              <option value="coloring">🎨 Coloring — Layanan Coloring</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Harga (Rp) <span class="text-danger">*</span></label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input name="price" type="number" min="0" step="1000" value="0"
+                     class="form-control form-control-sm" required>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Edit Layanan ═══ -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">Edit Layanan</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="mb-2">
+            <label class="form-label form-label-sm fw-semibold text-muted">Service ID</label>
+            <input id="edit_service_id_display" class="form-control form-control-sm font-monospace"
+                   readonly style="background:#f8f9fa; color:#6c757d;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Nama Layanan</label>
+            <input id="edit_name" name="name" class="form-control form-control-sm" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Kategori</label>
+            <select id="edit_category" name="category" class="form-select form-select-sm">
+              <option value="main">✂️ Main — Layanan Utama</option>
+              <option value="coloring">🎨 Coloring — Layanan Coloring</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Harga (Rp)</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input id="edit_price" name="price" type="number" min="0" step="1000"
+                     class="form-control form-control-sm" required>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const sid = btn.dataset.id;
+
+  document.getElementById('editForm').action = '/services/edit/' + sid;
+  document.getElementById('edit_service_id_display').value = sid;
+  document.getElementById('edit_name').value     = btn.dataset.name;
+  document.getElementById('edit_category').value = btn.dataset.category;
+  document.getElementById('edit_price').value    = btn.dataset.price;
+});
+</script>
+{% endblock %}

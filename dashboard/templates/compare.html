@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Perbandingan Cabang — Dashboard{% endblock %}
+{% block page_title %}Perbandingan Cabang — {{ month_name }}{% endblock %}
+
+{% block content %}
+<!-- Filter -->
+<div class="card stat-card p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Bulan</label>
+      <select name="month" class="form-select form-select-sm">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Tahun</label>
+      <select name="year" class="form-select form-select-sm">
+        {% for y in years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Tampilkan</button>
+    </div>
+  </form>
+</div>
+
+<!-- Summary Bar -->
+<div class="row g-3 mb-4">
+  {% for b in branch_stats %}
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="badge" style="background:#1a1a2e; color:#fff; font-size:.8rem;">{{ b.short }}</span>
+        <span class="fw-semibold">{{ b.name }}</span>
+      </div>
+      <div class="fw-bold fs-5 text-success">{{ b.revenue|idr }}</div>
+      <div class="text-muted small">{{ b.tx_count }} transaksi · {{ b.rev_pct }}% share</div>
+      {% if b.growth is not none %}
+      <div class="small mt-1" style="color:{{ '#2e7d32' if b.growth >= 0 else '#c62828' }}">
+        {{ '+' if b.growth >= 0 else '' }}{{ b.growth }}% vs bulan lalu
+      </div>
+      {% else %}
+      <div class="small text-muted mt-1">Bulan lalu: {{ b.prev_revenue|idr }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Tabel Perbandingan Detail -->
+<div class="card stat-card p-3 mb-4">
+  <div class="fw-semibold mb-3">📊 Perbandingan Detail</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Cabang</th>
+          <th class="text-end">Revenue</th>
+          <th class="text-end">Transaksi</th>
+          <th class="text-end">Avg/TX</th>
+          <th class="text-end">Share</th>
+          <th class="text-end">vs Bln Lalu</th>
+          <th>Top Capster</th>
+          <th>Layanan Terlaris</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in branch_stats %}
+        <tr>
+          <td>
+            <span class="badge me-1" style="background:#1a1a2e; color:#fff;">{{ b.short }}</span>
+            <span class="fw-semibold">{{ b.name }}</span>
+          </td>
+          <td class="text-end fw-semibold text-success">{{ b.revenue|idr }}</td>
+          <td class="text-end">{{ b.tx_count }}</td>
+          <td class="text-end text-muted">{{ b.avg_tx|idr }}</td>
+          <td class="text-end">
+            <div class="d-flex align-items-center justify-content-end gap-1">
+              <div class="progress" style="width:50px; height:6px;">
+                <div class="progress-bar" style="width:{{ b.rev_pct }}%; background:#e94560;"></div>
+              </div>
+              <span class="small text-muted">{{ b.rev_pct }}%</span>
+            </div>
+          </td>
+          <td class="text-end">
+            {% if b.growth is not none %}
+            <span style="color:{{ '#2e7d32' if b.growth >= 0 else '#c62828' }}; font-size:.85rem; font-weight:600;">
+              {{ '+' if b.growth >= 0 else '' }}{{ b.growth }}%
+            </span>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if b.top_cap %}
+              <span class="fw-semibold">{{ b.top_cap.name }}</span>
+              <span class="text-muted">({{ b.top_cap.revenue|idr }})</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="small">
+            {% if b.top_svc %}
+              {{ b.top_svc.name }}
+              <span class="text-muted">({{ b.top_svc.count }}x)</span>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td>Total</td>
+          <td class="text-end text-success">{{ total_rev|idr }}</td>
+          <td class="text-end">{{ branch_stats|sum(attribute='tx_count') }}</td>
+          <td colspan="5"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- Grafik Revenue per Hari per Cabang -->
+<div class="card stat-card p-3">
+  <div class="fw-semibold mb-3">📈 Tren Revenue Harian — {{ month_name }}</div>
+  <canvas id="compareChart" height="80"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COLORS = ['#e94560','#0f3460','#533483','#16213e','#2e7d32','#1565c0'];
+const nowDate = new Date();
+const yr = {{ year }}, mo = {{ month }};
+
+// Build day labels (1..last day of month)
+const daysInMonth = new Date(yr, mo, 0).getDate();
+const labels = Array.from({length: daysInMonth}, (_, i) => String(i+1).padStart(2,'0') + '/' + String(mo).padStart(2,'0'));
+
+const datasets = [
+  {% for b in branch_stats %}
+  {
+    label: '{{ b.name }}',
+    data: {{ b.sparkline | tojson }},
+    borderColor: COLORS[{{ loop.index0 }} % COLORS.length],
+    backgroundColor: 'transparent',
+    tension: 0.3,
+    pointRadius: 2,
+  },
+  {% endfor %}
+];
+
+new Chart(document.getElementById('compareChart'), {
+  type: 'line',
+  data: { labels, datasets },
+  options: {
+    plugins: {
+      legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': Rp ' + ctx.raw.toLocaleString('id') } }
+    },
+    scales: {
+      y: { ticks: { callback: v => 'Rp ' + (v/1000).toFixed(0) + 'k' } }
+    }
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Laporan Harian — Dashboard{% endblock %}
+{% block page_title %}Laporan Harian{% endblock %}
+
+{% block content %}
+<!-- Date Navigator -->
+<div class="card stat-card p-3 mb-4">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <a href="/report/daily?date={{ prev_date }}" class="btn btn-sm btn-outline-secondary">&#8592; Kemarin</a>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <input type="date" name="date" class="form-control form-control-sm" value="{{ date_str }}"
+             style="width:160px">
+      <button type="submit" class="btn btn-sm" style="background:#e94560; color:#fff;">Tampilkan</button>
+    </form>
+    {% if not is_today %}
+    <a href="/report/daily?date={{ next_date }}" class="btn btn-sm btn-outline-secondary">Besok &#8594;</a>
+    {% endif %}
+    <a href="/report/daily" class="btn btn-sm btn-outline-primary">Hari Ini</a>
+    <span class="ms-auto fw-semibold text-muted small">
+      {{ selected.strftime('%A, %d %B %Y') }}
+    </span>
+  </div>
+</div>
+
+{% if total_tx == 0 %}
+<div class="alert alert-info">Tidak ada transaksi pada tanggal ini.</div>
+{% else %}
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fw-bold fs-5 text-success">{{ total_revenue|idr }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Total Transaksi</div>
+      <div class="fw-bold fs-5">{{ total_tx }} tx</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Rata-rata / Transaksi</div>
+      <div class="fw-bold fs-5">{{ (total_revenue // total_tx)|idr }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Capster Aktif</div>
+      <div class="fw-bold fs-5">{{ by_capster|length }} orang</div>
+    </div>
+  </div>
+</div>
+
+<!-- Breakdown Row -->
+<div class="row g-3 mb-4">
+
+  <!-- Per Layanan -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">✂️ Per Layanan</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Layanan</th><th class="text-center">Jumlah</th><th class="text-end">Revenue</th><th class="text-end">%</th></tr></thead>
+        <tbody>
+        {% for s in by_service %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td class="text-center">{{ s.count }}x</td>
+            <td class="text-end fw-semibold">{{ s.revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ s.pct }}%</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Capster -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">💈 Per Capster</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Capster</th><th class="text-center">Transaksi</th><th class="text-end">Revenue</th></tr></thead>
+        <tbody>
+        {% for c in by_capster %}
+          <tr>
+            <td class="fw-semibold">{{ c.name }}</td>
+            <td class="text-center">{{ c.count }}x</td>
+            <td class="text-end fw-semibold">{{ c.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Metode Bayar -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3">
+      <div class="fw-semibold mb-3">💳 Metode Pembayaran</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Metode</th><th class="text-center">Jumlah</th><th class="text-end">Revenue</th><th class="text-end">%</th></tr></thead>
+        <tbody>
+        {% for p in by_payment %}
+          <tr>
+            <td>
+              {% if 'cash' in p.name|lower %}💵{% elif 'qris' in p.name|lower %}📲{% endif %}
+              {{ p.name }}
+            </td>
+            <td class="text-center">{{ p.count }}x</td>
+            <td class="text-end fw-semibold">{{ p.revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ p.pct }}%</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Cabang -->
+  {% if by_branch|length > 1 %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3">
+      <div class="fw-semibold mb-3">🏢 Per Cabang</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Cabang</th><th class="text-center">Transaksi</th><th class="text-end">Revenue</th></tr></thead>
+        <tbody>
+        {% for b in by_branch %}
+          <tr>
+            <td>{{ b.name }}</td>
+            <td class="text-center">{{ b.count }}x</td>
+            <td class="text-end fw-semibold">{{ b.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Detail Transaksi -->
+<div class="card stat-card p-3">
+  <div class="fw-semibold mb-3">📋 Detail Transaksi ({{ total_tx }})</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Waktu</th>
+          <th>Capster</th>
+          <th>Layanan</th>
+          <th>Cabang</th>
+          <th>Bayar</th>
+          <th class="text-end">Harga</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for t in transactions %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="font-monospace small">{{ t.time }}</td>
+          <td class="fw-semibold">{{ t.capster }}</td>
+          <td>{{ t.service }}</td>
+          <td class="text-muted small">{{ t.branch }}</td>
+          <td class="small">
+            {% if 'cash' in t.payment|lower %}💵{% elif 'qris' in t.payment|lower %}📲{% endif %}
+            {{ t.payment }}
+          </td>
+          <td class="text-end fw-semibold text-success">{{ t.price|idr }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td colspan="6" class="text-end">Total</td>
+          <td class="text-end text-success">{{ total_revenue|idr }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

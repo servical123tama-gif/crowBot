@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}Kelola Cabang — Dashboard{% endblock %}
+{% block page_title %}Kelola Cabang{% endblock %}
+
+{% block content %}
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+  {{ msg }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span class="text-muted small">{{ branches|length }} cabang terdaftar</span>
+  <button class="btn btn-sm text-white" style="background:#e94560"
+          data-bs-toggle="modal" data-bs-target="#addModal">
+    + Tambah Cabang
+  </button>
+</div>
+
+<!-- Branch Cards -->
+{% if branches %}
+<div class="row g-3 mb-4">
+  {% for b in branches %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+
+      <!-- Card Header -->
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <span class="fw-bold fs-6">🏢 {{ b.name }}</span>
+          {% if b.short %}
+          <span class="badge ms-2" style="background:#16213e; color:#fff;">{{ b.short }}</span>
+          {% endif %}
+          <div class="font-monospace text-muted small mt-1">ID: {{ b.branch_id }}</div>
+          {% if b.location %}
+          <div class="text-muted small">📍 {{ b.location }}</div>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal" data-bs-target="#editModal"
+                  data-id="{{ b.branch_id }}"
+                  data-name="{{ b.name }}"
+                  data-short="{{ b.short }}"
+                  data-location="{{ b.location }}"
+                  data-employees="{{ b.employees }}"
+                  data-commission="{{ b.commission_pct }}"
+                  data-cost-tempat="{{ b.cost_tempat }}"
+                  data-cost-listrik="{{ b.cost_listrik_air }}"
+                  data-cost-wifi="{{ b.cost_wifi }}"
+                  data-cost-karyawan="{{ b.cost_karyawan }}">
+            Edit
+          </button>
+          <form method="post" action="/branches/delete/{{ b.branch_id }}"
+                onsubmit="return confirm('Hapus cabang \'{{ b.name }}\'?\n\nData capster yang ter-assign ke cabang ini tidak ikut terhapus.');">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+          </form>
+        </div>
+      </div>
+
+      <hr class="my-2">
+
+      <!-- Info row -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div class="text-muted small">Karyawan</div>
+          <div class="fw-semibold">{{ b.employees }} orang</div>
+        </div>
+        <div class="col-6">
+          <div class="text-muted small">Komisi Default</div>
+          <div class="fw-semibold">{{ b.commission_pct }}%</div>
+        </div>
+      </div>
+
+      <!-- Operational Costs -->
+      <div class="text-muted small fw-semibold mb-1">Biaya Operasional / Bulan</div>
+      <div class="row g-1">
+        <div class="col-6">
+          <div class="d-flex justify-content-between small border-bottom pb-1">
+            <span class="text-muted">Sewa Tempat</span>
+            <span class="fw-semibold">{{ b.cost_tempat|idr }}</span>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="d-flex justify-content-between small border-bottom pb-1">
+            <span class="text-muted">Listrik & Air</span>
+            <span class="fw-semibold">{{ b.cost_listrik_air|idr }}</span>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="d-flex justify-content-between small border-bottom pb-1">
+            <span class="text-muted">WiFi</span>
+            <span class="fw-semibold">{{ b.cost_wifi|idr }}</span>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="d-flex justify-content-between small border-bottom pb-1">
+            <span class="text-muted">Karyawan Fixed</span>
+            <span class="fw-semibold">{{ b.cost_karyawan|idr }}</span>
+          </div>
+        </div>
+        <div class="col-12 mt-1">
+          {% set total_cost = b.cost_tempat + b.cost_listrik_air + b.cost_wifi + b.cost_karyawan %}
+          <div class="d-flex justify-content-between small">
+            <span class="fw-semibold">Total Fixed Cost</span>
+            <span class="fw-bold text-danger">{{ total_cost|idr }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">Belum ada cabang terdaftar.</div>
+{% endif %}
+
+
+<!-- ═══ MODAL: Tambah Cabang ═══ -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="/branches/add">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addModalLabel">Tambah Cabang Baru</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="row g-3">
+            <!-- Info Dasar -->
+            <div class="col-12">
+              <div class="fw-semibold small text-muted mb-2">📋 Informasi Dasar</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label form-label-sm fw-semibold">Nama Cabang <span class="text-danger">*</span></label>
+              <input name="name" class="form-control form-control-sm" placeholder="Contoh: Cabang Utama" required>
+              <div class="form-text">Branch ID dibuat otomatis (snake_case).</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Kode Singkat</label>
+              <input name="short" class="form-control form-control-sm" placeholder="Contoh: A">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Jumlah Karyawan</label>
+              <input name="employees" type="number" min="0" value="2" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label form-label-sm fw-semibold">Lokasi / Alamat</label>
+              <input name="location" class="form-control form-control-sm" placeholder="Contoh: Jl. Merdeka No. 1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm fw-semibold">Komisi Default (%)</label>
+              <div class="input-group input-group-sm">
+                <input name="commission_rate" type="number" min="0" max="100" step="0.5" value="0"
+                       class="form-control form-control-sm">
+                <span class="input-group-text">%</span>
+              </div>
+              <div class="form-text">Komisi per-capster lebih prioritas.</div>
+            </div>
+
+            <!-- Biaya Operasional -->
+            <div class="col-12 mt-2">
+              <div class="fw-semibold small text-muted mb-2">💸 Biaya Operasional / Bulan</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Sewa Tempat</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input name="cost_tempat" type="number" min="0" value="0" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Listrik & Air</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input name="cost_listrik_air" type="number" min="0" value="0" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">WiFi</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input name="cost_wifi" type="number" min="0" value="0" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Karyawan Fixed</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input name="cost_karyawan" type="number" min="0" value="0" class="form-control form-control-sm">
+              </div>
+              <div class="form-text">Biasanya 0 (pakai gaji per-capster).</div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Edit Cabang ═══ -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" id="editForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">Edit Cabang</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="row g-3">
+            <!-- Info Dasar -->
+            <div class="col-12">
+              <div class="fw-semibold small text-muted mb-1">📋 Informasi Dasar</div>
+              <div class="text-muted small">Branch ID: <code id="edit_branch_id_display"></code></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label form-label-sm fw-semibold">Nama Cabang</label>
+              <input id="edit_name" name="name" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Kode Singkat</label>
+              <input id="edit_short" name="short" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Jumlah Karyawan</label>
+              <input id="edit_employees" name="employees" type="number" min="0"
+                     class="form-control form-control-sm">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label form-label-sm fw-semibold">Lokasi / Alamat</label>
+              <input id="edit_location" name="location" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label form-label-sm fw-semibold">Komisi Default (%)</label>
+              <div class="input-group input-group-sm">
+                <input id="edit_commission" name="commission_rate" type="number" min="0" max="100" step="0.5"
+                       class="form-control form-control-sm">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+
+            <!-- Biaya Operasional -->
+            <div class="col-12 mt-2">
+              <div class="fw-semibold small text-muted mb-2">💸 Biaya Operasional / Bulan</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Sewa Tempat</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input id="edit_cost_tempat" name="cost_tempat" type="number" min="0"
+                       class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Listrik & Air</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input id="edit_cost_listrik" name="cost_listrik_air" type="number" min="0"
+                       class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">WiFi</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input id="edit_cost_wifi" name="cost_wifi" type="number" min="0"
+                       class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label form-label-sm fw-semibold">Karyawan Fixed</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rp</span>
+                <input id="edit_cost_karyawan" name="cost_karyawan" type="number" min="0"
+                       class="form-control form-control-sm">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const bid = btn.dataset.id;
+
+  document.getElementById('editForm').action = '/branches/edit/' + bid;
+  document.getElementById('edit_branch_id_display').textContent = bid;
+  document.getElementById('edit_name').value         = btn.dataset.name;
+  document.getElementById('edit_short').value        = btn.dataset.short;
+  document.getElementById('edit_location').value     = btn.dataset.location;
+  document.getElementById('edit_employees').value    = btn.dataset.employees;
+  document.getElementById('edit_commission').value   = btn.dataset.commission;
+  document.getElementById('edit_cost_tempat').value  = btn.dataset.costTempat;
+  document.getElementById('edit_cost_listrik').value = btn.dataset.costListrik;
+  document.getElementById('edit_cost_wifi').value    = btn.dataset.costWifi;
+  document.getElementById('edit_cost_karyawan').value= btn.dataset.costKaryawan;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Transaksi — Dashboard{% endblock %}
+{% block page_title %}Data Transaksi{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}{% endif %}{% endwith %}
+
+<!-- Filter Form -->
+<div class="card stat-card p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Dari</label>
+      <input type="date" name="start" value="{{ start_str }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Sampai</label>
+      <input type="date" name="end" value="{{ end_str }}" class="form-control form-control-sm">
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Capster</label>
+      <input type="text" name="capster" value="{{ capster_f }}" placeholder="Semua"
+             class="form-control form-control-sm" style="width:130px">
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Cabang</label>
+      <input type="text" name="branch" value="{{ branch_f }}" placeholder="Semua"
+             class="form-control form-control-sm" style="width:120px">
+    </div>
+    <div class="col-sm-auto d-flex gap-2">
+      <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">Filter</button>
+      <a href="/transactions" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </div>
+    <div class="col-sm-auto ms-auto">
+      <a href="/transactions/export?start={{ start_str }}&end={{ end_str }}"
+         class="btn btn-sm btn-outline-success">
+        ⬇️ Export CSV
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Summary -->
+<div class="row g-3 mb-3">
+  <div class="col-auto">
+    <div class="card stat-card px-3 py-2">
+      <span class="text-muted small">Jumlah</span>
+      <span class="fw-bold ms-2">{{ total_count }} transaksi</span>
+    </div>
+  </div>
+  <div class="col-auto">
+    <div class="card stat-card px-3 py-2">
+      <span class="text-muted small">Total</span>
+      <span class="fw-bold ms-2">{{ total_revenue|idr }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card stat-card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:130px;">Tanggal</th>
+          <th>Capster</th>
+          <th>Layanan</th>
+          <th>Cabang</th>
+          <th>Pembayaran</th>
+          <th class="text-end">Harga</th>
+          <th class="text-center" style="width:80px;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows %}
+          {% for r in rows %}
+          <tr>
+            <td class="text-muted small">{{ r.date }}</td>
+            <td>{{ r.capster }}</td>
+            <td>{{ r.service }}</td>
+            <td><span class="badge bg-light text-dark">{{ r.branch }}</span></td>
+            <td>
+              <span class="badge {{ 'bg-success' if r.payment == 'Cash' else 'bg-info text-dark' }}">
+                {{ r.payment }}
+              </span>
+            </td>
+            <td class="text-end fw-semibold">{{ r.price|idr }}</td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                <!-- Edit -->
+                <button class="btn btn-xs btn-outline-primary p-1 lh-1"
+                        title="Edit"
+                        data-bs-toggle="modal" data-bs-target="#editModal"
+                        data-id="{{ r.id }}"
+                        data-date="{{ r.date_input }}"
+                        data-capster="{{ r.capster }}"
+                        data-service="{{ r.service }}"
+                        data-price="{{ r.price }}"
+                        data-payment="{{ r.payment }}"
+                        data-branch="{{ r.branch }}">
+                  <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                </button>
+                <!-- Hapus -->
+                <button class="btn btn-xs btn-outline-danger p-1 lh-1"
+                        title="Hapus"
+                        data-bs-toggle="modal" data-bs-target="#deleteModal"
+                        data-id="{{ r.id }}"
+                        data-info="{{ r.date }} · {{ r.capster }} · {{ r.service }}">
+                  <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">Tidak ada transaksi ditemukan</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% if rows|length >= 500 %}
+  <div class="p-3 text-muted small text-center border-top">
+    Menampilkan 500 transaksi terbaru. Gunakan Export CSV untuk data lengkap.
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ═══ MODAL: Edit Transaksi ═══ -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editForm" action="">
+        <div class="modal-header">
+          <h5 class="modal-title">✏️ Edit Transaksi <span class="text-muted small" id="editModalId"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Tanggal & Waktu</label>
+            <input type="datetime-local" name="date" id="edit_date"
+                   class="form-control form-control-sm" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Capster</label>
+            <input list="capsterList" name="capster" id="edit_capster"
+                   class="form-control form-control-sm" required autocomplete="off">
+            <datalist id="capsterList">
+              {% for c in all_capsters %}
+              <option value="{{ c }}">
+              {% endfor %}
+            </datalist>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Layanan</label>
+            <input list="serviceList" name="service" id="edit_service"
+                   class="form-control form-control-sm" required autocomplete="off">
+            <datalist id="serviceList">
+              {% for s in service_names %}
+              <option value="{{ s }}">
+              {% endfor %}
+            </datalist>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Harga (Rp)</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input type="number" name="price" id="edit_price"
+                     class="form-control form-control-sm" min="1" step="1" required>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label form-label-sm fw-semibold">Pembayaran</label>
+              <select name="payment" id="edit_payment" class="form-select form-select-sm" required>
+                {% for p in payment_names %}
+                <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm fw-semibold">Cabang</label>
+              <input list="branchList" name="branch" id="edit_branch"
+                     class="form-control form-control-sm" required autocomplete="off">
+              <datalist id="branchList">
+                {% for b in branch_shorts %}
+                <option value="{{ b }}">
+                {% endfor %}
+              </datalist>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">
+            <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Konfirmasi Hapus ═══ -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post" id="deleteForm" action="">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">🗑️ Hapus Transaksi</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-1 small">Anda akan menghapus transaksi:</p>
+          <p class="fw-semibold small text-muted" id="deleteInfo"></p>
+          <div class="alert alert-warning py-2 small mb-0">
+            ⚠️ Data yang dihapus <strong>tidak dapat dikembalikan</strong>.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm btn-danger">
+            <i class="bi bi-trash me-1"></i> Hapus
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Edit Modal ─────────────────────────────────────────────────────────
+document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const id = btn.dataset.id;
+
+  document.getElementById('editModalId').textContent = '#' + id;
+  document.getElementById('editForm').action = '/transactions/' + id + '/edit';
+  document.getElementById('edit_date').value    = btn.dataset.date;
+  document.getElementById('edit_capster').value = btn.dataset.capster;
+  document.getElementById('edit_service').value = btn.dataset.service;
+  document.getElementById('edit_price').value   = btn.dataset.price;
+  document.getElementById('edit_branch').value  = btn.dataset.branch;
+
+  // Set payment select
+  const paySelect = document.getElementById('edit_payment');
+  for (let i = 0; i < paySelect.options.length; i++) {
+    if (paySelect.options[i].value === btn.dataset.payment) {
+      paySelect.selectedIndex = i;
+      break;
+    }
+  }
+});
+
+// ── Delete Modal ────────────────────────────────────────────────────────
+document.getElementById('deleteModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const id  = btn.dataset.id;
+  document.getElementById('deleteForm').action = '/transactions/' + id + '/delete';
+  document.getElementById('deleteInfo').textContent = btn.dataset.info;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Beranda — Dashboard{% endblock %}
+{% block page_title %}Beranda{% endblock %}
+
+{% block content %}
+<!-- ══ Stat Cards ═══════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <!-- Revenue Hari Ini -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3 h-100" style="border-left:4px solid #e94560;">
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="text-muted small">Revenue Hari Ini</div>
+          <div class="fw-bold fs-4 mt-1">{{ today_revenue|idr }}</div>
+          <div class="text-muted mt-1" style="font-size:.78rem;">
+            {{ today_count }} transaksi
+            {% if today_avg %}&nbsp;·&nbsp;avg {{ today_avg|idr }}/tx{% endif %}
+          </div>
+        </div>
+        <div class="icon-box" style="background:#fff3e0; flex-shrink:0;"><span>💰</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenue Bulan Ini -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3 h-100" style="border-left:4px solid #2e7d32;">
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="text-muted small">Revenue {{ now.strftime('%B %Y') }}</div>
+          <div class="fw-bold fs-4 mt-1">{{ month_revenue|idr }}</div>
+          <div class="mt-1" style="font-size:.78rem;">
+            {% if growth is not none %}
+            <span class="badge rounded-pill px-2 py-1"
+                  style="background:{{ '#d4edda' if growth >= 0 else '#f8d7da' }};
+                         color:{{ '#155724' if growth >= 0 else '#721c24' }}; font-size:.75rem;">
+              {{ '+' if growth >= 0 else '' }}{{ growth }}% vs bln lalu
+            </span>
+            {% else %}
+            <span class="text-muted">bln lalu: {{ last_month_revenue|idr }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="icon-box" style="background:#e8f5e9; flex-shrink:0;"><span>📅</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rata-rata / Transaksi -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3 h-100" style="border-left:4px solid #1565c0;">
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="text-muted small">Rata-rata / Transaksi</div>
+          <div class="fw-bold fs-4 mt-1">{{ month_avg|idr }}</div>
+          <div class="text-muted mt-1" style="font-size:.78rem;">
+            {{ month_count }} transaksi bulan ini
+          </div>
+        </div>
+        <div class="icon-box" style="background:#e3f2fd; flex-shrink:0;"><span>🧾</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layanan Terlaris + Capster -->
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3 h-100" style="border-left:4px solid #533483;">
+      <div class="d-flex align-items-start justify-content-between">
+        <div style="min-width:0;">
+          <div class="text-muted small">Layanan Terlaris (bln ini)</div>
+          <div class="fw-bold fs-5 mt-1 text-truncate" style="max-width:160px;">
+            {{ month_top_svc if month_top_svc else '—' }}
+          </div>
+          <div class="text-muted mt-1" style="font-size:.78rem;">
+            ✂️ {{ capster_count }} capster terdaftar
+          </div>
+        </div>
+        <div class="icon-box" style="background:#f3e5f5; flex-shrink:0;"><span>⭐</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══ Charts utama ══════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-3">
+
+  <!-- Revenue 30 hari -->
+  <div class="col-xl-8">
+    <div class="card stat-card p-3 h-100">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <span class="fw-semibold">📈 Revenue Keseluruhan — 30 Hari Terakhir</span>
+        <a href="/report/daily" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;">Laporan Harian</a>
+      </div>
+      <!-- Resume strip -->
+      <div id="revenueSummary" class="d-flex gap-3 mb-3" style="font-size:.78rem; color:#555;">
+        <span>Total: <strong id="sumTotal">—</strong></span>
+        <span>Rata-rata/hari: <strong id="sumAvg">—</strong></span>
+        <span>Hari terbaik: <strong id="sumBest">—</strong></span>
+      </div>
+      <canvas id="revenueChart" height="90"></canvas>
+    </div>
+  </div>
+
+  <!-- Doughnut split -->
+  <div class="col-xl-4">
+    <div class="row g-3 h-100">
+
+      <!-- Branch split -->
+      <div class="col-12">
+        <div class="card stat-card p-3">
+          <span class="fw-semibold d-block mb-1">🍩 Split per Cabang (Bulan Ini)</span>
+          <div id="branchSummary" class="text-muted mb-2" style="font-size:.75rem;">memuat…</div>
+          <canvas id="branchChart" height="130"></canvas>
+        </div>
+      </div>
+
+      <!-- Payment split -->
+      <div class="col-12">
+        <div class="card stat-card p-3">
+          <span class="fw-semibold d-block mb-1">💳 Metode Pembayaran (Bulan Ini)</span>
+          <div id="paymentSummary" class="text-muted mb-2" style="font-size:.75rem;">memuat…</div>
+          <canvas id="paymentChart" height="130"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ Per-Cabang charts ══════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+  {% for branch_id, branch_cfg in branches.items() %}
+  {% set short = branch_cfg.get('short', branch_id) %}
+  {% set bname = branch_cfg.get('name', branch_id) %}
+  {% set brev   = branch_month.get(short, {}).get('revenue', 0) %}
+  {% set bcount = branch_month.get(short, {}).get('count', 0) %}
+  {% set bgrow  = branch_growth.get(short) %}
+  <div class="col-xl-6">
+    <div class="card stat-card p-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="fw-semibold">🏢 {{ bname }}</span>
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+          {% if bgrow is not none %}
+          <span class="badge rounded-pill px-2"
+                style="background:{{ '#d4edda' if bgrow >= 0 else '#f8d7da' }};
+                       color:{{ '#155724' if bgrow >= 0 else '#721c24' }}; font-size:.72rem;">
+            {{ '+' if bgrow >= 0 else '' }}{{ bgrow }}%
+          </span>
+          {% endif %}
+          <span class="text-muted small">
+            {{ brev|idr }} · {{ bcount }} tx
+          </span>
+        </div>
+      </div>
+      <canvas id="chart_{{ branch_id }}" height="100"></canvas>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+
+<!-- ══ Bottom tables ══════════════════════════════════════════════════════ -->
+<div class="row g-3">
+
+  <!-- Top Capsters -->
+  <div class="col-md-7">
+    <div class="card stat-card p-3">
+      <div class="fw-semibold mb-3">🏆 Top Capster Bulan Ini</div>
+      {% if top_capsters %}
+      {% set max_rev = top_capsters[0].revenue %}
+      <div class="d-flex flex-column gap-2">
+        {% for c in top_capsters %}
+        {% set pct = (c.revenue / max_rev * 100) | round(0) | int if max_rev > 0 else 0 %}
+        <div>
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <div class="d-flex align-items-center gap-2">
+              <span style="font-size:1.1rem; width:24px; text-align:center;">
+                {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+              </span>
+              <span class="fw-semibold" style="font-size:.9rem;">{{ c.name }}</span>
+              <span class="text-muted" style="font-size:.75rem;">{{ c.count }} tx</span>
+            </div>
+            <span class="fw-semibold text-success" style="font-size:.88rem;">{{ c.revenue|idr }}</span>
+          </div>
+          <div class="progress" style="height:5px;">
+            <div class="progress-bar" style="width:{{ pct }}%; background:#e94560;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">Belum ada data bulan ini.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Per-Cabang Hari Ini + Bulan Ini -->
+  <div class="col-md-5">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">🏢 Per Cabang — Hari Ini</div>
+      {% if branch_today %}
+      {% set total_today = branch_today.values() | sum %}
+      <div class="d-flex flex-column gap-2">
+        {% for branch, rev in branch_today.items() %}
+        {% set share = (rev / total_today * 100) | round(1) if total_today > 0 else 0 %}
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="fw-semibold small">{{ branch }}</span>
+            <span class="badge ms-1 rounded-pill"
+                  style="background:#e3f2fd; color:#1565c0; font-size:.7rem;">{{ share }}%</span>
+          </div>
+          <span class="fw-semibold text-success small">{{ rev|idr }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if branch_month %}
+      <hr class="my-2">
+      <div class="text-muted small fw-semibold mb-2">Bulan Ini:</div>
+      <div class="d-flex flex-column gap-1">
+        {% for branch, stats in branch_month.items() %}
+        {% set bgrow = branch_growth.get(branch) %}
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-1">
+            <span class="small">{{ branch }}</span>
+            {% if bgrow is not none %}
+            <span class="badge rounded-pill"
+                  style="background:{{ '#d4edda' if bgrow >= 0 else '#f8d7da' }};
+                         color:{{ '#155724' if bgrow >= 0 else '#721c24' }}; font-size:.65rem; padding:1px 5px;">
+              {{ '+' if bgrow >= 0 else '' }}{{ bgrow }}%
+            </span>
+            {% endif %}
+          </div>
+          <span class="fw-semibold text-success small">{{ stats.revenue|idr }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <p class="text-muted small mb-0">Belum ada transaksi hari ini.</p>
+      {% if branch_month %}
+      <hr class="my-2">
+      <div class="text-muted small fw-semibold mb-2">Bulan Ini:</div>
+      <div class="d-flex flex-column gap-1">
+        {% for branch, stats in branch_month.items() %}
+        {% set bgrow = branch_growth.get(branch) %}
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-1">
+            <span class="small">{{ branch }}</span>
+            {% if bgrow is not none %}
+            <span class="badge rounded-pill"
+                  style="background:{{ '#d4edda' if bgrow >= 0 else '#f8d7da' }};
+                         color:{{ '#155724' if bgrow >= 0 else '#721c24' }}; font-size:.65rem; padding:1px 5px;">
+              {{ '+' if bgrow >= 0 else '' }}{{ bgrow }}%
+            </span>
+            {% endif %}
+          </div>
+          <span class="fw-semibold text-success small">{{ stats.revenue|idr }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+const BRANCH_COLORS = ['#0f3460','#e94560','#533483','#16213e'];
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function fmtIdr(n) {
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+function makeLineChart(canvasId, data, color, onDone) {
+  const chart = new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: 'Revenue',
+        data: data.values,
+        borderColor: color,
+        backgroundColor: color + '1e',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fmtIdr(ctx.raw) } }
+      },
+      scales: {
+        y: { ticks: { callback: v => 'Rp ' + (v/1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
+  if (onDone) onDone(data);
+  return chart;
+}
+
+function makeDoughnut(canvasId, data, colors, summaryId) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'doughnut',
+    data: {
+      labels: data.labels,
+      datasets: [{ data: data.values, backgroundColor: colors }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmtIdr(ctx.raw) } }
+      }
+    }
+  });
+
+  // Populate summary text
+  if (summaryId && data.labels && data.values) {
+    const total = data.values.reduce((a, b) => a + b, 0);
+    const top   = data.labels.reduce((best, lbl, i) =>
+      data.values[i] > (data.values[best.i] || 0) ? { i, lbl } : best,
+      { i: 0, lbl: data.labels[0] }
+    );
+    const pct = total > 0 ? Math.round(data.values[top.i] / total * 100) : 0;
+    document.getElementById(summaryId).textContent =
+      `${top.lbl}: ${fmtIdr(data.values[top.i])} (${pct}% dari total)`;
+  }
+}
+
+// ── Revenue keseluruhan ─────────────────────────────────────────────────
+fetch('/api/chart/revenue-daily?days=30')
+  .then(r => r.json())
+  .then(data => {
+    makeLineChart('revenueChart', data, '#e94560', d => {
+      const vals  = d.values.filter(v => v > 0);
+      const total = d.values.reduce((a, b) => a + b, 0);
+      const avg   = vals.length ? Math.round(total / vals.length) : 0;
+      const best  = Math.max(...(vals.length ? vals : [0]));
+      const bestIdx = d.values.indexOf(best);
+      const bestLabel = bestIdx >= 0 ? d.labels[bestIdx] : '—';
+
+      document.getElementById('sumTotal').textContent = fmtIdr(total);
+      document.getElementById('sumAvg').textContent   = fmtIdr(avg);
+      document.getElementById('sumBest').textContent  = fmtIdr(best) + (bestLabel ? ' (' + bestLabel + ')' : '');
+    });
+  });
+
+// ── Doughnuts ───────────────────────────────────────────────────────────
+const nowDate = new Date();
+const yr = nowDate.getFullYear(), mo = nowDate.getMonth() + 1;
+
+fetch(`/api/chart/branch-split?year=${yr}&month=${mo}`)
+  .then(r => r.json())
+  .then(d => makeDoughnut('branchChart', d, BRANCH_COLORS, 'branchSummary'));
+
+fetch(`/api/chart/payment-split?year=${yr}&month=${mo}`)
+  .then(r => r.json())
+  .then(d => makeDoughnut('paymentChart', d, ['#2e7d32','#1565c0','#e94560','#533483'], 'paymentSummary'));
+
+// ── Per-cabang charts ───────────────────────────────────────────────────
+const branchList = [
+  {% for branch_id, branch_cfg in branches.items() %}
+  {
+    id:       '{{ branch_id }}',
+    short:    '{{ branch_cfg.get("short", branch_id) }}',
+    canvasId: 'chart_{{ branch_id }}',
+    color:    BRANCH_COLORS[{{ loop.index0 }} % BRANCH_COLORS.length],
+  },
+  {% endfor %}
+];
+
+branchList.forEach(b => {
+  fetch(`/api/chart/revenue-daily?days=30&branch=${encodeURIComponent(b.short)}`)
+    .then(r => r.json())
+    .then(d => makeLineChart(b.canvasId, d, b.color));
+});
+</script>
+{% endblock %}

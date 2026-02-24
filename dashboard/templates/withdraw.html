@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Withdraw Capster — Dashboard{% endblock %}
+{% block page_title %}Withdraw Capster{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}{% endif %}{% endwith %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span class="text-muted small">{{ capsters|length }} capster</span>
+  <button class="btn btn-sm btn-outline-secondary"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#riwayatSection"
+          aria-expanded="false">
+    <i class="bi bi-clock-history"></i> Riwayat Transaksi
+  </button>
+</div>
+
+<!-- ── Kartu Saldo per Capster ── -->
+<div class="row g-3 mb-4">
+  {% for c in capsters %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card stat-card p-3 h-100">
+
+      <!-- Header Kartu -->
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <span class="fw-bold">{{ c.name }}</span>
+          {% if c.alias %}<span class="text-muted small ms-1">({{ c.alias }})</span>{% endif %}
+          <div class="mt-1">
+            {% if c.type == 'mitra' %}
+            <span class="badge badge-mitra">Mitra</span>
+            {% else %}
+            <span class="badge badge-tetap">Tetap</span>
+            {% endif %}
+            <span class="text-muted small ms-1">{{ c.pay_label }}</span>
+          </div>
+        </div>
+        <!-- Saldo besar -->
+        <div class="text-end">
+          <div class="text-muted" style="font-size:.7rem;">Saldo</div>
+          <div class="fw-bold fs-5 {{ 'text-success' if c.balance > 0 else ('text-danger' if c.balance < 0 else 'text-muted') }}">
+            {{ c.balance|idr }}
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-2">
+
+      <!-- Earned & Withdrawn -->
+      <div class="row g-0 text-center mb-3">
+        <div class="col border-end">
+          <div class="text-muted" style="font-size:.7rem;">Total Komisi/Gaji</div>
+          <div class="fw-semibold text-success" style="font-size:.85rem;">{{ c.earned_all|idr }}</div>
+        </div>
+        <div class="col">
+          <div class="text-muted" style="font-size:.7rem;">Total Withdraw</div>
+          <div class="fw-semibold text-danger" style="font-size:.85rem;">{{ c.withdrawn_all|idr }}</div>
+        </div>
+      </div>
+
+      <!-- Tombol Withdraw -->
+      <button class="btn btn-sm w-100 text-white {% if c.balance <= 0 %}disabled{% endif %}"
+              style="background: {% if c.balance > 0 %}#e94560{% else %}#adb5bd{% endif %};"
+              {% if c.balance > 0 %}
+              data-bs-toggle="modal" data-bs-target="#withdrawModal"
+              data-name="{{ c.name }}"
+              data-balance="{{ c.balance }}"
+              data-tid="{{ c.telegram_id }}"
+              {% endif %}>
+        {% if c.balance > 0 %}
+          <i class="bi bi-cash-coin me-1"></i> Tarik Saldo
+        {% else %}
+          Saldo Tidak Tersedia
+        {% endif %}
+      </button>
+
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not capsters %}
+  <div class="col-12">
+    <div class="alert alert-info">Belum ada capster terdaftar.</div>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ── Riwayat Transaksi (collapsible) ── -->
+<div class="collapse" id="riwayatSection">
+  <div class="card stat-card p-3">
+
+    <div class="fw-semibold mb-3">
+      <i class="bi bi-clock-history me-1"></i> Riwayat Transaksi Withdraw
+    </div>
+
+    <!-- Filter riwayat -->
+    <form method="get" class="row g-2 align-items-end mb-3">
+      <div class="col-auto">
+        <label class="form-label small fw-semibold mb-1">Capster</label>
+        <select name="capster" class="form-select form-select-sm">
+          <option value="">— Semua —</option>
+          {% for name in capster_names %}
+          <option value="{{ name }}" {% if name == filter_capster %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold mb-1">Bulan</label>
+        <input type="month" name="month" class="form-control form-control-sm"
+               value="{{ filter_month }}" style="width:145px">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">Filter</button>
+        <a href="/withdraw#riwayatSection" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
+      </div>
+      {% if records %}
+      <div class="col-auto ms-auto">
+        <span class="text-muted small">{{ records|length }} record ·</span>
+        <span class="fw-semibold text-danger ms-1">{{ total_withdrawn|idr }}</span>
+      </div>
+      {% endif %}
+    </form>
+
+    <!-- Tabel -->
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tanggal</th>
+            <th>Capster</th>
+            <th>Periode</th>
+            <th class="text-end">Jumlah</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if records %}
+          {% for r in records %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="small text-muted">{{ r.Date[:16] if r.Date else '—' }}</td>
+            <td class="fw-semibold">{{ r.CapsterName }}</td>
+            <td class="small text-muted">
+              {% if r.PeriodStart and r.PeriodEnd %}
+                {{ r.PeriodStart }} s/d {{ r.PeriodEnd }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end fw-semibold text-danger">{{ r.Amount|int|idr }}</td>
+            <td class="small text-muted">{{ r.Note or '—' }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-3">Belum ada riwayat withdraw.</td></tr>
+        {% endif %}
+        </tbody>
+        {% if records %}
+        <tfoot>
+          <tr class="fw-bold">
+            <td colspan="4" class="text-end">Total</td>
+            <td class="text-end text-danger">{{ total_withdrawn|idr }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Tarik Saldo ═══ -->
+<div class="modal fade" id="withdrawModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/withdraw/add">
+        <div class="modal-header">
+          <h5 class="modal-title">Tarik Saldo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- Info capster -->
+          <div class="alert alert-light border mb-3 py-2">
+            <div class="fw-semibold" id="modal_capster_name">—</div>
+            <div class="text-muted small">
+              Saldo tersedia: <span id="modal_balance" class="fw-bold text-success">—</span>
+            </div>
+          </div>
+
+          <input type="hidden" name="capster_name" id="modal_capster_input">
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Jumlah Withdraw (Rp) <span class="text-danger">*</span></label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rp</span>
+              <input id="modal_amount" name="amount" type="number" min="1" step="1"
+                     class="form-control form-control-sm" placeholder="Contoh: 260000" required>
+            </div>
+            <div class="form-text">Maks: <span id="modal_max"></span></div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label form-label-sm fw-semibold">Periode Mulai</label>
+              <input name="period_start" type="date" class="form-control form-control-sm"
+                     id="modal_period_start">
+            </div>
+            <div class="col-6">
+              <label class="form-label form-label-sm fw-semibold">Periode Akhir</label>
+              <input name="period_end" type="date" class="form-control form-control-sm"
+                     id="modal_period_end">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Catatan <span class="text-muted fw-normal">(opsional)</span></label>
+            <input name="note" class="form-control form-control-sm" placeholder="Contoh: Gaji Februari 2026">
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">
+            <i class="bi bi-cash-coin me-1"></i> Konfirmasi Withdraw
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Format angka ke Rupiah
+function formatIdr(n) {
+  return 'Rp ' + Number(n).toLocaleString('id-ID');
+}
+
+// Isi modal dari data-* tombol
+document.getElementById('withdrawModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const name    = btn.dataset.name;
+  const balance = parseInt(btn.dataset.balance);
+
+  document.getElementById('modal_capster_name').textContent = name;
+  document.getElementById('modal_balance').textContent      = formatIdr(balance);
+  document.getElementById('modal_capster_input').value      = name;
+  document.getElementById('modal_amount').value             = '';
+  document.getElementById('modal_amount').max               = balance;
+  document.getElementById('modal_max').textContent          = formatIdr(balance);
+
+  // Default periode: bulan ini
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = String(now.getMonth() + 1).padStart(2, '0');
+  const d   = String(now.getDate()).padStart(2, '0');
+  document.getElementById('modal_period_start').value = `${y}-${m}-01`;
+  document.getElementById('modal_period_end').value   = `${y}-${m}-${d}`;
+});
+
+// Auto-expand riwayat section jika ada filter aktif dari URL
+{% if filter_capster or filter_month %}
+const el = document.getElementById('riwayatSection');
+new bootstrap.Collapse(el, { toggle: false }).show();
+{% endif %}
+</script>
+{% endblock %}

@@ -89,9 +89,36 @@ class SheetsService:
                 transaction.service,
                 transaction.price,
                 transaction.payment_method,
-                transaction.branch 
+                transaction.branch
             ]
-            
+
+            # ── Dedup guard: tolak jika transaksi identik sudah ada dalam 30 detik ──
+            try:
+                all_values = worksheet.get_all_values()
+                if len(all_values) > 1:  # ada baris selain header
+                    cutoff = transaction.date - timedelta(seconds=30)
+                    for recent_row in reversed(all_values[1:]):  # skip header, cek dari bawah
+                        if len(recent_row) < 5:
+                            continue
+                        try:
+                            row_dt = datetime.strptime(recent_row[0], DATETIME_FORMAT)
+                        except ValueError:
+                            continue
+                        if row_dt < cutoff:
+                            break  # sudah melewati window 30 detik, stop
+                        if (recent_row[1] == transaction.capster
+                                and recent_row[2] == transaction.service
+                                and str(recent_row[3]) == str(transaction.price)
+                                and recent_row[5] == transaction.branch):
+                            logger.warning(
+                                f"⚠️ Duplicate transaction blocked (within 30s): "
+                                f"{transaction.capster} / {transaction.service} / {transaction.price}"
+                            )
+                            return True  # kembalikan True agar UI tetap tampil sukses
+            except Exception as dedup_err:
+                logger.warning(f"Dedup check failed (ignored): {dedup_err}")
+            # ── End dedup guard ──
+
             worksheet.append_row(row)
             logger.info(f"✅ Transaction saved to '{sheet_name}': {transaction}")
             
@@ -264,7 +291,7 @@ class SheetsService:
 
     # --- Capster Management ---
 
-    _CAPSTER_HEADERS = ['Name', 'TelegramID', 'Alias', 'EmploymentType', 'CommissionRate']
+    _CAPSTER_HEADERS = ['Name', 'TelegramID', 'Alias', 'EmploymentType', 'CommissionRate', 'MonthlySalary', 'BranchID']
 
     def _ensure_capster_sheet(self):
         """Create CapsterList sheet with headers if it doesn't exist."""
@@ -302,6 +329,13 @@ class SheetsService:
                         if any(row) and (len(row) < 4 or not row[3]):
                             worksheet.update_cell(i + 1, 4, 'mitra')
                             worksheet.update_cell(i + 1, 5, '0.5')
+
+                # Auto-upgrade: add MonthlySalary & BranchID columns if missing
+                first_row = worksheet.row_values(1)
+                if len(first_row) < 6 or first_row[5] != 'MonthlySalary':
+                    logger.info("Upgrading CapsterList headers with MonthlySalary & BranchID...")
+                    worksheet.update_cell(1, 6, 'MonthlySalary')
+                    worksheet.update_cell(1, 7, 'BranchID')
 
                 self._worksheet_cache[SHEET_CAPSTERS] = worksheet
             return worksheet
@@ -354,7 +388,8 @@ class SheetsService:
             return False
 
     def update_capster(self, telegram_id: int, name: str = None, alias: str = None,
-                       employment_type: str = None, commission_rate: float = None) -> bool:
+                       employment_type: str = None, commission_rate: float = None,
+                       monthly_salary: int = None, branch_id: str = None) -> bool:
         """Update capster data by telegram_id."""
         try:
             worksheet = self._ensure_capster_sheet()
@@ -372,8 +407,13 @@ class SheetsService:
                         worksheet.update_cell(i, 4, employment_type)
                     if commission_rate is not None:
                         worksheet.update_cell(i, 5, str(commission_rate))
+                    if monthly_salary is not None:
+                        worksheet.update_cell(i, 6, str(monthly_salary))
+                    if branch_id is not None:
+                        worksheet.update_cell(i, 7, branch_id)
                     logger.info(f"Capster {telegram_id} updated: name={name}, alias={alias}, "
-                                f"employment_type={employment_type}, commission_rate={commission_rate}")
+                                f"employment_type={employment_type}, commission_rate={commission_rate}, "
+                                f"monthly_salary={monthly_salary}, branch_id={branch_id}")
                     return True
 
             logger.warning(f"Capster {telegram_id} not found for update.")

@@ -102,12 +102,45 @@ def handle_errors(func):
             return await func(update, context, *args, **kwargs)
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
-            
+
             error_msg = "❌ Terjadi kesalahan. Silakan coba lagi atau hubungi admin."
-            
+
             if update.message:
                 await update.message.reply_text(error_msg)
             elif update.callback_query:
                 await update.callback_query.answer(error_msg, show_alert=True)
-    
+
+    return wrapper
+
+
+def prevent_double_submit(func):
+    """Prevent duplicate transactions from double-clicks / Telegram callback retries.
+
+    While a transaction handler is running for user X, any subsequent callback
+    from the same user is immediately acknowledged and silently dropped.
+    The lock is released automatically after the handler finishes (success or error).
+    """
+    @functools.wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user_id = update.effective_user.id
+
+        # bot_data is shared across all handlers and persists for the bot lifetime.
+        # setdefault is atomic in asyncio (no await between check and set).
+        in_flight: set = context.bot_data.setdefault('_tx_in_flight', set())
+
+        if user_id in in_flight:
+            logger.info(f"Double-submit blocked for user {user_id} in {func.__name__}")
+            if update.callback_query:
+                await update.callback_query.answer(
+                    "⏳ Sedang diproses, mohon tunggu sebentar...",
+                    show_alert=False,
+                )
+            return
+
+        in_flight.add(user_id)
+        try:
+            return await func(update, context, *args, **kwargs)
+        finally:
+            in_flight.discard(user_id)
+
     return wrapper

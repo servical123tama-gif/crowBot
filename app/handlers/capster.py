@@ -30,12 +30,15 @@ from app.config.constants import (
     MSG_EDIT_CAPSTER_NAME,
     MSG_EDIT_CAPSTER_ALIAS,
     MSG_CAPSTER_UPDATED,
+    BRANCHES,
 )
 
 logger = logging.getLogger(__name__)
 
 # Conversation states - Add capster
 GET_CAPSTER_NAME, GET_CAPSTER_TELEGRAM_ID, GET_CAPSTER_ALIAS, GET_CAPSTER_TYPE, GET_CAPSTER_COMMISSION = range(5)
+GET_CAPSTER_SALARY = 5   # untuk capster tetap
+GET_CAPSTER_BRANCH = 6   # untuk capster tetap
 # Conversation states - Edit capster
 EDIT_CAPSTER_NAME, EDIT_CAPSTER_ALIAS = range(10, 12)
 
@@ -68,12 +71,15 @@ async def list_capsters_handler(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = KeyboardBuilder.capster_menu()
     else:
         text = f"{MSG_CAPSTER_LIST_HEADER}\n\n"
+        from app.utils.formatters import Formatter
         for i, c in enumerate(capsters, 1):
             alias_part = f" (alias: {c.alias})" if c.alias else ""
             if c.employment_type == 'mitra':
                 type_part = f" | Mitra {int(c.commission_rate * 100)}%"
             else:
-                type_part = " | Tetap"
+                branch_name = BRANCHES.get(c.branch_id, {}).get('short', c.branch_id) if c.branch_id else '-'
+                salary_str = Formatter.format_currency(c.monthly_salary) if c.monthly_salary else 'Rp 0'
+                type_part = f" | Tetap | {salary_str}/bln | {branch_name}"
             text += f"{i}. {c.name}{alias_part}{type_part} - ID: {c.telegram_id}\n"
         text += "\n✏️ Klik nama untuk edit | 🗑️ Klik ikon untuk hapus"
         keyboard = KeyboardBuilder.capster_list_keyboard(capsters)
@@ -175,8 +181,14 @@ async def get_capster_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return GET_CAPSTER_COMMISSION
     else:
+        # tetap: tanya gaji bulanan
         context.user_data['capster_commission'] = 0.0
-        return await _save_new_capster(update, context)
+        await update.message.reply_text(
+            "💵 Masukkan gaji bulanan (Rp):\n"
+            "Contoh: 2000000\n\n"
+            "Ketik /skip untuk set 0"
+        )
+        return GET_CAPSTER_SALARY
 
 
 @handle_errors
@@ -205,6 +217,78 @@ async def skip_commission(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return await _save_new_capster(update, context)
 
 
+@handle_errors
+async def get_capster_salary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Get monthly salary for tetap capster."""
+    text = update.message.text.strip()
+    if text.startswith('/skip'):
+        salary = 0
+    else:
+        try:
+            salary = int(float(text.replace(',', '').replace('.', '')))
+            if salary < 0:
+                await update.message.reply_text("❌ Gaji tidak boleh negatif.\nCoba lagi:")
+                return GET_CAPSTER_SALARY
+        except ValueError:
+            await update.message.reply_text("❌ Angka tidak valid.\nCoba lagi:")
+            return GET_CAPSTER_SALARY
+
+    context.user_data['capster_salary'] = salary
+
+    # Tampilkan daftar branch
+    branch_list = "\n".join(
+        f"  • {bid} — {bcfg.get('name', bid)}"
+        for bid, bcfg in BRANCHES.items()
+    )
+    await update.message.reply_text(
+        f"🏢 Pilih branch tempat bekerja:\n{branch_list}\n\n"
+        "Ketik BranchID (misal: cabang_a)\n"
+        "Ketik /skip jika belum ditentukan"
+    )
+    return GET_CAPSTER_BRANCH
+
+
+async def skip_salary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skip salary input."""
+    context.user_data['capster_salary'] = 0
+    branch_list = "\n".join(
+        f"  • {bid} — {bcfg.get('name', bid)}"
+        for bid, bcfg in BRANCHES.items()
+    )
+    await update.message.reply_text(
+        f"🏢 Pilih branch tempat bekerja:\n{branch_list}\n\n"
+        "Ketik BranchID (misal: cabang_a)\n"
+        "Ketik /skip jika belum ditentukan"
+    )
+    return GET_CAPSTER_BRANCH
+
+
+@handle_errors
+async def get_capster_branch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Get branch assignment for tetap capster."""
+    text = update.message.text.strip()
+    if text.startswith('/skip'):
+        branch_id = ''
+    else:
+        branch_id = text.lower().strip()
+        if branch_id not in BRANCHES:
+            valid = ', '.join(BRANCHES.keys())
+            await update.message.reply_text(
+                f"❌ Branch tidak dikenal. Pilih: {valid}\n"
+                "Atau ketik /skip"
+            )
+            return GET_CAPSTER_BRANCH
+
+    context.user_data['capster_branch_id'] = branch_id
+    return await _save_new_capster(update, context)
+
+
+async def skip_branch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skip branch assignment."""
+    context.user_data['capster_branch_id'] = ''
+    return await _save_new_capster(update, context)
+
+
 async def _save_new_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Save the new capster with all collected data."""
     capster_name = context.user_data.get('capster_name')
@@ -212,12 +296,16 @@ async def _save_new_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     alias = context.user_data.get('capster_alias', '')
     employment_type = context.user_data.get('capster_type', 'mitra')
     commission_rate = context.user_data.get('capster_commission', 0.5)
+    monthly_salary = context.user_data.get('capster_salary', 0)
+    branch_id = context.user_data.get('capster_branch_id', '')
 
     capster_service = context.bot_data.get('capster_service')
 
     if capster_service.add_capster(capster_name, telegram_id, alias=alias,
                                     employment_type=employment_type,
-                                    commission_rate=commission_rate):
+                                    commission_rate=commission_rate,
+                                    monthly_salary=monthly_salary,
+                                    branch_id=branch_id):
         # Update query parser so /tanya recognizes the new name + alias
         query_parser = context.bot_data.get('query_parser_service')
         if query_parser:
@@ -230,6 +318,11 @@ async def _save_new_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         type_info = f"\nTipe: {employment_type}"
         if employment_type == 'mitra':
             type_info += f" ({int(commission_rate * 100)}%)"
+        else:
+            from app.utils.formatters import Formatter
+            branch_name = BRANCHES.get(branch_id, {}).get('name', branch_id) if branch_id else '-'
+            type_info += f"\nGaji: {Formatter.format_currency(monthly_salary)}/bln"
+            type_info += f"\nBranch: {branch_name}"
 
         await update.message.reply_text(
             MSG_CAPSTER_ADDED.format(name=capster_name, telegram_id=telegram_id)
@@ -240,7 +333,7 @@ async def _save_new_capster(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Cleanup
     for key in ['capster_name', 'capster_telegram_id', 'capster_alias',
-                'capster_type', 'capster_commission']:
+                'capster_type', 'capster_commission', 'capster_salary', 'capster_branch_id']:
         context.user_data.pop(key, None)
     return ConversationHandler.END
 
@@ -267,6 +360,14 @@ add_capster_conv_handler = ConversationHandler(
         GET_CAPSTER_COMMISSION: [
             CommandHandler('skip', skip_commission),
             MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_commission),
+        ],
+        GET_CAPSTER_SALARY: [
+            CommandHandler('skip', skip_salary),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_salary),
+        ],
+        GET_CAPSTER_BRANCH: [
+            CommandHandler('skip', skip_branch),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, get_capster_branch),
         ],
     },
     fallbacks=[CommandHandler('cancel', cancel_capster)],

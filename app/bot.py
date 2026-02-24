@@ -7,6 +7,9 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from app.config.settings import settings
 from app.services.auth_service import AuthService
 from app.services.sheets_service import SheetsService
+from app.db.database import init_db
+from app.db.repository import Repository
+from app.db.dual_write import DualWriteService
 from app.services.report_service import ReportService
 from app.services.gemini_service import GeminiService
 from app.services.query_parser_service import QueryParserService
@@ -46,19 +49,32 @@ class BarbershopBot:
         # Create application
         self.app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
-        # Instantiate services
-        sheets_service_instance = SheetsService()
+        # ── Data service dispatch (feature flags from .env) ──────────────
+        # Phase 0 (default): DB_DUAL_WRITE=false, DB_ONLY=false → Sheets only
+        # Phase 1: DB_DUAL_WRITE=true                           → write DB+Sheets, read DB
+        # Phase 3: DB_ONLY=true                                 → DB only (no credentials.json needed)
+        if settings.DB_ONLY:
+            init_db()
+            data_service = Repository()
+            logger.info("Data service: DB_ONLY (Repository)")
+        elif settings.DB_DUAL_WRITE:
+            init_db()
+            data_service = DualWriteService(Repository(), SheetsService())
+            logger.info("Data service: DB_DUAL_WRITE (DualWriteService)")
+        else:
+            data_service = SheetsService()
+            logger.info("Data service: Sheets only (SheetsService)")
 
-        # Load config from sheets BEFORE other services that read constants
-        config_service_instance = ConfigService(sheets_service=sheets_service_instance)
+        # Load config BEFORE other services that read constants
+        config_service_instance = ConfigService(sheets_service=data_service)
         config_service_instance.load_all_config()
 
-        report_service_instance = ReportService(sheets_service=sheets_service_instance)
+        report_service_instance = ReportService(sheets_service=data_service)
         gemini_service_instance = GeminiService()
 
-        capster_service_instance = CapsterService(sheets_service=sheets_service_instance)
+        capster_service_instance = CapsterService(sheets_service=data_service)
 
-        self.app.bot_data['sheets_service'] = sheets_service_instance
+        self.app.bot_data['sheets_service'] = data_service
         self.app.bot_data['config_service'] = config_service_instance
         self.app.bot_data['report_service'] = report_service_instance
         self.app.bot_data['gemini_service'] = gemini_service_instance

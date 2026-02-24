@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Capster — Dashboard{% endblock %}
+{% block page_title %}Capster — {{ month_name }}{% endblock %}
+
+{% block content %}
+<!-- Filter -->
+<div class="card stat-card p-3 mb-4">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Bulan</label>
+      <select name="month" class="form-select form-select-sm">
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label small fw-semibold mb-1">Tahun</label>
+      <select name="year" class="form-select form-select-sm">
+        {% for y in years %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm" style="background:#e94560; color:#fff;">Tampilkan</button>
+    </div>
+  </form>
+</div>
+
+<!-- Capster Cards -->
+{% if cap_stats %}
+<div class="row g-3">
+  {% for c in cap_stats %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card stat-card p-3">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <span class="fw-bold">{{ c.name }}</span>
+          {% if c.alias %}<span class="text-muted small ms-1">({{ c.alias }})</span>{% endif %}
+          <div class="mt-1">
+            {% if c.type == 'mitra' %}
+            <span class="badge badge-mitra">Mitra {{ c.pay_info.replace('Komisi ', '') }}</span>
+            {% else %}
+            <span class="badge badge-tetap">Tetap</span>
+            {% endif %}
+            {% if c.branch_name and c.branch_name != '-' %}
+            <span class="badge bg-light text-dark ms-1">{{ c.branch_name }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-end">
+          <div class="text-muted small">Revenue</div>
+          <div class="fw-bold text-primary">{{ c.revenue|idr }}</div>
+          <div class="text-muted" style="font-size:.75rem">{{ c.tx_count }} transaksi</div>
+        </div>
+      </div>
+      <hr class="my-2">
+      <!-- Salary Info (bulan ini) -->
+      <div class="row g-0 text-center mb-2">
+        <div class="col border-end">
+          <div class="text-muted" style="font-size:.7rem">{{ 'Komisi' if c.type == 'mitra' else 'Gaji' }} Bln Ini</div>
+          <div class="fw-semibold text-success">{{ c.earned|idr }}</div>
+        </div>
+        <div class="col">
+          <div class="text-muted" style="font-size:.7rem">Withdraw Bln Ini</div>
+          <div class="fw-semibold text-danger">{{ c.withdrawn|idr }}</div>
+        </div>
+      </div>
+      <hr class="my-1">
+      <!-- All-time saldo -->
+      <div class="row g-0 text-center">
+        <div class="col border-end">
+          <div class="text-muted" style="font-size:.7rem">Withdraw (Total)</div>
+          <div class="fw-semibold text-danger">{{ c.withdrawn_all|idr }}</div>
+        </div>
+        <div class="col">
+          <div class="text-muted" style="font-size:.7rem">Saldo (Keseluruhan)</div>
+          <div class="fw-bold {{ 'text-success' if c.balance >= 0 else 'text-danger' }}">
+            {{ c.balance|idr }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">Belum ada capster terdaftar.</div>
+{% endif %}
+{% endblock %}

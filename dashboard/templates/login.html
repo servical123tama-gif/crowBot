@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Barbershop Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #1a1a2e; min-height: 100vh; display:flex; align-items:center; justify-content:center; }
+    .login-card { background:#fff; border-radius:16px; padding:2.5rem; width:100%; max-width:380px; box-shadow:0 8px 32px rgba(0,0,0,.3); }
+    .brand { color:#e94560; font-size:1.8rem; font-weight:700; }
+  </style>
+</head>
+<body>
+<div class="login-card text-center">
+  <div class="brand mb-1">✂️ Barbershop</div>
+  <p class="text-muted mb-4" style="font-size:.9rem">Dashboard Management</p>
+
+  {% if error %}
+  <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <form method="post">
+    <div class="mb-3 text-start">
+      <label class="form-label fw-semibold">Password</label>
+      <input type="password" name="password" class="form-control" placeholder="Masukkan password" autofocus>
+    </div>
+    <button type="submit" class="btn w-100" style="background:#e94560; color:#fff;">Masuk</button>
+  </form>
+</div>
+</body>
+</html>

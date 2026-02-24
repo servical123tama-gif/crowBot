@@ -45,20 +45,29 @@ class Settings:
     # Business
     CURRENCY: str = os.getenv('CURRENCY', 'Rp')
     TIMEZONE: str = os.getenv('TIMEZONE', 'Asia/Jakarta')
-    
+
+    # Database (Phase 0: all False = Sheets only)
+    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///./barbershop.db')
+    DB_DUAL_WRITE: bool = os.getenv('DB_DUAL_WRITE', 'False').lower() == 'true'
+    DB_ONLY: bool = os.getenv('DB_ONLY', 'False').lower() == 'true'
+
     def validate(self) -> bool:
         """Validate required settings"""
         if not self.TELEGRAM_BOT_TOKEN:
             raise ValueError("TELEGRAM_BOT_TOKEN is required!")
-        
-        if not self.GOOGLE_SHEET_ID:
-            raise ValueError("GOOGLE_SHEET_ID is required!")
-        
+
         if not self.AUTHORIZED_CAPSTERS:
             raise ValueError("No authorized capsters configured!")
-        
-        if not os.path.exists(self.CREDENTIALS_FILE):
-            raise FileNotFoundError(f"{self.CREDENTIALS_FILE} not found!")
+
+        # Google Sheets credentials only required when NOT in DB_ONLY mode
+        if not self.DB_ONLY:
+            if not self.GOOGLE_SHEET_ID:
+                raise ValueError("GOOGLE_SHEET_ID is required (set DB_ONLY=true to skip Google Sheets)!")
+            if not os.path.exists(self.CREDENTIALS_FILE):
+                raise FileNotFoundError(
+                    f"{self.CREDENTIALS_FILE} not found! "
+                    "(set DB_ONLY=true to skip Google Sheets)"
+                )
 
         if not self.GEMINI_API_KEY:
             logger.warning("GEMINI_API_KEY not set - /tanya feature will use fallback mode (no AI)")
