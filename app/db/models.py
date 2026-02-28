@@ -22,6 +22,7 @@ class Transaction(Base):
     price = Column(Integer, nullable=False, default=0)
     payment_method = Column(String(20), nullable=False, default='Cash')
     branch = Column(String(50), nullable=True)
+    customer_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -41,6 +42,8 @@ class Capster(Base):
     name = Column(String(100), nullable=False)
     telegram_id = Column(BigInteger, nullable=False)
     alias = Column(String(100), nullable=True, default='')
+    username = Column(String(50), nullable=True, unique=True)
+    password_hash = Column(String(255), nullable=True)
     employment_type = Column(String(20), nullable=False, default='mitra')
     commission_rate = Column(Float, nullable=False, default=0.5)
     monthly_salary = Column(Integer, nullable=False, default=0)
@@ -61,6 +64,7 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True, default='')
+    visit_count = Column(Integer, nullable=False, default=0)
 
     def __repr__(self):
         return f"<Customer id={self.id} name={self.name}>"

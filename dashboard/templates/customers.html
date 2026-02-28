@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Daftar Customer{% endblock %}
+{% block page_title %}Daftar Customer{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div>
+    <h5 class="fw-bold mb-0">Customer</h5>
+    <small class="text-muted">Total: <strong>{{ total }}</strong> customer</small>
+  </div>
+  <button class="btn btn-sm text-white" style="background:#e94560;"
+          data-bs-toggle="modal" data-bs-target="#modalAdd">
+    <i class="bi bi-person-plus me-1"></i>Tambah Customer
+  </button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close btn-sm" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+<!-- Search -->
+<form method="get" class="mb-3">
+  <div class="input-group input-group-sm" style="max-width:320px;">
+    <span class="input-group-text bg-white border-end-0">
+      <i class="bi bi-search text-muted"></i>
+    </span>
+    <input type="text" name="q" class="form-control border-start-0 ps-0"
+           placeholder="Cari nama atau nomor HP..." value="{{ search }}">
+    {% if search %}
+      <a href="/customers" class="btn btn-outline-secondary">
+        <i class="bi bi-x"></i>
+      </a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Table -->
+<div class="card border-0 shadow-sm" style="border-radius:14px;">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:50px;">No</th>
+            <th>Nama</th>
+            <th>No. Telepon</th>
+            <th class="text-center">Kunjungan</th>
+            <th style="width:150px; text-align:right;">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if customers %}
+            {% for c in customers %}
+            <tr>
+              <td class="text-muted" style="font-size:.8rem;">{{ loop.index }}</td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                       style="width:34px;height:34px;flex-shrink:0;font-size:.8rem;
+                              background:{{ ['#e94560','#0f3460','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
+                    {{ c['Name'][0].upper() }}
+                  </div>
+                  <span class="fw-500">{{ c['Name'] }}</span>
+                </div>
+              </td>
+              <td>
+                {% if c['Phone'] %}
+                  <a href="https://wa.me/{{ c['Phone']|replace('+','') }}" target="_blank"
+                     class="text-decoration-none text-dark">
+                    <i class="bi bi-whatsapp text-success me-1"></i>{{ c['Phone'] }}
+                  </a>
+                {% else %}
+                  <span class="text-muted fst-italic" style="font-size:.82rem;">-</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <span class="badge rounded-pill px-2"
+                      style="background:#e8f4fd;color:#0f3460;font-size:.8rem;">
+                  <i class="bi bi-scissors me-1"></i>{{ c['VisitCount'] }}x
+                </span>
+              </td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-success py-0 px-2 me-1"
+                        title="QR Code"
+                        onclick="openQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
+                  <i class="bi bi-qr-code"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
+                        style="font-size:.78rem;"
+                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}')">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2"
+                        style="font-size:.78rem;"
+                        onclick="openDelete({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="4" class="text-center py-5 text-muted">
+                <i class="bi bi-person-x" style="font-size:2.5rem;opacity:.3;"></i>
+                <p class="mt-2 mb-0">
+                  {% if search %}
+                    Tidak ada customer dengan kata kunci "<strong>{{ search }}</strong>"
+                  {% else %}
+                    Belum ada data customer
+                  {% endif %}
+                </p>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tambah -->
+<div class="modal fade" id="modalAdd" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-person-plus me-2" style="color:#e94560;"></i>Tambah Customer
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/customers/add">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">
+              Nama <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="name" class="form-control" placeholder="Nama lengkap customer" required>
+          </div>
+          <div class="mb-1">
+            <label class="form-label fw-500" style="font-size:.85rem;">No. Telepon / WhatsApp</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-phone"></i></span>
+              <input type="text" name="phone" class="form-control" placeholder="628xxxxxxxx (opsional)">
+            </div>
+            <small class="text-muted">Format: 628xxx atau +628xxx</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">
+            <i class="bi bi-check2 me-1"></i>Simpan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit -->
+<div class="modal fade" id="modalEdit" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-pencil-square me-2" style="color:#e94560;"></i>Edit Customer
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formEdit">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">
+              Nama <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="name" id="editName" class="form-control" required>
+          </div>
+          <div class="mb-1">
+            <label class="form-label fw-500" style="font-size:.85rem;">No. Telepon / WhatsApp</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-phone"></i></span>
+              <input type="text" name="phone" id="editPhone" class="form-control" placeholder="628xxxxxxxx (opsional)">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">
+            <i class="bi bi-check2 me-1"></i>Update
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Hapus -->
+<div class="modal fade" id="modalDelete" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold text-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>Hapus Customer
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-0">Yakin ingin menghapus customer <strong id="deleteName"></strong>?</p>
+        <small class="text-muted">Tindakan ini tidak bisa dibatalkan.</small>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <form method="post" id="formDelete" style="display:inline;">
+          <button type="submit" class="btn btn-sm btn-danger">
+            <i class="bi bi-trash me-1"></i>Hapus
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal QR Code -->
+<div class="modal fade" id="modalQR" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:360px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-qr-code me-2" style="color:#0f3460;"></i>QR Code Customer
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="mb-1 fw-bold" id="qrCustName" style="font-size:.95rem;"></p>
+        <p class="text-muted mb-3" id="qrVisits" style="font-size:.82rem;"></p>
+        <div class="d-flex justify-content-center mb-3">
+          <img id="qrImg" src="" alt="QR Code"
+               style="width:220px;height:220px;border-radius:12px;border:3px solid #e2e8f0;">
+        </div>
+        <p class="text-muted" style="font-size:.75rem;">
+          Screenshot atau download QR ini untuk diberikan ke customer.
+          Scan QR saat customer datang untuk mencatat kunjungan otomatis.
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <a id="qrDownload" href="#" download="qr-customer.png"
+           class="btn btn-sm text-white" style="background:#0f3460;">
+          <i class="bi bi-download me-1"></i>Download PNG
+        </a>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openQR(id, name, visits) {
+    document.getElementById('qrCustName').textContent = name;
+    document.getElementById('qrVisits').textContent   = visits + ' kunjungan tercatat';
+    const url = '/customers/' + id + '/qr.png';
+    document.getElementById('qrImg').src         = url;
+    document.getElementById('qrDownload').href   = url;
+    document.getElementById('qrDownload').download = 'qr-' + name.replace(/\s+/g,'-') + '.png';
+    new bootstrap.Modal(document.getElementById('modalQR')).show();
+  }
+
+  function openEdit(id, name, phone) {
+    document.getElementById('editName').value  = name;
+    document.getElementById('editPhone').value = phone;
+    document.getElementById('formEdit').action = '/customers/' + id + '/edit';
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+  }
+
+  function openDelete(id, name) {
+    document.getElementById('deleteName').textContent = name;
+    document.getElementById('formDelete').action = '/customers/' + id + '/delete';
+    new bootstrap.Modal(document.getElementById('modalDelete')).show();
+  }
+</script>
+{% endblock %}

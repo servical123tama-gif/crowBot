@@ -1,0 +1,138 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Cari Customer{% endblock %}
+{% block page_title %}Cari Customer{% endblock %}
+
+{% block content %}
+
+<p class="text-muted mb-3" style="font-size:.85rem;">
+  Cari customer berdasarkan nama atau nomor HP untuk menampilkan ulang QR Code mereka.
+</p>
+
+<!-- Search form -->
+<form method="get" class="mb-4">
+  <div class="d-flex gap-2">
+    <div class="input-group">
+      <span class="input-group-text bg-white">
+        <i class="bi bi-search text-muted"></i>
+      </span>
+      <input type="text" name="q" class="form-control"
+             placeholder="Ketik nama atau nomor HP..."
+             value="{{ query }}" autofocus autocomplete="off">
+      {% if query %}
+        <a href="/portal/customers" class="btn btn-outline-secondary">
+          <i class="bi bi-x"></i>
+        </a>
+      {% endif %}
+    </div>
+    <button type="submit" class="btn text-white px-4" style="background:#0f3460;border-radius:8px;white-space:nowrap;">
+      Cari
+    </button>
+  </div>
+</form>
+
+{% if query %}
+  {% if results %}
+    <div class="mb-2">
+      <small class="text-muted">Ditemukan <strong>{{ results|length }}</strong> customer untuk "<strong>{{ query }}</strong>"</small>
+    </div>
+
+    <div class="d-flex flex-column gap-2">
+      {% for c in results %}
+      <div class="card stat-card">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <!-- Avatar -->
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+               style="width:44px;height:44px;font-size:.95rem;
+                      background:{{ ['#0f3460','#e94560','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
+            {{ c.name[0].upper() }}
+          </div>
+
+          <!-- Info -->
+          <div class="flex-grow-1" style="min-width:0;">
+            <div class="fw-600" style="font-size:.93rem;">{{ c.name }}</div>
+            <div class="text-muted" style="font-size:.78rem;">
+              {% if c.phone %}
+                <i class="bi bi-phone me-1"></i>{{ c.phone }}
+                &nbsp;·&nbsp;
+              {% endif %}
+              <i class="bi bi-scissors me-1"></i>{{ c.visits }} kunjungan
+            </div>
+          </div>
+
+          <!-- Tombol QR -->
+          <button class="btn btn-sm btn-outline-primary flex-shrink-0"
+                  style="border-radius:8px;"
+                  onclick="showQR({{ c.id }}, '{{ c.name|replace("'", "\\'") }}', {{ c.visits }}, '{{ c.phone }}')">
+            <i class="bi bi-qr-code me-1"></i>QR Code
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-person-x" style="font-size:3rem;opacity:.3;"></i>
+      <p class="mt-2 mb-0">Tidak ada customer dengan kata kunci "<strong>{{ query }}</strong>"</p>
+      <small>Coba cari dengan nama lengkap atau nomor HP (628xxx)</small>
+    </div>
+  {% endif %}
+
+{% else %}
+  <!-- Empty state -->
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-person-search" style="font-size:3.5rem;opacity:.25;"></i>
+    <p class="mt-3 mb-1 fw-500" style="font-size:.93rem;">Ketik nama atau nomor HP customer</p>
+    <small>QR Code bisa dicetak ulang jika hilang atau rusak</small>
+  </div>
+{% endif %}
+
+<!-- Modal QR Code -->
+<div class="modal fade" id="modalQR" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:340px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-qr-code me-2" style="color:#0f3460;"></i>QR Code Customer
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center pb-2">
+        <p class="fw-bold mb-0" id="qrName" style="font-size:.95rem;"></p>
+        <p class="text-muted mb-3" id="qrMeta" style="font-size:.8rem;"></p>
+        <div class="d-flex justify-content-center mb-3">
+          <img id="qrImg" src="" alt="QR Code"
+               style="width:220px;height:220px;border-radius:12px;border:3px solid #e2e8f0;">
+        </div>
+        <p class="text-muted" style="font-size:.75rem;">
+          Minta customer screenshot atau download QR ini.<br>
+          Scan QR saat kunjungan berikutnya untuk mencatat otomatis.
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center gap-2">
+        <a id="qrDownload" href="#" download="qr-customer.png"
+           class="btn btn-sm text-white" style="background:#0f3460;">
+          <i class="bi bi-download me-1"></i>Download PNG
+        </a>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function showQR(id, name, visits, phone) {
+    const url = '/portal/customer/' + id + '/qr.png';
+    document.getElementById('qrName').textContent  = name;
+    document.getElementById('qrMeta').textContent  =
+      (phone ? phone + '  ·  ' : '') + visits + ' kunjungan tercatat';
+    document.getElementById('qrImg').src            = url;
+    document.getElementById('qrDownload').href      = url;
+    document.getElementById('qrDownload').download  = 'qr-' + name.replace(/\s+/g, '-') + '.png';
+    new bootstrap.Modal(document.getElementById('modalQR')).show();
+  }
+</script>
+{% endblock %}

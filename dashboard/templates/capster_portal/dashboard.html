@@ -1,0 +1,120 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<p class="text-muted mb-3" style="font-size:.85rem;">
+  Halo, <strong>{{ cap.name }}</strong>! Berikut ringkasan bulan <strong>{{ month_name }}</strong>.
+</p>
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card card p-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="rounded-2 d-flex align-items-center justify-content-center"
+             style="width:38px;height:38px;background:#e8f4fd;">
+          <i class="bi bi-receipt" style="color:#0f3460;font-size:1rem;"></i>
+        </div>
+        <span class="text-muted" style="font-size:.78rem;">Transaksi</span>
+      </div>
+      <div class="fw-bold" style="font-size:1.4rem;">{{ tx_count }}</div>
+      <small class="text-muted">bulan ini</small>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card p-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="rounded-2 d-flex align-items-center justify-content-center"
+             style="width:38px;height:38px;background:#fef3f2;">
+          <i class="bi bi-currency-dollar" style="color:#e94560;font-size:1rem;"></i>
+        </div>
+        <span class="text-muted" style="font-size:.78rem;">Omset</span>
+      </div>
+      <div class="fw-bold" style="font-size:1.1rem;">{{ revenue|idr }}</div>
+      <small class="text-muted">bulan ini</small>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card p-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="rounded-2 d-flex align-items-center justify-content-center"
+             style="width:38px;height:38px;background:#f0fdf4;">
+          <i class="bi bi-wallet2" style="color:#2e7d32;font-size:1rem;"></i>
+        </div>
+        <span class="text-muted" style="font-size:.78rem;">
+          {% if cap.type == 'mitra' %}Komisi{% else %}Gaji{% endif %}
+        </span>
+      </div>
+      <div class="fw-bold" style="font-size:1.1rem;">{{ earned|idr }}</div>
+      <small class="text-muted">
+        {% if cap.type == 'mitra' %}{{ (cap.rate * 100)|int }}% dari omset{% else %}gaji tetap{% endif %}
+      </small>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card card p-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="rounded-2 d-flex align-items-center justify-content-center"
+             style="width:38px;height:38px;background:#fff8e1;">
+          <i class="bi bi-piggy-bank" style="color:#f59e0b;font-size:1rem;"></i>
+        </div>
+        <span class="text-muted" style="font-size:.78rem;">Saldo</span>
+      </div>
+      <div class="fw-bold {{ 'text-success' if balance >= 0 else 'text-danger' }}"
+           style="font-size:1.1rem;">{{ balance|idr }}</div>
+      <small class="text-muted">belum ditarik (all-time)</small>
+    </div>
+  </div>
+</div>
+
+<!-- Transaksi Terakhir -->
+<div class="stat-card card">
+  <div class="card-body p-0">
+    <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+      <h6 class="fw-bold mb-0" style="font-size:.9rem;">
+        <i class="bi bi-clock-history me-2" style="color:#0f3460;"></i>10 Transaksi Terakhir
+      </h6>
+      <a href="/portal/transactions" class="btn btn-sm btn-outline-primary py-0 px-2"
+         style="font-size:.78rem;">Lihat semua</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Layanan</th>
+            <th>Harga</th>
+            <th>Bayar</th>
+            <th>Cabang</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if recent_txs %}
+            {% for t in recent_txs %}
+            <tr>
+              <td style="font-size:.82rem;">{{ t.date.strftime('%d %b, %H:%M') }}</td>
+              <td>{{ t.service }}</td>
+              <td class="fw-500 text-success">{{ t.price|idr }}</td>
+              <td>
+                <span class="badge {{ 'bg-success' if t.payment == 'Cash' else 'bg-primary' }} bg-opacity-10
+                             {{ 'text-success' if t.payment == 'Cash' else 'text-primary' }}"
+                      style="font-size:.72rem;">{{ t.payment }}</span>
+              </td>
+              <td class="text-muted" style="font-size:.82rem;">{{ t.branch or '-' }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center py-4 text-muted">
+                <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;"></i>
+                <p class="mt-2 mb-0">Belum ada transaksi bulan ini</p>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

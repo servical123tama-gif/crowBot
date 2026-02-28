@@ -27,6 +27,8 @@ def create_app():
     from dashboard.routes.compare import compare_bp
     from dashboard.routes.api import api_bp
     from dashboard.routes.bot_control import bot_control_bp
+    from dashboard.routes.customers import customers_bp
+    from dashboard.routes.capster_portal import capster_portal_bp
 
     app.register_blueprint(home_bp)
     app.register_blueprint(profit_bp)
@@ -40,5 +42,7 @@ def create_app():
     app.register_blueprint(compare_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(bot_control_bp)
+    app.register_blueprint(customers_bp)
+    app.register_blueprint(capster_portal_bp)
 
     return app

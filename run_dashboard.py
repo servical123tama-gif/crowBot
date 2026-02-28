@@ -28,6 +28,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger('run_dashboard')
 
+# ── Database init (buat tabel + migrasi kolom baru jika belum ada) ────────────
+from app.db.database import init_db
+init_db()
+
 # ── Flask App ─────────────────────────────────────────────────────────────────
 from dashboard import create_app
 flask_app = create_app()

@@ -180,6 +180,7 @@ def capster_manage():
             'branch_id':      bid,
             'branch_name':    bname,
             'telegram_id':    c.get('TelegramID', ''),
+            'username':       c.get('Username', ''),
         })
     return render_template(
         'capster_manage.html',
@@ -287,6 +288,29 @@ def capster_edit(telegram_id):
         flash('Capster berhasil diperbarui.', 'success')
     else:
         flash('Gagal memperbarui capster.', 'danger')
+    return redirect(url_for('capsters.capster_manage'))
+
+
+@capsters_bp.route('/capsters/<int:telegram_id>/set-password', methods=['POST'])
+@login_required
+def capster_set_password(telegram_id):
+    db       = Repository()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+
+    if not username or not password:
+        flash('Username dan password wajib diisi.', 'danger')
+        return redirect(url_for('capsters.capster_manage'))
+
+    if len(password) < 6:
+        flash('Password minimal 6 karakter.', 'danger')
+        return redirect(url_for('capsters.capster_manage'))
+
+    ok, err = db.set_capster_credentials(telegram_id, username, password)
+    if ok:
+        flash(f'Akun portal untuk capster berhasil diset. Username: {username}', 'success')
+    else:
+        flash(err or 'Gagal menyimpan akun.', 'danger')
     return redirect(url_for('capsters.capster_manage'))
 
 

@@ -1,0 +1,427 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Tambah Transaksi{% endblock %}
+{% block page_title %}Tambah Transaksi{% endblock %}
+
+{% block content %}
+
+{% if success %}
+<div class="alert alert-success d-flex align-items-center gap-2 mb-3" style="border-radius:12px;">
+  <i class="bi bi-check-circle-fill fs-5"></i>
+  <div>
+    <strong>Transaksi berhasil disimpan!</strong>
+    <span class="ms-2" style="font-size:.85rem;">Kunjungan customer sudah tercatat.</span>
+  </div>
+</div>
+{% endif %}
+
+{# ── Pilih Cabang Hari Ini (muncul sekali per hari) ── #}
+{% if need_branch %}
+<div class="card stat-card mb-3" style="border-left:4px solid #e94560;">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-geo-alt-fill" style="color:#e94560;font-size:1.1rem;"></i>
+      <h6 class="fw-bold mb-0">Kamu kerja di cabang mana hari ini?</h6>
+    </div>
+    <p class="text-muted mb-3" style="font-size:.83rem;">
+      Pilih sekali, otomatis dipakai untuk semua transaksi hari ini. Bisa diganti per transaksi jika perlu.
+    </p>
+    <div class="row g-2">
+      {% for bid, binfo in branches.items() %}
+      <div class="col-6 col-sm-4">
+        <form method="post" action="/portal/set-daily-branch">
+          <input type="hidden" name="branch_id" value="{{ bid }}">
+          <button type="submit" class="btn w-100 text-start branch-pick-btn"
+                  style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:.65rem .85rem;transition:.15s;">
+            <div class="fw-600" style="font-size:.88rem;color:#0f3460;">{{ binfo.short or binfo.name }}</div>
+            <div class="text-muted" style="font-size:.75rem;">{{ binfo.location or '' }}</div>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# Disable the form below until branch is chosen #}
+<div style="opacity:.45;pointer-events:none;">
+{% endif %}
+
+{# ── Indicator cabang aktif ── #}
+{% if not need_branch %}
+<div class="d-flex align-items-center justify-content-between mb-3 px-1">
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge rounded-pill px-3 py-2"
+          style="background:#0f3460;color:#fff;font-size:.8rem;">
+      <i class="bi bi-geo-alt-fill me-1"></i>{{ daily_branch_name or daily_branch }}
+    </span>
+    <span class="text-muted" style="font-size:.78rem;">cabang hari ini</span>
+  </div>
+  <form method="post" action="/portal/set-daily-branch" style="display:inline;">
+    <input type="hidden" name="branch_id" value="">
+    <button type="submit" class="btn btn-sm btn-link text-muted p-0"
+            style="font-size:.78rem;"
+            onclick="return confirm('Ganti cabang hari ini?')">
+      <i class="bi bi-arrow-repeat me-1"></i>Ganti
+    </button>
+  </form>
+</div>
+{% endif %}
+
+<form method="post" id="txForm">
+
+  <!-- ── Step 1: Layanan ── -->
+  <div class="card stat-card mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:28px;height:28px;background:#0f3460;font-size:.8rem;flex-shrink:0;">1</div>
+        <h6 class="fw-bold mb-0">Pilih Layanan</h6>
+      </div>
+
+      <select name="service_id" id="serviceSelect" class="form-select" required
+              onchange="updatePrice()">
+        <option value="">— Pilih layanan —</option>
+        {% for s in services %}
+          {% if s.Category == 'main' %}
+            <option value="{{ s.ServiceID }}" data-price="{{ s.Price }}" data-name="{{ s.Name }}">
+              {{ s.Name }} — {{ s.Price|int|idr }}
+            </option>
+          {% endif %}
+        {% endfor %}
+        <optgroup label="── Coloring ──">
+        {% for s in services %}
+          {% if s.Category == 'coloring' %}
+            <option value="{{ s.ServiceID }}" data-price="{{ s.Price }}" data-name="{{ s.Name }}">
+              {{ s.Name }} — {{ s.Price|int|idr }}
+            </option>
+          {% endif %}
+        {% endfor %}
+        </optgroup>
+      </select>
+
+      <div id="pricePreview" class="mt-2 text-muted" style="font-size:.85rem;display:none;">
+        Harga: <strong id="priceText" class="text-success"></strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Customer ── -->
+  <div class="card stat-card mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:28px;height:28px;background:#0f3460;font-size:.8rem;flex-shrink:0;">2</div>
+        <h6 class="fw-bold mb-0">Customer <span class="text-muted fw-normal" style="font-size:.8rem;">(opsional)</span></h6>
+      </div>
+
+      <!-- Customer terpilih -->
+      <div id="customerSelected" style="display:none;" class="mb-2">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-3"
+             style="background:#f0f7ff;border:1.5px solid #bfdbfe;">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+               style="width:36px;height:36px;background:#0f3460;font-size:.85rem;flex-shrink:0;"
+               id="custAvatar">?</div>
+          <div class="flex-grow-1">
+            <div class="fw-600" id="custName" style="font-size:.9rem;">-</div>
+            <div class="text-muted" id="custMeta" style="font-size:.77rem;">-</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                  style="font-size:.75rem;" onclick="clearCustomer()">
+            <i class="bi bi-x"></i> Ganti
+          </button>
+        </div>
+        <input type="hidden" name="customer_id" id="customerIdInput">
+      </div>
+
+      <!-- Scan / Search -->
+      <div id="customerInput">
+        <div class="d-flex gap-2 mb-2">
+          <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1"
+                  onclick="openScanner()">
+            <i class="bi bi-qr-code-scan me-1"></i>Scan QR
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1"
+                  onclick="document.getElementById('searchBox').focus()">
+            <i class="bi bi-search me-1"></i>Cari Nama / HP
+          </button>
+        </div>
+
+        <!-- Search box -->
+        <div class="position-relative">
+          <input type="text" id="searchBox" class="form-control form-control-sm"
+                 placeholder="Ketik nama atau nomor HP customer..."
+                 autocomplete="off" oninput="debounceSearch(this.value)">
+          <div id="searchDropdown" class="position-absolute w-100 bg-white border rounded-3 shadow-sm"
+               style="top:100%;z-index:200;display:none;max-height:220px;overflow-y:auto;">
+          </div>
+        </div>
+
+        <div class="text-center mt-2">
+          <small class="text-muted">— atau —</small>
+        </div>
+        <div class="text-center mt-1">
+          <button type="button" class="btn btn-sm btn-link text-muted p-0"
+                  style="font-size:.82rem;" onclick="skipCustomer()">
+            Lanjut tanpa customer (walk-in)
+          </button>
+        </div>
+      </div>
+
+      <!-- QR Scanner area -->
+      <div id="scannerArea" style="display:none;">
+        <div id="reader" style="width:100%;border-radius:12px;overflow:hidden;"></div>
+        <button type="button" class="btn btn-sm btn-secondary mt-2 w-100"
+                onclick="stopScanner()">
+          <i class="bi bi-x-circle me-1"></i>Tutup Kamera
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 3: Metode Bayar ── -->
+  <div class="card stat-card mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:28px;height:28px;background:#0f3460;font-size:.8rem;flex-shrink:0;">3</div>
+        <h6 class="fw-bold mb-0">Metode Pembayaran</h6>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        {% for method in [('Cash','bi-cash','#2e7d32'),('Transfer','bi-bank','#1565c0'),('QRIS','bi-qr-code','#6a1b9a')] %}
+        <label class="flex-grow-1" style="cursor:pointer;">
+          <input type="radio" name="payment_method" value="{{ method[0] }}"
+                 class="d-none payment-radio" {{ 'checked' if loop.first }}>
+          <div class="pay-option text-center rounded-3 p-3 border"
+               style="transition:.15s;{{ 'background:#f0fdf4;border-color:#2e7d32!important;' if loop.first else '' }}">
+            <i class="bi {{ method[1] }}" style="font-size:1.4rem;color:{{ method[2] }};"></i>
+            <div style="font-size:.8rem;font-weight:600;margin-top:.25rem;">{{ method[0] }}</div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Override Cabang (opsional) ── -->
+  <div class="mb-3">
+    <button type="button" class="btn btn-sm btn-link text-muted p-0"
+            style="font-size:.8rem;" id="branchToggleBtn"
+            onclick="toggleBranchOverride()">
+      <i class="bi bi-geo-alt me-1"></i>Transaksi ini di cabang berbeda?
+    </button>
+    <div id="branchOverrideBox" style="display:none;margin-top:.5rem;">
+      <select name="branch_override" id="branchOverrideSelect" class="form-select form-select-sm">
+        <option value="">— Gunakan default ({{ daily_branch_name or 'belum diset' }}) —</option>
+        {% for bid, binfo in branches.items() %}
+          <option value="{{ bid }}" {{ 'selected' if bid == daily_branch }}>
+            {{ binfo.short or binfo.name }} — {{ binfo.location or '' }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <button type="submit" class="btn w-100 text-white fw-600 py-3"
+          style="background:linear-gradient(135deg,#0f3460,#e94560);border-radius:12px;font-size:1rem;"
+          id="submitBtn">
+    <i class="bi bi-check2-circle me-2"></i>Simpan Transaksi
+  </button>
+
+</form>
+
+{% if need_branch %}
+</div>{# end disabled overlay #}
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<!-- html5-qrcode CDN -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // ── Price preview ──────────────────────────────────────────────────────
+  function updatePrice() {
+    const sel = document.getElementById('serviceSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const price = opt.dataset.price;
+    const preview = document.getElementById('pricePreview');
+    if (price) {
+      document.getElementById('priceText').textContent =
+        'Rp ' + parseInt(price).toLocaleString('id-ID');
+      preview.style.display = '';
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  // ── Payment method highlight ───────────────────────────────────────────
+  document.querySelectorAll('.payment-radio').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.pay-option').forEach(el => {
+        el.style.background = '';
+        el.style.borderColor = '';
+      });
+      const opt = radio.nextElementSibling;
+      opt.style.background = '#f0f4ff';
+      opt.style.borderColor = '#0f3460';
+    });
+  });
+
+  // ── Branch override toggle ─────────────────────────────────────────────
+  function toggleBranchOverride() {
+    const box = document.getElementById('branchOverrideBox');
+    const btn = document.getElementById('branchToggleBtn');
+    const shown = box.style.display !== 'none';
+    box.style.display = shown ? 'none' : '';
+    if (shown) {
+      // Reset to default when closing
+      document.getElementById('branchOverrideSelect').value = '';
+    }
+    btn.innerHTML = shown
+      ? '<i class="bi bi-geo-alt me-1"></i>Transaksi ini di cabang berbeda?'
+      : '<i class="bi bi-x me-1"></i>Batal ganti cabang';
+  }
+
+  // ── Customer search ────────────────────────────────────────────────────
+  let _timer;
+  function debounceSearch(val) {
+    clearTimeout(_timer);
+    if (!val.trim()) { hideDropdown(); return; }
+    _timer = setTimeout(() => searchCustomer(val), 300);
+  }
+
+  function searchCustomer(q) {
+    fetch('/portal/customer/lookup?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => renderDropdown(data));
+  }
+
+  function renderDropdown(items) {
+    const dd = document.getElementById('searchDropdown');
+    if (!items.length) {
+      dd.innerHTML = '<div class="px-3 py-2 text-muted" style="font-size:.83rem;">Tidak ditemukan</div>';
+      dd.style.display = 'block';
+      return;
+    }
+    dd.innerHTML = items.map(c => `
+      <div class="px-3 py-2 d-flex align-items-center gap-2 search-item"
+           style="cursor:pointer;font-size:.85rem;"
+           onmouseenter="this.style.background='#f8f9ff'"
+           onmouseleave="this.style.background=''"
+           onclick="selectCustomer(${c.id}, '${c.name.replace(/'/g,"\\'")}', '${c.phone}', ${c.visits})">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:30px;height:30px;background:#0f3460;font-size:.75rem;flex-shrink:0;">
+          ${c.name[0].toUpperCase()}
+        </div>
+        <div>
+          <div class="fw-500">${c.name}</div>
+          <div class="text-muted" style="font-size:.75rem;">
+            ${c.phone || 'No HP belum diisi'} &nbsp;·&nbsp; ${c.visits} kunjungan
+          </div>
+        </div>
+      </div>
+    `).join('');
+    dd.style.display = 'block';
+  }
+
+  function hideDropdown() {
+    document.getElementById('searchDropdown').style.display = 'none';
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#searchBox') && !e.target.closest('#searchDropdown')) {
+      hideDropdown();
+    }
+  });
+
+  function selectCustomer(id, name, phone, visits) {
+    document.getElementById('customerIdInput').value = id;
+    document.getElementById('custName').textContent  = name;
+    document.getElementById('custMeta').textContent  =
+      (phone || 'No HP -') + '  ·  ' + visits + ' kunjungan sebelumnya';
+    document.getElementById('custAvatar').textContent = name[0].toUpperCase();
+    document.getElementById('customerSelected').style.display = '';
+    document.getElementById('customerInput').style.display    = 'none';
+    document.getElementById('searchBox').value = '';
+    hideDropdown();
+  }
+
+  function clearCustomer() {
+    document.getElementById('customerIdInput').value = '';
+    document.getElementById('customerSelected').style.display = 'none';
+    document.getElementById('customerInput').style.display    = '';
+  }
+
+  function skipCustomer() {
+    clearCustomer();
+    document.getElementById('customerSelected').style.display = '';
+    document.getElementById('customerInput').style.display    = 'none';
+    document.getElementById('custName').textContent  = 'Walk-in (tanpa data customer)';
+    document.getElementById('custMeta').textContent  = 'Kunjungan tidak akan terhitung';
+    document.getElementById('custAvatar').textContent = '?';
+    document.getElementById('customerIdInput').value = '';
+  }
+
+  // ── QR Scanner ────────────────────────────────────────────────────────
+  let html5QrCode = null;
+
+  function openScanner() {
+    document.getElementById('scannerArea').style.display = '';
+    document.getElementById('customerInput').querySelector('.d-flex').style.display = 'none';
+    document.getElementById('customerInput').querySelector('.position-relative').style.display = 'none';
+    document.getElementById('customerInput').querySelectorAll('.text-center').forEach(e => e.style.display = 'none');
+
+    html5QrCode = new Html5Qrcode('reader');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      (decodedText) => {
+        const match = decodedText.match(/^BARBER:(\d+)$/);
+        if (match) {
+          const id = match[1];
+          stopScanner();
+          fetch('/portal/customer/lookup?id=' + id)
+            .then(r => r.json())
+            .then(data => {
+              if (data.length) {
+                selectCustomer(data[0].id, data[0].name, data[0].phone, data[0].visits);
+              } else {
+                alert('Customer tidak ditemukan di database.');
+                resetScannerUI();
+              }
+            });
+        }
+      },
+      () => {}
+    ).catch(err => {
+      alert('Tidak bisa membuka kamera: ' + err);
+      resetScannerUI();
+    });
+  }
+
+  function stopScanner() {
+    if (html5QrCode) {
+      html5QrCode.stop().catch(() => {}).finally(() => {
+        html5QrCode = null;
+        document.getElementById('scannerArea').style.display = 'none';
+        resetScannerUI();
+      });
+    }
+  }
+
+  function resetScannerUI() {
+    document.getElementById('customerInput').querySelector('.d-flex').style.display = '';
+    document.getElementById('customerInput').querySelector('.position-relative').style.display = '';
+    document.getElementById('customerInput').querySelectorAll('.text-center').forEach(e => e.style.display = '');
+  }
+
+  // ── Form submit guard ──────────────────────────────────────────────────
+  document.getElementById('txForm').addEventListener('submit', function() {
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').innerHTML =
+      '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+  });
+</script>
+{% endblock %}

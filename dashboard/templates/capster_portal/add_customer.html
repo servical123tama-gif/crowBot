@@ -1,0 +1,137 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Tambah Pengunjung{% endblock %}
+{% block page_title %}Tambah Pengunjung{% endblock %}
+
+{% block content %}
+
+{% if new_customer %}
+<!-- ── QR Code tampil setelah berhasil ── -->
+<div class="card stat-card mb-3 border-0" style="border-radius:16px;overflow:hidden;">
+  <div class="card-body text-center p-4">
+
+    <!-- Success badge -->
+    <div class="mb-3">
+      <span class="badge rounded-pill px-3 py-2"
+            style="background:#f0fdf4;color:#2e7d32;font-size:.82rem;">
+        <i class="bi bi-check-circle-fill me-1"></i>Pengunjung berhasil ditambahkan!
+      </span>
+    </div>
+
+    <!-- Nama & info -->
+    <div class="d-flex align-items-center justify-content-center gap-3 mb-4">
+      <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+           style="width:52px;height:52px;font-size:1.3rem;
+                  background:linear-gradient(135deg,#0f3460,#e94560);flex-shrink:0;">
+        {{ new_customer['Name'][0].upper() }}
+      </div>
+      <div class="text-start">
+        <div class="fw-bold" style="font-size:1rem;">{{ new_customer['Name'] }}</div>
+        <div class="text-muted" style="font-size:.83rem;">
+          {% if new_customer['Phone'] %}
+            <i class="bi bi-telephone me-1"></i>{{ new_customer['Phone'] }}
+          {% else %}
+            Belum ada nomor HP
+          {% endif %}
+        </div>
+        <div class="text-muted" style="font-size:.78rem;">
+          <i class="bi bi-scissors me-1"></i>{{ new_customer['VisitCount'] }} kunjungan
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code -->
+    <p class="text-muted mb-2" style="font-size:.83rem;">
+      QR Code pengunjung — berikan ke customer untuk scan saat kunjungan berikutnya
+    </p>
+
+    <div class="d-flex justify-content-center mb-3">
+      <div style="padding:12px;background:#fff;border-radius:16px;
+                  box-shadow:0 4px 20px rgba(15,52,96,.12);display:inline-block;">
+        <img id="qrImg"
+             src="/portal/customer/{{ new_customer['id'] }}/qr.png"
+             alt="QR Code {{ new_customer['Name'] }}"
+             style="width:200px;height:200px;display:block;">
+      </div>
+    </div>
+
+    <!-- Tombol aksi -->
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+      <a href="/portal/customer/{{ new_customer['id'] }}/qr.png"
+         download="qr-{{ new_customer['Name']|replace(' ','-') }}.png"
+         class="btn btn-sm text-white" style="background:#0f3460;">
+        <i class="bi bi-download me-1"></i>Download QR
+      </a>
+      <a href="/portal/add-transaction"
+         class="btn btn-sm text-white" style="background:#e94560;">
+        <i class="bi bi-plus-circle me-1"></i>Langsung Input Transaksi
+      </a>
+      <a href="/portal/add-customer"
+         class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-person-plus me-1"></i>Tambah Pengunjung Lain
+      </a>
+    </div>
+
+    <!-- Instruksi share WA -->
+    {% if new_customer['Phone'] %}
+    <div class="mt-3 p-2 rounded-3" style="background:#f8fafc;font-size:.78rem;color:#64748b;">
+      <i class="bi bi-whatsapp text-success me-1"></i>
+      Mau kirim QR via WhatsApp?
+      <a href="https://wa.me/{{ new_customer['Phone']|replace('+','') }}" target="_blank"
+         class="text-success fw-500">Buka chat customer</a>
+      lalu kirim screenshot QR di atas.
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% else %}
+<!-- ── Form tambah pengunjung ── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show py-2" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+<div class="card stat-card" style="max-width:480px;">
+  <div class="card-body p-4">
+    <h6 class="fw-bold mb-1">Data Pengunjung Baru</h6>
+    <p class="text-muted mb-4" style="font-size:.83rem;">
+      Setelah disimpan, QR code otomatis tampil dan bisa didownload.
+    </p>
+
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label fw-500" style="font-size:.85rem;">
+          Nama <span class="text-danger">*</span>
+        </label>
+        <input type="text" name="name" class="form-control"
+               placeholder="Nama lengkap pengunjung" required autofocus>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-500" style="font-size:.85rem;">
+          No. HP / WhatsApp
+          <span class="text-muted fw-normal">(opsional)</span>
+        </label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-phone"></i></span>
+          <input type="text" name="phone" class="form-control"
+                 placeholder="628xxxxxxxx">
+        </div>
+        <small class="text-muted">Untuk kirim QR code via WhatsApp</small>
+      </div>
+
+      <button type="submit" class="btn w-100 text-white fw-600 py-2"
+              style="background:linear-gradient(135deg,#0f3460,#e94560);border-radius:10px;">
+        <i class="bi bi-person-plus me-2"></i>Tambah & Generate QR
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

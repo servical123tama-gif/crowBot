@@ -44,7 +44,36 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expi
 def init_db():
     """Create all tables (dev / first-run without Alembic)."""
     Base.metadata.create_all(bind=engine)
+    _migrate_capster_auth_columns()
     logger.info(f"Database initialized: {DATABASE_URL}")
+
+
+def _migrate_capster_auth_columns():
+    """Add new columns to existing tables if not yet exist (safe to re-run)."""
+    is_sqlite = DATABASE_URL.startswith('sqlite')
+    # (table, column, type)
+    migrations = [
+        ('capsters',      'username',      'VARCHAR(50)'),
+        ('capsters',      'password_hash', 'VARCHAR(255)'),
+        ('customers',     'visit_count',   'INTEGER DEFAULT 0'),
+        ('transactions',  'customer_id',   'INTEGER'),
+    ]
+    with engine.connect() as conn:
+        for table, col, col_type in migrations:
+            try:
+                if is_sqlite:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f'ALTER TABLE {table} ADD COLUMN {col} {col_type}'
+                    ))
+                else:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}'
+                    ))
+                conn.commit()
+                logger.info(f"Migration: added {table}.{col}")
+            except Exception:
+                # Column already exists — normal on second run
+                conn.rollback()
 
 
 @contextmanager

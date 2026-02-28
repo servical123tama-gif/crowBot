@@ -1,0 +1,89 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Pendapatan{% endblock %}
+{% block page_title %}Pendapatan Saya{% endblock %}
+
+{% block content %}
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="stat-card card p-3">
+      <div class="text-muted mb-1" style="font-size:.78rem;">
+        Total {% if cap.type == 'mitra' %}Komisi{% else %}Gaji{% endif %} (All-time)
+      </div>
+      <div class="fw-bold text-success" style="font-size:1.15rem;">{{ total_earned|idr }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="stat-card card p-3">
+      <div class="text-muted mb-1" style="font-size:.78rem;">Total Sudah Ditarik</div>
+      <div class="fw-bold text-danger" style="font-size:1.15rem;">{{ total_withdrawn|idr }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="stat-card card p-3">
+      <div class="text-muted mb-1" style="font-size:.78rem;">Saldo Tersisa</div>
+      <div class="fw-bold {{ 'text-success' if total_balance >= 0 else 'text-danger' }}"
+           style="font-size:1.15rem;">{{ total_balance|idr }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Info tipe -->
+<div class="alert alert-info py-2 mb-3" style="font-size:.83rem;">
+  {% if cap.type == 'mitra' %}
+    <i class="bi bi-info-circle me-1"></i>
+    Kamu adalah capster <strong>Mitra</strong>. Penghasilan dihitung dari
+    <strong>{{ (cap.rate * 100)|int }}%</strong> omset transaksi kamu.
+  {% else %}
+    <i class="bi bi-info-circle me-1"></i>
+    Kamu adalah karyawan <strong>Tetap</strong>. Gaji bulanan
+    <strong>{{ cap.salary|idr }}</strong>/bulan (dihitung dari bulan yang ada transaksi).
+  {% endif %}
+</div>
+
+<!-- Table per bulan -->
+<div class="stat-card card">
+  <div class="card-body p-0">
+    <div class="px-3 pt-3 pb-2">
+      <h6 class="fw-bold mb-0" style="font-size:.9rem;">Rincian per Bulan</h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Bulan</th>
+            <th class="text-end">Omset</th>
+            <th class="text-end">Tx</th>
+            <th class="text-end">{% if cap.type == 'mitra' %}Komisi{% else %}Gaji{% endif %}</th>
+            <th class="text-end">Sudah Ditarik</th>
+            <th class="text-end">Saldo Bulan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if monthly_stats %}
+            {% for s in monthly_stats %}
+            <tr>
+              <td class="fw-500">{{ s.label }}</td>
+              <td class="text-end">{{ s.revenue|idr }}</td>
+              <td class="text-end text-muted">{{ s.count }}</td>
+              <td class="text-end text-success fw-500">{{ s.earned|idr }}</td>
+              <td class="text-end text-danger">{{ s.withdrawn|idr }}</td>
+              <td class="text-end fw-bold {{ 'text-success' if s.saldo >= 0 else 'text-danger' }}">
+                {{ s.saldo|idr }}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size:2.5rem;opacity:.3;"></i>
+                <p class="mt-2 mb-0">Belum ada data pendapatan</p>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

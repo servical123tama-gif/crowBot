@@ -1,0 +1,126 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Profil Saya{% endblock %}
+{% block page_title %}Profil Saya{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  <!-- Info Profil -->
+  <div class="col-12 col-md-5">
+    <div class="stat-card card p-4">
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:64px;height:64px;font-size:1.5rem;background:linear-gradient(135deg,#0f3460,#e94560);flex-shrink:0;">
+          {{ cap.name[0].upper() }}
+        </div>
+        <div>
+          <h5 class="fw-bold mb-0">{{ cap.name }}</h5>
+          <span class="badge {{ 'bg-primary' if cap.type == 'mitra' else 'bg-success' }} bg-opacity-10
+                       {{ 'text-primary' if cap.type == 'mitra' else 'text-success' }}"
+                style="font-size:.78rem;">
+            {{ 'Mitra' if cap.type == 'mitra' else 'Karyawan Tetap' }}
+          </span>
+        </div>
+      </div>
+
+      <table class="table table-sm mb-0" style="font-size:.86rem;">
+        <tr>
+          <td class="text-muted border-0" style="width:40%;">Nama</td>
+          <td class="fw-500 border-0">{{ cap.name }}</td>
+        </tr>
+        {% if cap.alias %}
+        <tr>
+          <td class="text-muted">Alias</td>
+          <td class="fw-500">{{ cap.alias }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="text-muted">Tipe</td>
+          <td class="fw-500">{{ 'Mitra (Komisi)' if cap.type == 'mitra' else 'Karyawan Tetap' }}</td>
+        </tr>
+        <tr>
+          <td class="text-muted">
+            {% if cap.type == 'mitra' %}Komisi{% else %}Gaji{% endif %}
+          </td>
+          <td class="fw-500">
+            {% if cap.type == 'mitra' %}
+              {{ (cap.rate * 100)|int }}% per transaksi
+            {% else %}
+              {{ cap.salary|idr }}/bulan
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-muted">Cabang</td>
+          <td class="fw-500">{{ branch_name }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Ganti Password -->
+  <div class="col-12 col-md-7">
+    <div class="stat-card card p-4">
+      <h6 class="fw-bold mb-3">
+        <i class="bi bi-key me-2" style="color:#0f3460;"></i>Ganti Password
+      </h6>
+      <form method="post" action="/portal/profile/password">
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.85rem; font-weight:500;">
+            Password Lama <span class="text-danger">*</span>
+          </label>
+          <div class="input-group">
+            <input type="password" name="old_password" id="oldPwd"
+                   class="form-control" placeholder="Masukkan password lama" required>
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="toggleField('oldPwd','eyeOld')">
+              <i class="bi bi-eye" id="eyeOld"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.85rem; font-weight:500;">
+            Password Baru <span class="text-danger">*</span>
+          </label>
+          <div class="input-group">
+            <input type="password" name="new_password" id="newPwd"
+                   class="form-control" placeholder="Minimal 6 karakter" required>
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="toggleField('newPwd','eyeNew')">
+              <i class="bi bi-eye" id="eyeNew"></i>
+            </button>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label" style="font-size:.85rem; font-weight:500;">
+            Konfirmasi Password Baru <span class="text-danger">*</span>
+          </label>
+          <input type="password" name="confirm_password"
+                 class="form-control" placeholder="Ulangi password baru" required>
+        </div>
+        <button type="submit" class="btn text-white px-4"
+                style="background:linear-gradient(135deg,#0f3460,#e94560);">
+          <i class="bi bi-check2 me-1"></i>Simpan Password
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleField(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon  = document.getElementById(iconId);
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.className = 'bi bi-eye-slash';
+    } else {
+      input.type = 'password';
+      icon.className = 'bi bi-eye';
+    }
+  }
+</script>
+{% endblock %}

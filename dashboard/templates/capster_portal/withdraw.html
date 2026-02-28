@@ -1,0 +1,64 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Riwayat Withdraw{% endblock %}
+{% block page_title %}Riwayat Withdraw{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="stat-card card p-3">
+      <div class="text-muted mb-1" style="font-size:.78rem;">Total Sudah Ditarik</div>
+      <div class="fw-bold text-danger" style="font-size:1.2rem;">{{ total|idr }}</div>
+      <small class="text-muted">{{ records|length }} kali penarikan</small>
+    </div>
+  </div>
+</div>
+
+<div class="stat-card card">
+  <div class="card-body p-0">
+    <div class="px-3 pt-3 pb-2">
+      <h6 class="fw-bold mb-0" style="font-size:.9rem;">
+        <i class="bi bi-cash-coin me-2" style="color:#0f3460;"></i>Riwayat Penarikan
+      </h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tanggal Tarik</th>
+            <th>Periode</th>
+            <th class="text-end">Jumlah</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if records %}
+            {% for r in records %}
+            <tr>
+              <td class="text-muted" style="font-size:.8rem;">{{ loop.index }}</td>
+              <td style="font-size:.83rem;">{{ r.Date[:10] if r.Date else '-' }}</td>
+              <td style="font-size:.82rem;">
+                {% if r.PeriodStart and r.PeriodEnd %}
+                  {{ r.PeriodStart }} — {{ r.PeriodEnd }}
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td class="text-end fw-bold text-danger">{{ r.Amount|int|idr }}</td>
+              <td class="text-muted" style="font-size:.82rem;">{{ r.Note or '-' }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size:2.5rem;opacity:.3;"></i>
+                <p class="mt-2 mb-0">Belum ada riwayat penarikan</p>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

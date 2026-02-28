@@ -30,3 +30,6 @@ gunicorn==21.2.0
 sqlalchemy==2.0.25
 alembic==1.13.1
 psycopg2-binary==2.9.9
+
+# QR Code generation (free, local, no API key)
+qrcode[pil]>=7.4

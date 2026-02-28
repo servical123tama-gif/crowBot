@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 
 import pandas as pd
 from sqlalchemy import func, and_, or_, extract
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.db.database import get_db
 from app.db.models import (
@@ -203,11 +204,127 @@ class Repository:
     def get_all_customers(self) -> List[Dict[str, Any]]:
         try:
             with get_db() as db:
-                rows = db.query(Customer).all()
-            return [{'Name': r.name, 'Phone': r.phone} for r in rows]
+                rows = db.query(Customer).order_by(Customer.name).all()
+            return [
+                {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
+                 'VisitCount': getattr(r, 'visit_count', 0) or 0}
+                for r in rows
+            ]
         except Exception as e:
             logger.error(f"Failed to get customers: {e}")
             return []
+
+    def search_customers(self, query: str) -> List[Dict[str, Any]]:
+        """Search customers by name or phone (case-insensitive)."""
+        try:
+            q = query.strip().lower()
+            with get_db() as db:
+                rows = db.query(Customer).filter(
+                    or_(
+                        func.lower(Customer.name).contains(q),
+                        Customer.phone.contains(q),
+                    )
+                ).order_by(Customer.name).limit(10).all()
+            return [
+                {'id': r.id, 'name': r.name, 'phone': r.phone or '',
+                 'visits': getattr(r, 'visit_count', 0) or 0}
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to search customers: {e}")
+            return []
+
+    def increment_visit_count(self, customer_id: int) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+                if not row:
+                    return False
+                current = getattr(row, 'visit_count', 0) or 0
+                row.visit_count = current + 1
+            return True
+        except Exception as e:
+            logger.error(f"Failed to increment visit count for customer {customer_id}: {e}")
+            return False
+
+    def add_transaction_full(self, date: 'datetime', capster_name: str, service_name: str,
+                             price: int, payment_method: str, branch: str,
+                             customer_id: Optional[int] = None) -> bool:
+        """Add transaction and optionally increment customer visit count."""
+        try:
+            with get_db() as db:
+                row = Transaction(
+                    date=date,
+                    capster_name=capster_name,
+                    service_name=service_name,
+                    price=int(price),
+                    payment_method=payment_method or 'Cash',
+                    branch=branch,
+                    customer_id=customer_id,
+                )
+                db.add(row)
+            if customer_id:
+                self.increment_visit_count(customer_id)
+            logger.info(f"Transaction added: {capster_name} - {service_name} - customer={customer_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add transaction_full: {e}", exc_info=True)
+            return False
+
+    def generate_customer_qr_png(self, customer_id: int) -> bytes:
+        """Generate QR code PNG bytes for a customer. Content: BARBER:<id>"""
+        import qrcode
+        import io
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=3,
+        )
+        qr.add_data(f'BARBER:{customer_id}')
+        qr.make(fit=True)
+        img = qr.make_image(fill_color='#0f3460', back_color='white')
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        return buf.getvalue()
+
+    def get_customer_by_id(self, customer_id: int) -> Optional[Dict[str, Any]]:
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+            if not row:
+                return None
+            return {'id': row.id, 'name': row.name, 'phone': row.phone or ''}
+        except Exception as e:
+            logger.error(f"Failed to get customer {customer_id}: {e}")
+            return None
+
+    def update_customer(self, customer_id: int, name: str, phone: str) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+                if not row:
+                    return False
+                row.name = name
+                row.phone = phone or ''
+            logger.info(f"Customer {customer_id} updated")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update customer {customer_id}: {e}", exc_info=True)
+            return False
+
+    def delete_customer(self, customer_id: int) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+                if not row:
+                    return False
+                db.delete(row)
+            logger.info(f"Customer {customer_id} deleted")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete customer {customer_id}: {e}", exc_info=True)
+            return False
 
     # ------------------------------------------------------------------ #
     # Capsters                                                             #
@@ -245,11 +362,107 @@ class Repository:
                     'CommissionRate': str(r.commission_rate),
                     'MonthlySalary': str(r.monthly_salary or 0),
                     'BranchID': r.branch_id or '',
+                    'Username': r.username or '',
                 }
                 for r in rows
             ]
         except Exception as e:
             logger.error(f"Failed to get capsters: {e}")
+            return []
+
+    # ── Capster Auth ────────────────────────────────────────────────────── #
+
+    def get_capster_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        try:
+            with get_db() as db:
+                row = db.query(Capster).filter(Capster.username == username).first()
+            if not row:
+                return None
+            return {
+                'id': row.id,
+                'Name': row.name,
+                'TelegramID': str(row.telegram_id),
+                'Alias': row.alias or '',
+                'EmploymentType': row.employment_type,
+                'CommissionRate': str(row.commission_rate),
+                'MonthlySalary': str(row.monthly_salary or 0),
+                'BranchID': row.branch_id or '',
+                'Username': row.username or '',
+                'password_hash': row.password_hash or '',
+            }
+        except Exception as e:
+            logger.error(f"Failed to get capster by username: {e}")
+            return None
+
+    def set_capster_credentials(self, telegram_id: int, username: str, password: str) -> tuple:
+        """Set username + password for a capster. Returns (ok, error_message)."""
+        try:
+            with get_db() as db:
+                conflict = db.query(Capster).filter(
+                    Capster.username == username,
+                    Capster.telegram_id != telegram_id,
+                ).first()
+                if conflict:
+                    return False, f'Username "{username}" sudah dipakai capster lain.'
+                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                if not row:
+                    return False, 'Capster tidak ditemukan.'
+                row.username = username
+                row.password_hash = generate_password_hash(password)
+            logger.info(f"Credentials set for capster {telegram_id} → username={username}")
+            return True, ''
+        except Exception as e:
+            logger.error(f"Failed to set capster credentials: {e}", exc_info=True)
+            return False, 'Terjadi kesalahan server.'
+
+    def verify_capster_login(self, username: str, password: str) -> Optional[Dict[str, Any]]:
+        """Return capster dict if username+password valid, else None."""
+        capster = self.get_capster_by_username(username)
+        if not capster or not capster.get('password_hash'):
+            return None
+        if check_password_hash(capster['password_hash'], password):
+            return capster
+        return None
+
+    def update_capster_password(self, telegram_id: int, new_password: str) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                if not row:
+                    return False
+                row.password_hash = generate_password_hash(new_password)
+            logger.info(f"Password updated for capster {telegram_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update capster password: {e}", exc_info=True)
+            return False
+
+    def get_transactions_by_capster_month(self, capster_name: str, alias: str,
+                                          year: int, month: int) -> List[Dict[str, Any]]:
+        """Transactions for a capster (by name OR alias) in a given month."""
+        try:
+            names_lower = [capster_name.lower()]
+            if alias:
+                names_lower.append(alias.lower())
+            with get_db() as db:
+                rows = db.query(Transaction).filter(
+                    func.lower(Transaction.capster_name).in_(names_lower),
+                    extract('year',  Transaction.date) == year,
+                    extract('month', Transaction.date) == month,
+                ).order_by(Transaction.date.desc()).all()
+            return [
+                {
+                    'id':      r.id,
+                    'date':    r.date,
+                    'service': r.service_name,
+                    'price':   r.price,
+                    'payment': r.payment_method,
+                    'branch':  r.branch or '',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get capster transactions: {e}")
             return []
 
     def remove_capster(self, telegram_id: int) -> bool:
