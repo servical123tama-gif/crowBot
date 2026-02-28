@@ -35,16 +35,17 @@ init_db()
 # ── Flask App ─────────────────────────────────────────────────────────────────
 from dashboard import create_app
 flask_app = create_app()
+app = flask_app  # alias for gunicorn: gunicorn run_dashboard:app
+
+# ── Auto-start Bot (berjalan baik via gunicorn maupun python langsung) ────────
+from app.bot_manager import BotManager
+_bot_mgr = BotManager()
+_bot_mgr.start()
+logger.info("BotManager: bot thread dimulai.")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     port = int(os.getenv('DASHBOARD_PORT', 5000))
-
-    # Auto-start bot via BotManager
-    from app.bot_manager import BotManager
-    mgr = BotManager()
-    mgr.start()
-    logger.info("BotManager: bot thread dimulai (auto-start).")
 
     print()
     print("=" * 55)
