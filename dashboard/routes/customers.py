@@ -11,6 +11,7 @@ customers_bp = Blueprint('customers', __name__)
 def customers_list():
     repo = Repository()
     all_customers = repo.get_all_customers()
+    all_capsters  = repo.get_all_capsters()
 
     search = request.args.get('q', '').strip().lower()
     if search:
@@ -22,6 +23,7 @@ def customers_list():
     return render_template(
         'customers.html',
         customers=all_customers,
+        capsters=all_capsters,
         search=search,
         total=len(all_customers),
         active_page='customers',

@@ -201,8 +201,12 @@
             <label class="form-label fw-500" style="font-size:.85rem;">Ditambah oleh</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
-              <input type="text" name="added_by" id="editAddedBy" class="form-control"
-                     placeholder="Nama capster (opsional)">
+              <select name="added_by" id="editAddedBy" class="form-select">
+                <option value="">— Tidak diketahui —</option>
+                {% for cap in capsters %}
+                  <option value="{{ cap['Name'] }}">{{ cap['Name'] }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="form-text">Capster yang mendaftarkan customer ini.</div>
           </div>
@@ -291,10 +295,13 @@
   }
 
   function openEdit(id, name, phone, addedBy) {
-    document.getElementById('editName').value     = name;
-    document.getElementById('editPhone').value    = phone;
-    document.getElementById('editAddedBy').value  = addedBy || '';
-    document.getElementById('formEdit').action    = '/customers/' + id + '/edit';
+    document.getElementById('editName').value   = name;
+    document.getElementById('editPhone').value  = phone;
+    document.getElementById('formEdit').action  = '/customers/' + id + '/edit';
+    // Set dropdown ke nilai addedBy yang sesuai
+    const sel = document.getElementById('editAddedBy');
+    sel.value = addedBy || '';
+    if (sel.value !== (addedBy || '')) sel.value = '';  // fallback jika tidak ditemukan
     new bootstrap.Modal(document.getElementById('modalEdit')).show();
   }
 
