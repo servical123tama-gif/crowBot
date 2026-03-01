@@ -304,7 +304,7 @@ class Repository:
             logger.error(f"Failed to get customer {customer_id}: {e}")
             return None
 
-    def update_customer(self, customer_id: int, name: str, phone: str) -> bool:
+    def update_customer(self, customer_id: int, name: str, phone: str, added_by: str = None) -> bool:
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -312,6 +312,8 @@ class Repository:
                     return False
                 row.name = name
                 row.phone = phone or ''
+                if added_by is not None:
+                    row.added_by = added_by
             logger.info(f"Customer {customer_id} updated")
             return True
         except Exception as e:

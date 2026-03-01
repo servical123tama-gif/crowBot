@@ -55,15 +55,16 @@ def customer_add():
 @customers_bp.route('/customers/<int:cid>/edit', methods=['POST'])
 @login_required
 def customer_edit(cid):
-    name = request.form.get('name', '').strip()
-    phone = request.form.get('phone', '').strip()
+    name      = request.form.get('name', '').strip()
+    phone     = request.form.get('phone', '').strip()
+    added_by  = request.form.get('added_by', '').strip()
 
     if not name:
         flash('Nama customer wajib diisi.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
     repo = Repository()
-    ok = repo.update_customer(cid, name, phone)
+    ok = repo.update_customer(cid, name, phone, added_by=added_by)
 
     if ok:
         flash(f'Customer "{name}" berhasil diupdate.', 'success')
