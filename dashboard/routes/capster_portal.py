@@ -429,16 +429,23 @@ def add_transaction():
 def customers():
     repo  = Repository()
     now   = datetime.now()
+    cap   = _current_capster()
     query = request.args.get('q', '').strip()
 
-    results = repo.search_customers(query) if query else []
+    if query:
+        results      = repo.search_customers(query)
+        my_customers = None
+    else:
+        results      = None
+        my_customers = repo.get_customers_by_capster(cap.get('name', ''))
 
     return render_template(
         'capster_portal/customers.html',
-        cap=_current_capster(),
+        cap=cap,
         now=now,
         query=query,
         results=results,
+        my_customers=my_customers,
         active_page='customers',
     )
 

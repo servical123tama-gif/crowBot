@@ -219,6 +219,23 @@ class Repository:
             logger.error(f"Failed to get customers: {e}")
             return []
 
+    def get_customers_by_capster(self, capster_name: str) -> List[Dict[str, Any]]:
+        """Get all customers added by a specific capster."""
+        try:
+            with get_db() as db:
+                rows = db.query(Customer).filter(
+                    Customer.added_by == capster_name
+                ).order_by(Customer.name).all()
+            return [
+                {'id': r.id, 'name': r.name, 'phone': r.phone or '',
+                 'visits': getattr(r, 'visit_count', 0) or 0,
+                 'added_by': getattr(r, 'added_by', '') or ''}
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get customers by capster: {e}")
+            return []
+
     def search_customers(self, query: str) -> List[Dict[str, Any]]:
         """Search customers by name or phone (case-insensitive)."""
         try:
@@ -232,7 +249,8 @@ class Repository:
                 ).order_by(Customer.name).limit(10).all()
             return [
                 {'id': r.id, 'name': r.name, 'phone': r.phone or '',
-                 'visits': getattr(r, 'visit_count', 0) or 0}
+                 'visits': getattr(r, 'visit_count', 0) or 0,
+                 'added_by': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
         except Exception as e:
