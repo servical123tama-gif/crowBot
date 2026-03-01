@@ -191,11 +191,15 @@ class Repository:
     # Customers                                                            #
     # ------------------------------------------------------------------ #
 
-    def add_customer(self, customer) -> bool:
+    def add_customer(self, customer, added_by: str = '') -> bool:
         try:
             with get_db() as db:
-                db.add(Customer(name=customer.name, phone=customer.phone))
-            logger.info(f"Customer added: {customer.name}")
+                db.add(Customer(
+                    name=customer.name,
+                    phone=customer.phone,
+                    added_by=added_by,
+                ))
+            logger.info(f"Customer added: {customer.name} by {added_by or 'unknown'}")
             return True
         except Exception as e:
             logger.error(f"Failed to add customer: {e}", exc_info=True)
@@ -207,7 +211,8 @@ class Repository:
                 rows = db.query(Customer).order_by(Customer.name).all()
             return [
                 {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
-                 'VisitCount': getattr(r, 'visit_count', 0) or 0}
+                 'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'AddedBy': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
         except Exception as e:

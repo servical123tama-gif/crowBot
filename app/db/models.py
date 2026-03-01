@@ -65,6 +65,7 @@ class Customer(Base):
     name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True, default='')
     visit_count = Column(Integer, nullable=False, default=0)
+    added_by = Column(String(100), nullable=True, default='')  # nama capster yang menginput
 
     def __repr__(self):
         return f"<Customer id={self.id} name={self.name}>"

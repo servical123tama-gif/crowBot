@@ -56,6 +56,7 @@ def _migrate_capster_auth_columns():
         ('capsters',      'username',      'VARCHAR(50)'),
         ('capsters',      'password_hash', 'VARCHAR(255)'),
         ('customers',     'visit_count',   'INTEGER DEFAULT 0'),
+        ('customers',     'added_by',      "VARCHAR(100) DEFAULT ''"),
         ('transactions',  'customer_id',   'INTEGER'),
     ]
     with engine.connect() as conn:

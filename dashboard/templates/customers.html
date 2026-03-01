@@ -50,6 +50,7 @@
             <th>Nama</th>
             <th>No. Telepon</th>
             <th class="text-center">Kunjungan</th>
+            <th>Ditambah oleh</th>
             <th style="width:150px; text-align:right;">Aksi</th>
           </tr>
         </thead>
@@ -84,6 +85,16 @@
                   <i class="bi bi-scissors me-1"></i>{{ c['VisitCount'] }}x
                 </span>
               </td>
+              <td>
+                {% if c['AddedBy'] %}
+                  <div class="d-flex align-items-center gap-1">
+                    <i class="bi bi-person-badge text-muted" style="font-size:.8rem;"></i>
+                    <span style="font-size:.82rem;">{{ c['AddedBy'] }}</span>
+                  </div>
+                {% else %}
+                  <span class="text-muted fst-italic" style="font-size:.78rem;">—</span>
+                {% endif %}
+              </td>
               <td class="text-end">
                 <button class="btn btn-sm btn-outline-success py-0 px-2 me-1"
                         title="QR Code"
@@ -105,7 +116,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="4" class="text-center py-5 text-muted">
+              <td colspan="5" class="text-center py-5 text-muted">
                 <i class="bi bi-person-x" style="font-size:2.5rem;opacity:.3;"></i>
                 <p class="mt-2 mb-0">
                   {% if search %}

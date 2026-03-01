@@ -323,7 +323,7 @@ def add_customer():
         c.name  = name
         c.phone = phone
 
-        ok = repo.add_customer(c)
+        ok = repo.add_customer(c, added_by=cap.get('name', ''))
         if ok:
             # Ambil ID customer yang baru saja ditambahkan
             all_c   = repo.get_all_customers()
