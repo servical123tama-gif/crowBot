@@ -571,17 +571,20 @@ class Repository:
                 self._seed_services_if_empty(db)
                 rows = db.query(Service).all()
             return [
-                {'ServiceID': r.service_id, 'Name': r.name, 'Category': r.category, 'Price': str(r.price)}
+                {'ServiceID': r.service_id, 'Name': r.name, 'Category': r.category,
+                 'Price': str(r.price),
+                 'CommissionRate': float(getattr(r, 'commission_rate', 0.5) or 0.5)}
                 for r in rows
             ]
         except Exception as e:
             logger.error(f"Failed to get services: {e}")
             return []
 
-    def add_service(self, service_id: str, name: str, category: str, price: int) -> bool:
+    def add_service(self, service_id: str, name: str, category: str, price: int, commission_rate: float = 0.5) -> bool:
         try:
             with get_db() as db:
-                db.add(Service(service_id=service_id, name=name, category=category, price=int(price)))
+                db.add(Service(service_id=service_id, name=name, category=category,
+                               price=int(price), commission_rate=commission_rate))
             logger.info(f"Service added: {service_id}")
             return True
         except Exception as e:
@@ -603,6 +606,8 @@ class Repository:
                         row.category = value
                     elif col == 'price':
                         row.price = int(value)
+                    elif col == 'commission_rate':
+                        row.commission_rate = float(value)
             logger.info(f"Service {service_id} updated: {fields}")
             return True
         except Exception as e:

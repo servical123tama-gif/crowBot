@@ -78,6 +78,7 @@ class Service(Base):
     name = Column(String(100), nullable=False)
     category = Column(String(20), nullable=False, default='main')
     price = Column(Integer, nullable=False, default=0)
+    commission_rate = Column(Float, nullable=False, default=0.5)  # komisi capster mitra per layanan
 
     __table_args__ = (
         CheckConstraint("category IN ('main', 'coloring')", name='ck_services_category'),

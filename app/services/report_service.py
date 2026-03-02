@@ -108,7 +108,22 @@ class ReportService:
         except Exception as e:
             logger.warning(f"_build_capster_lookup failed: {e}")
         return lookup
-    
+
+    def _build_service_lookup(self) -> dict:
+        """Build lookup dict: service_name (lowercase) → commission_rate (float).
+        Falls back to 0.5 if service not found."""
+        lookup = {}
+        try:
+            from app.db.repository import Repository
+            for s in Repository().get_all_services():
+                name_lower = (s.get('Name') or '').lower().strip()
+                rate = float(s.get('CommissionRate') or 0.5)
+                if name_lower:
+                    lookup[name_lower] = rate
+        except Exception as e:
+            logger.warning(f"_build_service_lookup failed: {e}")
+        return lookup
+
     def _get_week_range(self) -> tuple:
         """
         Get start and end date of current week (Monday to Sunday)
@@ -713,12 +728,17 @@ class ReportService:
                     branch_df_r = monthly_df[monthly_df['Branch'] == branch_short]
                     if not branch_df_r.empty:
                         for cap_name, cap_df in branch_df_r.groupby('Capster'):
-                            cap_rev = cap_df['Price'].sum()
                             info = capster_lookup.get(cap_name.lower().strip())
                             if info and info['employment_type'] == 'mitra':
-                                rate = info['commission_rate']
-                                cap_com = cap_rev * rate
-                                report += f"      • {cap_name} (mitra {rate*100:.0f}%): {Formatter.format_currency(cap_com)} dari {Formatter.format_currency(cap_rev)}\n"
+                                # Hitung per transaksi pakai rate per layanan
+                                cap_com = 0.0
+                                cap_rev = 0.0
+                                for _, tx in cap_df.iterrows():
+                                    svc_name = str(tx.get('Service', '')).lower().strip()
+                                    rate = service_lookup.get(svc_name, info['commission_rate'])
+                                    cap_com += float(tx['Price']) * rate
+                                    cap_rev += float(tx['Price'])
+                                report += f"      • {cap_name} (mitra): {Formatter.format_currency(cap_com)} dari {Formatter.format_currency(cap_rev)}\n"
 
                 report += f"    - Total Biaya: {Formatter.format_currency(total_costs)}\n"
                 profit_emoji_b = "✅" if net_profit >= 0 else "❌"
@@ -750,8 +770,9 @@ class ReportService:
                 logger.info(f"No transactions or 'Branch' column missing for {month_str}. Returning empty DataFrame.")
                 return pd.DataFrame()
 
-            # Build per-capster commission lookup once
+            # Build lookup tables once
             capster_lookup = self._build_capster_lookup()
+            service_lookup = self._build_service_lookup()  # komisi per layanan
 
             # Prepare results dictionary — loop all branches dynamically
             results = {}
@@ -790,13 +811,17 @@ class ReportService:
 
                 fixed_costs += tetap_salary
 
-                # Per-capster commission: mitra × individual rate, tetap = 0
+                # Per-transaction commission: mitra × service rate, tetap = 0
                 commission_cost = 0.0
                 if not branch_df.empty and 'Capster' in branch_df.columns:
                     for cap_name, cap_df in branch_df.groupby('Capster'):
                         info = capster_lookup.get(cap_name.lower().strip())
                         if info and info['employment_type'] == 'mitra':
-                            commission_cost += cap_df['Price'].sum() * info['commission_rate']
+                            # Hitung per transaksi agar bisa pakai rate berbeda per layanan
+                            for _, tx in cap_df.iterrows():
+                                svc_name = str(tx.get('Service', '')).lower().strip()
+                                rate = service_lookup.get(svc_name, info['commission_rate'])
+                                commission_cost += float(tx['Price']) * rate
 
                 total_costs = fixed_costs + commission_cost
                 net_profit = revenue - total_costs

@@ -58,6 +58,7 @@ def _migrate_capster_auth_columns():
         ('customers',     'visit_count',   'INTEGER DEFAULT 0'),
         ('customers',     'added_by',      "VARCHAR(100) DEFAULT ''"),
         ('transactions',  'customer_id',   'INTEGER'),
+        ('services',      'commission_rate', 'REAL DEFAULT 0.5'),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:

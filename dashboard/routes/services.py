@@ -29,10 +29,11 @@ def service_manage():
         except (ValueError, TypeError):
             price = 0
         services.append({
-            'service_id': s.get('ServiceID', ''),
-            'name':       s.get('Name', ''),
-            'category':   (s.get('Category') or 'main').lower(),
-            'price':      price,
+            'service_id':      s.get('ServiceID', ''),
+            'name':            s.get('Name', ''),
+            'category':        (s.get('Category') or 'main').lower(),
+            'price':           price,
+            'commission_rate': float(s.get('CommissionRate') or 0.5),
         })
 
     # Pisah per kategori untuk tampilan
@@ -70,6 +71,13 @@ def service_add():
         flash('Harga tidak valid.', 'danger')
         return redirect(url_for('services.service_manage'))
 
+    try:
+        commission_rate = float(request.form.get('commission_rate', '50').replace(',', '.')) / 100
+        if not (0 <= commission_rate <= 1):
+            raise ValueError
+    except (ValueError, TypeError):
+        commission_rate = 0.5
+
     service_id = _make_service_id(name)
 
     # Cek duplikat
@@ -78,7 +86,7 @@ def service_add():
         flash(f"Layanan '{name}' (ID: {service_id}) sudah terdaftar.", 'warning')
         return redirect(url_for('services.service_manage'))
 
-    if db.add_service(service_id, name, category, price):
+    if db.add_service(service_id, name, category, price, commission_rate=commission_rate):
         flash(f"Layanan '{name}' berhasil ditambahkan.", 'success')
     else:
         flash('Gagal menambahkan layanan.', 'danger')
@@ -102,6 +110,13 @@ def service_edit(service_id):
     except (ValueError, TypeError):
         price = None
 
+    try:
+        commission_rate = float(request.form.get('commission_rate', '').replace(',', '.')) / 100
+        if not (0 <= commission_rate <= 1):
+            raise ValueError
+    except (ValueError, TypeError):
+        commission_rate = None
+
     fields = {}
     if name is not None:
         fields['name'] = name
@@ -109,6 +124,8 @@ def service_edit(service_id):
         fields['category'] = category
     if price is not None:
         fields['price'] = price
+    if commission_rate is not None:
+        fields['commission_rate'] = commission_rate
 
     if not fields:
         flash('Tidak ada perubahan.', 'info')
