@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Stok Produk — Dashboard{% endblock %}
+{% block page_title %}Stok Produk per Cabang{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}{% for cat, msg in messages %}
+<div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+  {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}{% endif %}{% endwith %}
+
+{% if not branches %}
+<div class="alert alert-info">Belum ada cabang terdaftar. Tambah cabang terlebih dahulu.</div>
+{% else %}
+
+{# Tab navigation per branch #}
+{% set active_branch = request.args.get('branch', branches[0].id) %}
+<ul class="nav nav-tabs mb-3" id="branchTabs">
+  {% for b in branches %}
+  <li class="nav-item">
+    <a class="nav-link {% if b.id == active_branch %}active{% endif %}"
+       href="{{ url_for('products.product_stock', branch=b.id) }}">
+      {{ b.short or b.name }}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% for b in branches %}
+{% if b.id == active_branch %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span class="fw-semibold">{{ b.name }}</span>
+  <span class="text-muted small">{{ stock_by_branch[b.id]|length }} produk</span>
+</div>
+
+<div class="card stat-card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Produk</th>
+          <th class="text-end">Harga</th>
+          <th class="text-end">Komisi Capster</th>
+          <th class="text-center">Stok</th>
+          <th class="text-end">Atur Stok</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% if stock_by_branch[b.id] %}
+        {% for p in stock_by_branch[b.id] %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td class="text-end text-success fw-semibold">{{ p.price|idr }}</td>
+          <td class="text-end">
+            {% if p.commission_pct > 0 %}
+            <span class="badge bg-success bg-opacity-10 text-success">{{ p.commission_pct }}%</span>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if p.quantity == 0 %}
+            <span class="badge bg-danger bg-opacity-10 text-danger">Habis</span>
+            {% elif p.quantity <= 3 %}
+            <span class="badge bg-warning bg-opacity-15 text-warning fw-bold">{{ p.quantity }}</span>
+            {% else %}
+            <span class="badge bg-success bg-opacity-10 text-success fw-bold">{{ p.quantity }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                    onclick="openStockModal('{{ p.product_id }}', '{{ p.name|e }}', {{ p.quantity }}, '{{ b.id }}')">
+              <i class="bi bi-pencil-square"></i> Set
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Belum ada produk.</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+
+<!-- Modal Atur Stok -->
+<div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <form method="post" action="/products/stock/set">
+        <input type="hidden" id="stock_product_id" name="product_id">
+        <input type="hidden" id="stock_branch_id"  name="branch_id">
+        <div class="modal-header">
+          <h6 class="modal-title">Atur Stok</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="fw-semibold mb-1" id="stock_product_name">—</p>
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Jumlah Stok <span class="text-danger">*</span></label>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-secondary px-3"
+                      onclick="adjustQty(-1)">−</button>
+              <input id="stock_quantity" name="quantity" type="number" min="0" value="0"
+                     class="form-control text-center fw-bold" style="font-size:1.1rem;">
+              <button type="button" class="btn btn-outline-secondary px-3"
+                      onclick="adjustQty(1)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openStockModal(productId, productName, currentQty, branchId) {
+  document.getElementById('stock_product_id').value   = productId;
+  document.getElementById('stock_branch_id').value    = branchId;
+  document.getElementById('stock_product_name').textContent = productName;
+  document.getElementById('stock_quantity').value     = currentQty;
+  new bootstrap.Modal(document.getElementById('stockModal')).show();
+}
+
+function adjustQty(delta) {
+  const inp = document.getElementById('stock_quantity');
+  inp.value = Math.max(0, parseInt(inp.value || 0) + delta);
+}
+</script>
+{% endblock %}

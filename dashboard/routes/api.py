@@ -1,5 +1,5 @@
 """JSON API endpoints for Chart.js."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from flask import Blueprint, jsonify, request, session, redirect, url_for
@@ -31,9 +31,12 @@ def revenue_daily():
     start_dt = start_dt.replace(hour=0, minute=0, second=0)
     df = db.get_transactions_by_range(start_dt, now)
 
-    # Filter by branch if provided
+    # Filter by branch if provided (branch_f is short name, DB stores branch_id)
     if branch_f and not df.empty and 'Branch' in df.columns:
-        df = df[df['Branch'] == branch_f]
+        # Build reverse map: short → branch_id (handles both short and branch_id as input)
+        short_to_id = {cfg.get('short', bid): bid for bid, cfg in BRANCHES.items()}
+        branch_id_f = short_to_id.get(branch_f, branch_f)
+        df = df[df['Branch'] == branch_id_f]
 
     labels = []
     values = []
@@ -72,8 +75,9 @@ def branch_split():
     values = []
     if not month_df.empty and 'Branch' in month_df.columns:
         by_branch = month_df.groupby('Branch')['Price'].sum().sort_values(ascending=False)
-        for branch, rev in by_branch.items():
-            labels.append(branch)
+        for branch_id, rev in by_branch.items():
+            short = BRANCHES.get(branch_id, {}).get('short', branch_id)
+            labels.append(short)
             values.append(int(rev))
 
     return jsonify({'labels': labels, 'values': values})
@@ -142,3 +146,65 @@ def top_services():
         'counts':   by_service['count'].tolist(),
         'revenues': by_service['revenue'].astype(int).tolist(),
     })
+
+
+@api_bp.route('/customer/<int:cid>/transactions')
+def customer_transactions(cid):
+    err = _auth_check()
+    if err:
+        return err
+    db   = Repository()
+    rows = db.get_transactions_by_customer(cid, limit=30)
+    data = [
+        {
+            'date':    r['date'].strftime('%d %b %Y'),
+            'time':    r['date'].strftime('%H:%M'),
+            'service': r['service'],
+            'price':   r['price'],
+            'capster': r['capster'],
+            'payment': r['payment'],
+            'promo':   r['promo'],
+        }
+        for r in rows
+    ]
+    return jsonify({'transactions': data, 'total': len(data)})
+
+
+@api_bp.route('/notifications')
+def notifications():
+    err = _auth_check()
+    if err:
+        return err
+
+    db   = Repository()
+    rows = db.get_recent_customers(limit=15)
+    now  = datetime.now()
+
+    items = []
+    for r in rows:
+        created = r.get('CreatedAt')
+        if created:
+            diff   = now - created
+            secs   = int(diff.total_seconds())
+            if secs < 60:
+                ago = 'Baru saja'
+            elif secs < 3600:
+                ago = f'{secs // 60} menit lalu'
+            elif secs < 86400:
+                ago = f'{secs // 3600} jam lalu'
+            else:
+                ago = f'{secs // 86400} hari lalu'
+        else:
+            ago = ''
+
+        date_str = created.strftime('%d %b %Y, %H:%M') if created else ''
+
+        items.append({
+            'name':     r.get('Name', ''),
+            'phone':    r.get('Phone', '') or '-',
+            'added_by': r.get('AddedBy', '') or '-',
+            'ago':      ago,
+            'date_str': date_str,
+        })
+
+    return jsonify({'notifications': items, 'count': len(items)})

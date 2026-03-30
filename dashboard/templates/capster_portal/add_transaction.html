@@ -4,15 +4,115 @@
 
 {% block content %}
 
-{% if success %}
-<div class="alert alert-success d-flex align-items-center gap-2 mb-3" style="border-radius:12px;">
-  <i class="bi bi-check-circle-fill fs-5"></i>
-  <div>
-    <strong>Transaksi berhasil disimpan!</strong>
-    <span class="ms-2" style="font-size:.85rem;">Kunjungan customer sudah tercatat.</span>
+{# ══════════════════════════════════════════════════════════
+   SUCCESS STATE — tampil setelah transaksi berhasil disimpan
+   ══════════════════════════════════════════════════════════ #}
+{% if success and last_tx %}
+
+<div class="card mb-3" style="border:none;border-left:4px solid #22c55e;background:#f0fdf4;border-radius:14px;box-shadow:0 2px 12px rgba(34,197,94,.12);">
+  <div class="card-body">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <div class="rounded-circle d-flex align-items-center justify-content-center text-white"
+           style="width:44px;height:44px;background:#22c55e;font-size:1.25rem;flex-shrink:0;">
+        <i class="bi bi-check-lg"></i>
+      </div>
+      <div>
+        <div class="fw-bold" style="font-size:1rem;color:#15803d;">Transaksi Tersimpan!</div>
+        <div class="text-muted" style="font-size:.78rem;">{{ now.strftime('%d %b %Y, %H:%M') }}</div>
+      </div>
+    </div>
+
+    <!-- Detail transaksi -->
+    <div class="bg-white rounded-3 p-3 mb-3" style="border:1.5px solid #bbf7d0;">
+      <div class="row g-2" style="font-size:.86rem;">
+        <div class="col-6">
+          <span class="text-muted d-block" style="font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Layanan</span>
+          <strong>{{ last_tx.service or '— (Produk saja)' }}</strong>
+        </div>
+        <div class="col-6">
+          <span class="text-muted d-block" style="font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Total Layanan</span>
+          {% if last_tx.price %}
+          <strong class="text-success">{{ last_tx.price|idr }}</strong>
+          {% if last_tx.promo_name %}
+          <span class="badge rounded-pill ms-1" style="background:#f97316;font-size:.68rem;">{{ last_tx.promo_name }}</span>
+          {% endif %}
+          {% else %}
+          <span class="text-muted">—</span>
+          {% endif %}
+        </div>
+        <div class="col-6">
+          <span class="text-muted d-block" style="font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Pembayaran</span>
+          <span>{{ last_tx.payment }}</span>
+        </div>
+        <div class="col-6">
+          <span class="text-muted d-block" style="font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Cabang</span>
+          <span>{{ last_tx.branch_name or '-' }}</span>
+        </div>
+        {% if last_tx.commission > 0 %}
+        <div class="col-12 pt-1" style="border-top:1px solid #dcfce7;margin-top:.25rem;">
+          <span class="text-muted d-block" style="font-size:.71rem;text-transform:uppercase;letter-spacing:.04em;">Komisi Kamu (estimasi)</span>
+          <strong class="text-success" style="font-size:.95rem;">+{{ last_tx.commission|idr }}</strong>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Produk dijual -->
+    {% if last_tx.products %}
+    <div class="mb-3">
+      <div class="text-muted fw-semibold mb-1" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">
+        🛍️ Produk Dijual
+      </div>
+      {% for p in last_tx.products %}
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom" style="font-size:.84rem;">
+        <span>{{ p.name }}{% if p.qty > 1 %} <span class="text-muted">×{{ p.qty }}</span>{% endif %}</span>
+        {% if p.commission > 0 %}
+        <span class="text-success fw-semibold">+{{ p.commission|idr }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Info customer -->
+    {% if last_tx.had_customer %}
+    <div class="d-flex align-items-center gap-1 mb-3 text-success" style="font-size:.82rem;">
+      <i class="bi bi-person-check-fill"></i>
+      <span>Kunjungan customer tercatat +1</span>
+    </div>
+    {% endif %}
+
+    <!-- Action buttons -->
+    <div class="d-flex gap-2">
+      <a href="/portal/add-transaction"
+         class="btn flex-grow-1 fw-semibold text-white"
+         style="background:#0f3460;border-radius:10px;">
+        <i class="bi bi-plus-circle me-1"></i>Tambah Lagi
+      </a>
+      <a href="/portal/transactions"
+         class="btn btn-outline-secondary flex-grow-1"
+         style="border-radius:10px;">
+        <i class="bi bi-receipt me-1"></i>Riwayat
+      </a>
+    </div>
+
   </div>
 </div>
+
+{% else %}{# ── FORM STATE (normal / success tanpa data) ── #}
+
+{% if success %}
+<div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-check-circle-fill fs-5"></i>
+  <strong>Transaksi berhasil disimpan!</strong>
+</div>
 {% endif %}
+
+<script>
+const ACTIVE_PROMOS = {{ active_promos | tojson }};
+</script>
 
 {# ── Pilih Cabang Hari Ini (muncul sekali per hari) ── #}
 {% if need_branch %}
@@ -75,10 +175,10 @@
       <div class="d-flex align-items-center gap-2 mb-3">
         <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
              style="width:28px;height:28px;background:#0f3460;font-size:.8rem;flex-shrink:0;">1</div>
-        <h6 class="fw-bold mb-0">Pilih Layanan</h6>
+        <h6 class="fw-bold mb-0">Pilih Layanan <span class="text-muted fw-normal" style="font-size:.8rem;">(opsional)</span></h6>
       </div>
 
-      <select name="service_id" id="serviceSelect" class="form-select" required
+      <select name="service_id" id="serviceSelect" class="form-select"
               onchange="updatePrice()">
         <option value="">— Pilih layanan —</option>
         {% for s in services %}
@@ -102,6 +202,51 @@
       <div id="pricePreview" class="mt-2 text-muted" style="font-size:.85rem;display:none;">
         Harga: <strong id="priceText" class="text-success"></strong>
       </div>
+
+      <!-- Promo options (muncul dinamis jika ada promo untuk layanan ini) -->
+      <div id="promoSection" class="mt-3" style="display:none;">
+        <div class="text-muted fw-semibold mb-2" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">
+          <i class="bi bi-tag-fill me-1 text-warning"></i>Pilih Harga
+        </div>
+        <div id="promoOptions"></div>
+        <input type="hidden" name="promo_id" id="promoIdInput" value="">
+      </div>
+
+      <!-- Paket Keluarga — pilih anggota (muncul otomatis jika layanan mengandung "paket") -->
+      <div id="familySection" class="mt-3" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-muted fw-semibold" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">
+            <i class="bi bi-people-fill me-1" style="color:#0f3460;"></i>Untuk Siapa? <span class="text-muted fw-normal">(boleh lebih dari satu)</span>
+          </span>
+          <span id="familyCount" class="badge rounded-pill"
+                style="background:#0f3460;font-size:.72rem;display:none;">0 orang</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2" id="familyOptions">
+          {% for label in paket_members %}
+          <label style="cursor:pointer;">
+            <input type="checkbox" value="{{ label }}" class="d-none family-check"
+                   onchange="updateFamilySelection()">
+            <div class="family-chip px-3 py-2 rounded-pill border"
+                 style="font-size:.82rem;font-weight:500;transition:.12s;background:#f8fafc;">
+              {{ label }}
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="mt-2">
+          <input type="text" id="familyCustomInput" class="form-control form-control-sm"
+                 placeholder="Tambah anggota lain (mis. Cucu, Keponakan...)"
+                 oninput="updateFamilySelection()">
+        </div>
+        <div id="familyPriceSummary" class="mt-2 p-2 rounded-3" style="display:none;background:#f0f7ff;border:1.5px solid #bfdbfe;">
+          <span style="font-size:.82rem;color:#0f3460;">
+            <i class="bi bi-calculator me-1"></i>
+            <span id="familyPriceDetail"></span>
+          </span>
+        </div>
+        <input type="hidden" name="family_member" id="familyMemberInput" value="">
+        <input type="hidden" name="family_count" id="familyCountInput" value="1">
+      </div>
     </div>
   </div>
 
@@ -115,26 +260,35 @@
       </div>
 
       <!-- Customer terpilih -->
-      <div id="customerSelected" style="display:none;" class="mb-2">
+      <div id="customerSelected"
+           style="display:{% if preset_customer %}block{% else %}none{% endif %};" class="mb-2">
         <div class="d-flex align-items-center gap-2 p-2 rounded-3"
              style="background:#f0f7ff;border:1.5px solid #bfdbfe;">
           <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
                style="width:36px;height:36px;background:#0f3460;font-size:.85rem;flex-shrink:0;"
-               id="custAvatar">?</div>
+               id="custAvatar">{% if preset_customer %}{{ preset_customer['Name'][0].upper() }}{% else %}?{% endif %}</div>
           <div class="flex-grow-1">
-            <div class="fw-600" id="custName" style="font-size:.9rem;">-</div>
-            <div class="text-muted" id="custMeta" style="font-size:.77rem;">-</div>
+            <div class="fw-600" id="custName" style="font-size:.9rem;">
+              {% if preset_customer %}{{ preset_customer['Name'] }}{% else %}-{% endif %}
+            </div>
+            <div class="text-muted" id="custMeta" style="font-size:.77rem;">
+              {% if preset_customer %}
+                {{ preset_customer['Phone'] or 'No HP belum diisi' }} · {{ preset_customer['VisitCount'] }} kunjungan sebelumnya
+              {% else %}-{% endif %}
+            </div>
           </div>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
                   style="font-size:.75rem;" onclick="clearCustomer()">
             <i class="bi bi-x"></i> Ganti
           </button>
         </div>
-        <input type="hidden" name="customer_id" id="customerIdInput">
+        <input type="hidden" name="customer_id" id="customerIdInput"
+               value="{% if preset_customer %}{{ preset_customer['id'] }}{% endif %}">
       </div>
 
       <!-- Scan / Search -->
-      <div id="customerInput">
+      <div id="customerInput"
+           style="{% if preset_customer %}display:none;{% endif %}">
         <div class="d-flex gap-2 mb-2">
           <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1"
                   onclick="openScanner()">
@@ -179,7 +333,7 @@
   </div>
 
   <!-- ── Step 3: Metode Bayar ── -->
-  <div class="card stat-card mb-3">
+  <div class="card stat-card mb-3" id="paymentStep">
     <div class="card-body">
       <div class="d-flex align-items-center gap-2 mb-3">
         <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
@@ -202,6 +356,54 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Step 4: Produk Dijual (opsional) ── -->
+  {% if products_in_stock %}
+  <div class="card stat-card mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:28px;height:28px;background:#0f3460;font-size:.8rem;flex-shrink:0;">4</div>
+        <h6 class="fw-bold mb-0">Produk Dijual <span class="text-muted fw-normal" style="font-size:.8rem;">(opsional)</span></h6>
+      </div>
+
+      {% for p in products_in_stock %}
+      <div class="d-flex align-items-center gap-2 py-2 border-bottom product-row"
+           id="row_{{ p.ProductID }}">
+        <div class="form-check" style="margin:0;">
+          <input class="form-check-input product-check" type="checkbox"
+                 name="sell_product" value="{{ p.ProductID }}" id="chk_{{ p.ProductID }}"
+                 onchange="toggleProductQty('{{ p.ProductID }}', this.checked)"
+                 {% if p.Quantity == 0 %}disabled{% endif %}>
+        </div>
+        <label class="flex-grow-1" for="chk_{{ p.ProductID }}" style="cursor:pointer;">
+          <div class="fw-semibold" style="font-size:.88rem;">{{ p.Name }}</div>
+          <div class="text-muted" style="font-size:.75rem;">
+            {{ p.Price|int|idr }}
+            {% if p.CommissionRate > 0 %}
+            · <span class="text-success">Komisi {{ (p.CommissionRate * 100)|int }}%</span>
+            {% endif %}
+            {% if p.Quantity == 0 %}
+            · <span class="text-danger">Stok habis</span>
+            {% else %}
+            · Stok: {{ p.Quantity }}
+            {% endif %}
+          </div>
+        </label>
+        <div id="qty_box_{{ p.ProductID }}" style="display:none;width:80px;">
+          <input type="number" name="qty_{{ p.ProductID }}" id="qty_{{ p.ProductID }}"
+                 min="1" max="{{ p.Quantity }}" value="1"
+                 class="form-control form-control-sm text-center" disabled>
+        </div>
+      </div>
+      {% endfor %}
+
+      <p class="text-muted mb-0 mt-2" style="font-size:.78rem;">
+        <i class="bi bi-info-circle me-1"></i>Stok akan berkurang otomatis saat transaksi disimpan.
+      </p>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- ── Override Cabang (opsional) ── -->
   <div class="mb-3">
@@ -235,24 +437,161 @@
 </div>{# end disabled overlay #}
 {% endif %}
 
+{% endif %}{# end success/form toggle #}
+
 {% endblock %}
 
 {% block scripts %}
 <!-- html5-qrcode CDN -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  // ── Price preview ──────────────────────────────────────────────────────
+  // ── Price preview + Promo options ─────────────────────────────────────
+  function formatIDR(n) {
+    return 'Rp ' + parseInt(n).toLocaleString('id-ID');
+  }
+
   function updatePrice() {
-    const sel = document.getElementById('serviceSelect');
-    const opt = sel.options[sel.selectedIndex];
-    const price = opt.dataset.price;
-    const preview = document.getElementById('pricePreview');
-    if (price) {
-      document.getElementById('priceText').textContent =
-        'Rp ' + parseInt(price).toLocaleString('id-ID');
+    const sel       = document.getElementById('serviceSelect');
+    const opt       = sel.options[sel.selectedIndex];
+    const serviceId = sel.value;
+    const basePrice = parseInt(opt.dataset.price || '0');
+    const preview   = document.getElementById('pricePreview');
+
+    if (serviceId && basePrice) {
+      document.getElementById('priceText').textContent = formatIDR(basePrice);
       preview.style.display = '';
     } else {
       preview.style.display = 'none';
+    }
+
+    // Reset promo selection
+    document.getElementById('promoIdInput').value = '';
+
+    // Find active promos for this service
+    const promos = (typeof ACTIVE_PROMOS !== 'undefined')
+      ? ACTIVE_PROMOS.filter(p => p.service_ids.includes(serviceId))
+      : [];
+
+    const promoSection = document.getElementById('promoSection');
+    const promoOptions = document.getElementById('promoOptions');
+
+    // Paket keluarga detection
+    const svcName = (opt.dataset.name || '').toLowerCase();
+    const isPackage = svcName.includes('paket') || svcName.includes('keluarga') || svcName.includes('family');
+    const familySection = document.getElementById('familySection');
+    familySection.style.display = (isPackage && serviceId) ? '' : 'none';
+    if (!isPackage) {
+      document.getElementById('familyMemberInput').value  = '';
+      document.getElementById('familyCountInput').value   = '1';
+      document.getElementById('familyCustomInput').value  = '';
+      document.getElementById('familyCount').style.display = 'none';
+      document.getElementById('familyPriceSummary').style.display = 'none';
+      document.querySelectorAll('.family-check').forEach(r => { r.checked = false; });
+      document.querySelectorAll('.family-chip').forEach(c => {
+        c.style.background = '#f8fafc'; c.style.borderColor = ''; c.style.color = '';
+      });
+    }
+
+    if (promos.length > 0 && serviceId) {
+      let html = '';
+      // Regular (default selected)
+      html += buildPromoCard('', 'Regular', basePrice, basePrice, true, null);
+      promos.forEach(p => {
+        const discounted = Math.round(basePrice * (1 - p.discount_pct / 100));
+        html += buildPromoCard(p.id, p.name, discounted, basePrice, false, p.discount_pct);
+      });
+      promoOptions.innerHTML = html;
+      promoSection.style.display = '';
+      // Highlight regular by default
+      const first = promoOptions.querySelector('.promo-card');
+      if (first) highlightCard(first, '');
+    } else {
+      promoSection.style.display = 'none';
+      promoOptions.innerHTML = '';
+    }
+  }
+
+  function buildPromoCard(promoId, name, price, basePrice, isDefault, discountPct) {
+    const savings = basePrice - price;
+    const isPromo = !!promoId;
+    return `
+      <label class="d-flex align-items-center gap-3 p-3 mb-2 rounded-3 border promo-card"
+             style="cursor:pointer;transition:.12s;"
+             onclick="selectPromo('${promoId}', this)">
+        <div class="flex-grow-1">
+          <div class="fw-semibold" style="font-size:.9rem;">${name}</div>
+          ${discountPct ? `<div class="text-muted" style="font-size:.75rem;">Diskon ${discountPct}% &nbsp;·&nbsp; Hemat ${formatIDR(savings)}</div>` : ''}
+        </div>
+        <div class="fw-bold text-success" style="font-size:.95rem;">${formatIDR(price)}</div>
+      </label>`;
+  }
+
+  function selectPromo(promoId, card) {
+    document.querySelectorAll('.promo-card').forEach(c => {
+      c.style.background    = '#f8fafc';
+      c.style.borderColor   = '#e2e8f0';
+    });
+    highlightCard(card, promoId);
+    document.getElementById('promoIdInput').value = promoId;
+    // Update price preview to reflect chosen price
+    const priceEl = card.querySelector('.fw-bold');
+    if (priceEl) document.getElementById('priceText').textContent = priceEl.textContent;
+  }
+
+  function highlightCard(card, promoId) {
+    card.style.background  = promoId ? '#fff8f0' : '#f0f7ff';
+    card.style.borderColor = promoId ? '#f97316' : '#0f3460';
+  }
+
+  // ── Paket Keluarga — pilih anggota (multi-select) ─────────────────────
+  function updateFamilySelection() {
+    const checks  = document.querySelectorAll('.family-check');
+    const custom  = document.getElementById('familyCustomInput').value.trim();
+    const members = [];
+
+    checks.forEach(cb => {
+      const chip = cb.nextElementSibling;
+      if (cb.checked) {
+        members.push(cb.value);
+        chip.style.background  = '#e8f0fe';
+        chip.style.borderColor = '#0f3460';
+        chip.style.color       = '#0f3460';
+      } else {
+        chip.style.background  = '#f8fafc';
+        chip.style.borderColor = '';
+        chip.style.color       = '';
+      }
+    });
+
+    if (custom) members.push(custom);
+
+    const count    = Math.max(members.length, 1);
+    const label    = members.length ? members.join(', ') : '';
+    const countBadge = document.getElementById('familyCount');
+    const summary    = document.getElementById('familyPriceSummary');
+    const detail     = document.getElementById('familyPriceDetail');
+
+    document.getElementById('familyMemberInput').value = label;
+    document.getElementById('familyCountInput').value  = count;
+
+    if (members.length > 0) {
+      countBadge.textContent    = members.length + ' orang';
+      countBadge.style.display  = '';
+    } else {
+      countBadge.style.display  = 'none';
+    }
+
+    // Tampilkan ringkasan harga
+    const sel       = document.getElementById('serviceSelect');
+    const basePrice = parseInt(sel.options[sel.selectedIndex]?.dataset?.price || '0');
+    if (members.length > 1 && basePrice) {
+      const total = basePrice * members.length;
+      detail.textContent = members.length + ' × ' + formatIDR(basePrice) + ' = ' + formatIDR(total);
+      summary.style.display = '';
+      document.getElementById('priceText').textContent = formatIDR(total);
+    } else {
+      summary.style.display = 'none';
+      if (basePrice) document.getElementById('priceText').textContent = formatIDR(basePrice);
     }
   }
 
@@ -417,8 +756,26 @@
     document.getElementById('customerInput').querySelectorAll('.text-center').forEach(e => e.style.display = '');
   }
 
+  // ── Product qty toggle ────────────────────────────────────────────────
+  function toggleProductQty(productId, checked) {
+    const box = document.getElementById('qty_box_' + productId);
+    const inp = document.getElementById('qty_' + productId);
+    if (box) box.style.display = checked ? '' : 'none';
+    if (inp) {
+      inp.disabled = !checked;  // exclude from validation when hidden
+      if (!checked) inp.value = 1;
+    }
+  }
+
   // ── Form submit guard ──────────────────────────────────────────────────
-  document.getElementById('txForm').addEventListener('submit', function() {
+  document.getElementById('txForm').addEventListener('submit', function(e) {
+    const hasService  = !!document.getElementById('serviceSelect').value;
+    const hasProduct  = document.querySelectorAll('.product-check:checked').length > 0;
+    if (!hasService && !hasProduct) {
+      e.preventDefault();
+      alert('Pilih minimal satu layanan atau produk sebelum menyimpan.');
+      return;
+    }
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('submitBtn').innerHTML =
       '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';

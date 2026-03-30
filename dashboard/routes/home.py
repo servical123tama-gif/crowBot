@@ -72,15 +72,18 @@ def index():
     branch_today = {}
     if not today_df.empty and 'Branch' in today_df.columns:
         for branch, grp in today_df.groupby('Branch'):
-            branch_today[branch] = int(grp['Price'].sum())
+            short = BRANCHES.get(branch, {}).get('short', branch)
+            branch_today[short] = branch_today.get(short, 0) + int(grp['Price'].sum())
 
     # ── Per branch this month ──────────────────────────────────────
     branch_month = {}
     if not month_df.empty and 'Branch' in month_df.columns:
         for branch, grp in month_df.groupby('Branch'):
-            branch_month[branch] = {
-                'revenue': int(grp['Price'].sum()),
-                'count': len(grp),
+            short = BRANCHES.get(branch, {}).get('short', branch)
+            existing = branch_month.get(short, {'revenue': 0, 'count': 0})
+            branch_month[short] = {
+                'revenue': existing['revenue'] + int(grp['Price'].sum()),
+                'count': existing['count'] + len(grp),
             }
 
     # ── Top 5 capsters this month ──────────────────────────────────
@@ -101,6 +104,9 @@ def index():
     # ── Active capsters count ─────────────────────────────────────
     capster_count = len(db.get_all_capsters())
 
+    # ── Notifikasi customer baru (10 terakhir) ────────────────────
+    recent_customers = db.get_recent_customers(limit=10)
+
     # ── Extra quick stats ─────────────────────────────────────────
     today_avg     = int(today_revenue / today_count) if today_count else 0
     month_avg     = int(month_revenue / month_count) if month_count else 0
@@ -111,11 +117,14 @@ def index():
             month_top_svc = svc_counts.idxmax()
 
     # Growth per branch (bulan ini vs bulan lalu)
+    # lm_df['Branch'] berisi branch_id, tapi branch_month pakai key 'short'
+    short_to_id = {cfg.get('short', bid): bid for bid, cfg in BRANCHES.items()}
     branch_growth = {}
     for short, stats in branch_month.items():
         lm_rev = 0
         if not lm_df.empty and 'Branch' in lm_df.columns:
-            lm_rev = int(lm_df[lm_df['Branch'] == short]['Price'].sum())
+            branch_id = short_to_id.get(short, short)
+            lm_rev = int(lm_df[lm_df['Branch'] == branch_id]['Price'].sum())
         if lm_rev:
             branch_growth[short] = round((stats['revenue'] - lm_rev) / lm_rev * 100, 1)
 
@@ -136,6 +145,7 @@ def index():
         branch_growth=branch_growth,
         top_capsters=top_capsters,
         capster_count=capster_count,
+        recent_customers=recent_customers,
         branches=BRANCHES,
         active_page='home',
     )

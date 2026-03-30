@@ -138,6 +138,48 @@
 </div>
 
 
+<!-- ── Pengaturan Paket ── -->
+<div class="card stat-card mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <div class="fw-semibold" style="font-size:.95rem;color:#1e293b;">
+          <i class="bi bi-people-fill me-2" style="color:#0f3460;"></i>Pilihan Anggota Paket
+        </div>
+        <div class="text-muted" style="font-size:.78rem;">
+          Ditampilkan saat capster memilih layanan yang mengandung kata "paket"
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview chips -->
+    <div class="d-flex flex-wrap gap-2 mb-3" id="paketChipsPreview">
+      {% for m in paket_members %}
+      <span class="badge rounded-pill px-3 py-2"
+            style="background:#f0f4ff;color:#0f3460;font-size:.82rem;font-weight:500;">
+        {{ m }}
+      </span>
+      {% endfor %}
+    </div>
+
+    <form method="post" action="/services/paket-settings" class="d-flex align-items-end gap-2 flex-wrap">
+      <div class="flex-grow-1">
+        <label class="form-label form-label-sm fw-semibold">Daftar Anggota
+          <span class="text-muted fw-normal">(pisahkan dengan koma)</span>
+        </label>
+        <input type="text" name="paket_members" class="form-control form-control-sm"
+               value="{{ paket_members_raw }}"
+               placeholder="Bapak,Anak 1,Anak 2,Anak 3" required>
+      </div>
+      <button type="submit" class="btn btn-sm text-white mb-0"
+              style="background:#0f3460;border-radius:8px;white-space:nowrap;">
+        <i class="bi bi-check-lg me-1"></i>Simpan
+      </button>
+    </form>
+  </div>
+</div>
+
+
 <!-- ═══ MODAL: Tambah Layanan ═══ -->
 <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
   <div class="modal-dialog">

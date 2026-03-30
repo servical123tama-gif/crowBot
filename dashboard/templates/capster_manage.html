@@ -34,7 +34,7 @@
           <th>Nama</th>
           <th>Alias</th>
           <th>Tipe</th>
-          <th>Komisi / Gaji</th>
+          <th>Gaji Tetap</th>
           <th>Branch</th>
           <th>Telegram ID</th>
           <th>Akun Portal</th>
@@ -57,7 +57,7 @@
           </td>
           <td>
             {% if c.type == 'mitra' %}
-              {{ c.commission_pct }}%
+              <span class="text-muted">—</span>
             {% else %}
               {{ c.monthly_salary|idr }}/bln
             {% endif %}
@@ -87,7 +87,6 @@
                     data-name="{{ c.name }}"
                     data-alias="{{ c.alias }}"
                     data-type="{{ c.type }}"
-                    data-rate="{{ c.commission_pct }}"
                     data-salary="{{ c.monthly_salary }}"
                     data-branch="{{ c.branch_id }}">
               Edit
@@ -143,18 +142,6 @@
               <option value="mitra">Mitra — Komisi dari transaksi</option>
               <option value="tetap">Tetap — Gaji bulanan fixed</option>
             </select>
-          </div>
-
-          <!-- Mitra fields -->
-          <div id="add_mitra_fields">
-            <div class="mb-3">
-              <label class="form-label form-label-sm fw-semibold">Komisi (%)</label>
-              <div class="input-group input-group-sm">
-                <input name="commission_rate" type="number" min="1" max="100" value="50"
-                       class="form-control form-control-sm">
-                <span class="input-group-text">%</span>
-              </div>
-            </div>
           </div>
 
           <!-- Tetap fields -->
@@ -217,18 +204,6 @@
               <option value="mitra">Mitra — Komisi dari transaksi</option>
               <option value="tetap">Tetap — Gaji bulanan fixed</option>
             </select>
-          </div>
-
-          <!-- Mitra fields -->
-          <div id="edit_mitra_fields">
-            <div class="mb-3">
-              <label class="form-label form-label-sm fw-semibold">Komisi (%)</label>
-              <div class="input-group input-group-sm">
-                <input id="edit_rate" name="commission_rate" type="number" min="1" max="100"
-                       class="form-control form-control-sm">
-                <span class="input-group-text">%</span>
-              </div>
-            </div>
           </div>
 
           <!-- Tetap fields -->
@@ -322,14 +297,12 @@
 // Toggle add modal fields
 function toggleAddFields() {
   const t = document.getElementById('add_type').value;
-  document.getElementById('add_mitra_fields').style.display = t === 'mitra' ? '' : 'none';
   document.getElementById('add_tetap_fields').style.display = t === 'tetap' ? '' : 'none';
 }
 
 // Toggle edit modal fields
 function toggleEditFields() {
   const t = document.getElementById('edit_type').value;
-  document.getElementById('edit_mitra_fields').style.display = t === 'mitra' ? '' : 'none';
   document.getElementById('edit_tetap_fields').style.display = t === 'tetap' ? '' : 'none';
 }
 
@@ -360,7 +333,6 @@ document.getElementById('editModal').addEventListener('show.bs.modal', function(
   document.getElementById('edit_name').value   = btn.dataset.name;
   document.getElementById('edit_alias').value  = btn.dataset.alias;
   document.getElementById('edit_type').value   = btn.dataset.type;
-  document.getElementById('edit_rate').value   = btn.dataset.rate;
   document.getElementById('edit_salary').value = btn.dataset.salary;
 
   const branchSel = document.getElementById('edit_branch');

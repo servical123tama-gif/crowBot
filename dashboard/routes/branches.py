@@ -1,4 +1,4 @@
-"""Branch CRUD management page."""
+b"""Branch CRUD management page."""
 import re
 from datetime import datetime
 
@@ -36,20 +36,38 @@ def branch_manage():
     db  = Repository()
     raw = db.get_all_branches_config()
 
+    # Hitung gaji tetap per branch dari data capster
+    tetap_salary_by_branch: dict[str, int] = {}
+    tetap_names_by_branch:  dict[str, list] = {}
+    seen_names: set = set()
+    for c in db.get_all_capsters():
+        if (c.get('EmploymentType') or 'mitra').lower() != 'tetap':
+            continue
+        cname = c.get('Name', '')
+        if not cname or cname in seen_names:
+            continue
+        seen_names.add(cname)
+        bid = (c.get('BranchID') or '').strip()
+        salary = c.get('MonthlySalary', 0)
+        tetap_salary_by_branch[bid] = tetap_salary_by_branch.get(bid, 0) + salary
+        tetap_names_by_branch.setdefault(bid, []).append(cname)
+
     branches = []
     for b in raw:
+        bid = b.get('BranchID', '')
         branches.append({
-            'branch_id':       b.get('BranchID', ''),
+            'branch_id':       bid,
             'name':            b.get('Name', ''),
             'location':        b.get('Location', ''),
             'short':           b.get('Short', ''),
-            'employees':       _parse_int(b.get('Employees', 2), 2),
-            'commission_rate': _parse_float(b.get('CommissionRate', 0)),
-            'commission_pct':  int(_parse_float(b.get('CommissionRate', 0)) * 100),
-            'cost_tempat':     _parse_int(b.get('Cost_tempat', 0)),
-            'cost_listrik_air':_parse_int(b.get('Cost_listrik_air', 0)),
-            'cost_wifi':       _parse_int(b.get('Cost_wifi', 0)),
-            'cost_karyawan':   _parse_int(b.get('Cost_karyawan', 0)),
+            'employees':       b.get('Employees', 2),
+            'commission_rate': b.get('CommissionRate', 0.0),
+            'commission_pct':  int(b.get('CommissionRate', 0.0) * 100),
+            'cost_tempat':     b.get('Cost_tempat', 0),
+            'cost_listrik_air':b.get('Cost_listrik_air', 0),
+            'cost_wifi':       b.get('Cost_wifi', 0),
+            'tetap_salary':    tetap_salary_by_branch.get(bid, 0),
+            'tetap_names':     tetap_names_by_branch.get(bid, []),
         })
 
     return render_template(
@@ -85,12 +103,11 @@ def branch_add():
     cost_tempat      = _parse_int(request.form.get('cost_tempat', '0'))
     cost_listrik_air = _parse_int(request.form.get('cost_listrik_air', '0'))
     cost_wifi        = _parse_int(request.form.get('cost_wifi', '0'))
-    cost_karyawan    = _parse_int(request.form.get('cost_karyawan', '0'))
 
     if db.add_branch(branch_id, name, location=location, short=short,
                      employees=employees, commission_rate=commission_rate,
                      cost_tempat=cost_tempat, cost_listrik_air=cost_listrik_air,
-                     cost_wifi=cost_wifi, cost_karyawan=cost_karyawan):
+                     cost_wifi=cost_wifi, cost_karyawan=0):
         flash(f"Cabang '{name}' berhasil ditambahkan (ID: {branch_id}).", 'success')
     else:
         flash('Gagal menambahkan cabang.', 'danger')
@@ -133,10 +150,6 @@ def branch_edit(branch_id):
     cost_wifi = request.form.get('cost_wifi', '').strip()
     if cost_wifi:
         fields['cost_wifi'] = _parse_int(cost_wifi)
-
-    cost_karyawan = request.form.get('cost_karyawan', '').strip()
-    if cost_karyawan:
-        fields['cost_karyawan'] = _parse_int(cost_karyawan)
 
     if not fields:
         flash('Tidak ada perubahan.', 'info')

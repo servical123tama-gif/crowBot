@@ -54,8 +54,7 @@
                   data-commission="{{ b.commission_pct }}"
                   data-cost-tempat="{{ b.cost_tempat }}"
                   data-cost-listrik="{{ b.cost_listrik_air }}"
-                  data-cost-wifi="{{ b.cost_wifi }}"
-                  data-cost-karyawan="{{ b.cost_karyawan }}">
+                  data-cost-wifi="{{ b.cost_wifi }}">
             Edit
           </button>
           <form method="post" action="/branches/delete/{{ b.branch_id }}"
@@ -102,12 +101,19 @@
         </div>
         <div class="col-6">
           <div class="d-flex justify-content-between small border-bottom pb-1">
-            <span class="text-muted">Karyawan Fixed</span>
-            <span class="fw-semibold">{{ b.cost_karyawan|idr }}</span>
+            <span class="text-muted">
+              Gaji Karyawan Tetap
+              {% if b.tetap_names %}
+              <span class="text-info ms-1" title="{{ b.tetap_names|join(', ') }}" style="cursor:help;">ⓘ</span>
+              {% endif %}
+            </span>
+            <span class="fw-semibold {% if not b.tetap_salary %}text-muted{% endif %}">
+              {% if b.tetap_salary %}{{ b.tetap_salary|idr }}{% else %}—{% endif %}
+            </span>
           </div>
         </div>
         <div class="col-12 mt-1">
-          {% set total_cost = b.cost_tempat + b.cost_listrik_air + b.cost_wifi + b.cost_karyawan %}
+          {% set total_cost = b.cost_tempat + b.cost_listrik_air + b.cost_wifi + b.tetap_salary %}
           <div class="d-flex justify-content-between small">
             <span class="fw-semibold">Total Fixed Cost</span>
             <span class="fw-bold text-danger">{{ total_cost|idr }}</span>
@@ -192,15 +198,13 @@
                 <input name="cost_wifi" type="number" min="0" value="0" class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
-              <label class="form-label form-label-sm fw-semibold">Karyawan Fixed</label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">Rp</span>
-                <input name="cost_karyawan" type="number" min="0" value="0" class="form-control form-control-sm">
-              </div>
-              <div class="form-text">Biasanya 0 (pakai gaji per-capster).</div>
+          </div>
+          <div class="col-12">
+            <div class="form-text text-info">
+              ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
             </div>
           </div>
+        </div>
 
         </div>
         <div class="modal-footer">
@@ -284,15 +288,13 @@
                        class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
-              <label class="form-label form-label-sm fw-semibold">Karyawan Fixed</label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">Rp</span>
-                <input id="edit_cost_karyawan" name="cost_karyawan" type="number" min="0"
-                       class="form-control form-control-sm">
-              </div>
+          </div>
+          <div class="col-12">
+            <div class="form-text text-info">
+              ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
             </div>
           </div>
+        </div>
 
         </div>
         <div class="modal-footer">
@@ -321,7 +323,6 @@ document.getElementById('editModal').addEventListener('show.bs.modal', function(
   document.getElementById('edit_cost_tempat').value  = btn.dataset.costTempat;
   document.getElementById('edit_cost_listrik').value = btn.dataset.costListrik;
   document.getElementById('edit_cost_wifi').value    = btn.dataset.costWifi;
-  document.getElementById('edit_cost_karyawan').value= btn.dataset.costKaryawan;
 });
 </script>
 {% endblock %}

@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dir /s \"D:\\\\Document\\\\barber\\\\bot_barber_2\")",
-      "Bash(del \"D:\\\\Document\\\\barber\\\\bot_barber_2\\\\app\\\\utils\\\\oprational_calculator.py\")"
+      "Bash(del \"D:\\\\Document\\\\barber\\\\bot_barber_2\\\\app\\\\utils\\\\oprational_calculator.py\")",
+      "Bash(cd:*)",
+      "Bash(python fix_branch_data.py)"
     ]
   }
 }

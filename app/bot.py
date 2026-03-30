@@ -59,8 +59,13 @@ class BarbershopBot:
             logger.info("Data service: DB_ONLY (Repository)")
         elif settings.DB_DUAL_WRITE:
             init_db()
-            data_service = DualWriteService(Repository(), SheetsService())
-            logger.info("Data service: DB_DUAL_WRITE (DualWriteService)")
+            try:
+                data_service = DualWriteService(Repository(), SheetsService())
+                logger.info("Data service: DB_DUAL_WRITE (DualWriteService)")
+            except Exception as sheets_err:
+                logger.warning(f"Google Sheets tidak bisa diakses ({sheets_err}), fallback ke DB_ONLY.")
+                data_service = Repository()
+                logger.info("Data service: fallback DB_ONLY (Repository)")
         else:
             data_service = SheetsService()
             logger.info("Data service: Sheets only (SheetsService)")

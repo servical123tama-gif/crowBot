@@ -12,7 +12,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.db.database import get_db
 from app.db.models import (
-    Transaction, Capster, Customer, Service, Branch, Product, SalaryWithdrawal
+    Transaction, Capster, Customer, Service, Branch, Product, SalaryWithdrawal,
+    ProductStock, ProductSale, Promo, Setting,
 )
 from app.config.constants import (
     DATETIME_FORMAT, DATE_FORMAT,
@@ -72,7 +73,7 @@ class Repository:
                 ).all()
             return self._rows_to_df(rows)
         except Exception as e:
-            logger.error(f"Failed to get transactions for date {date_str}: {e}")
+            logger.error(f"Failed to get transactions for date {dt}: {e}")
             return pd.DataFrame()
 
     def get_transactions_by_range(self, start: datetime, end: datetime) -> pd.DataFrame:
@@ -128,6 +129,7 @@ class Repository:
                 'Price': r.price,
                 'Payment_Method': r.payment_method,
                 'Branch': r.branch or '',
+                'PromoName': r.promo_name or '',
             }
             for r in rows
         ]
@@ -191,6 +193,46 @@ class Repository:
     # Customers                                                            #
     # ------------------------------------------------------------------ #
 
+    def get_recent_customers(self, limit: int = 20) -> List[Dict]:
+        """Return N most recently added customers, newest first."""
+        try:
+            with get_db() as db:
+                rows = db.query(Customer).order_by(
+                    Customer.created_at.desc().nullslast(),
+                    Customer.id.desc()
+                ).limit(limit).all()
+            return [
+                {
+                    'id':        r.id,
+                    'Name':      r.name,
+                    'Phone':     r.phone or '',
+                    'AddedBy':   getattr(r, 'added_by', '') or '',
+                    'CreatedAt': r.created_at,
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get recent customers: {e}")
+            return []
+
+    def get_customer_by_phone(self, phone: str) -> Optional[Dict]:
+        """Return existing customer dict if phone already registered, else None."""
+        if not phone or not phone.strip():
+            return None
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(
+                    Customer.phone == phone.strip()
+                ).first()
+            if row:
+                return {'id': row.id, 'Name': row.name, 'Phone': row.phone or '',
+                        'VisitCount': getattr(row, 'visit_count', 0) or 0,
+                        'AddedBy': getattr(row, 'added_by', '') or ''}
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get customer by phone: {e}")
+            return None
+
     def add_customer(self, customer, added_by: str = '') -> bool:
         try:
             with get_db() as db:
@@ -198,6 +240,7 @@ class Repository:
                     name=customer.name,
                     phone=customer.phone,
                     added_by=added_by,
+                    visit_count=1,
                 ))
             logger.info(f"Customer added: {customer.name} by {added_by or 'unknown'}")
             return True
@@ -212,11 +255,33 @@ class Repository:
             return [
                 {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
                  'VisitCount': getattr(r, 'visit_count', 0) or 0,
-                 'AddedBy': getattr(r, 'added_by', '') or ''}
+                 'AddedBy': getattr(r, 'added_by', '') or '',
+                 'CreatedAt': getattr(r, 'created_at', None)}
                 for r in rows
             ]
         except Exception as e:
             logger.error(f"Failed to get customers: {e}")
+            return []
+
+    def get_transactions_by_customer(self, customer_id: int, limit: int = 30) -> List[Dict[str, Any]]:
+        try:
+            with get_db() as db:
+                rows = db.query(Transaction).filter(
+                    Transaction.customer_id == customer_id
+                ).order_by(Transaction.date.desc()).limit(limit).all()
+            return [
+                {
+                    'date':    r.date,
+                    'service': r.service_name,
+                    'price':   r.price,
+                    'capster': r.capster_name,
+                    'payment': r.payment_method,
+                    'promo':   r.promo_name or '',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get transactions by customer: {e}")
             return []
 
     def get_customers_by_capster(self, capster_name: str) -> List[Dict[str, Any]]:
@@ -227,9 +292,9 @@ class Repository:
                     Customer.added_by == capster_name
                 ).order_by(Customer.name).all()
             return [
-                {'id': r.id, 'name': r.name, 'phone': r.phone or '',
-                 'visits': getattr(r, 'visit_count', 0) or 0,
-                 'added_by': getattr(r, 'added_by', '') or ''}
+                {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
+                 'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'AddedBy': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
         except Exception as e:
@@ -248,9 +313,9 @@ class Repository:
                     )
                 ).order_by(Customer.name).limit(10).all()
             return [
-                {'id': r.id, 'name': r.name, 'phone': r.phone or '',
-                 'visits': getattr(r, 'visit_count', 0) or 0,
-                 'added_by': getattr(r, 'added_by', '') or ''}
+                {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
+                 'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'AddedBy': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
         except Exception as e:
@@ -272,7 +337,8 @@ class Repository:
 
     def add_transaction_full(self, date: 'datetime', capster_name: str, service_name: str,
                              price: int, payment_method: str, branch: str,
-                             customer_id: Optional[int] = None) -> bool:
+                             customer_id: Optional[int] = None,
+                             promo_name: Optional[str] = None) -> bool:
         """Add transaction and optionally increment customer visit count."""
         try:
             with get_db() as db:
@@ -284,6 +350,7 @@ class Repository:
                     payment_method=payment_method or 'Cash',
                     branch=branch,
                     customer_id=customer_id,
+                    promo_name=promo_name or '',
                 )
                 db.add(row)
             if customer_id:
@@ -317,12 +384,18 @@ class Repository:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
             if not row:
                 return None
-            return {'id': row.id, 'name': row.name, 'phone': row.phone or ''}
+            return {
+                'id': row.id, 'Name': row.name, 'Phone': row.phone or '',
+                'VisitCount': getattr(row, 'visit_count', 0) or 0,
+                'AddedBy': getattr(row, 'added_by', '') or '',
+                'CreatedAt': getattr(row, 'created_at', None),
+            }
         except Exception as e:
             logger.error(f"Failed to get customer {customer_id}: {e}")
             return None
 
-    def update_customer(self, customer_id: int, name: str, phone: str, added_by: str = None) -> bool:
+    def update_customer(self, customer_id: int, name: str, phone: str,
+                        added_by: str = None, visit_count: int = None) -> bool:
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -332,6 +405,8 @@ class Repository:
                 row.phone = phone or ''
                 if added_by is not None:
                     row.added_by = added_by
+                if visit_count is not None:
+                    row.visit_count = visit_count
             logger.info(f"Customer {customer_id} updated")
             return True
         except Exception as e:
@@ -381,11 +456,11 @@ class Repository:
             return [
                 {
                     'Name': r.name,
-                    'TelegramID': str(r.telegram_id),
+                    'TelegramID': r.telegram_id,
                     'Alias': r.alias or '',
                     'EmploymentType': r.employment_type,
-                    'CommissionRate': str(r.commission_rate),
-                    'MonthlySalary': str(r.monthly_salary or 0),
+                    'CommissionRate': float(r.commission_rate or 0.5),
+                    'MonthlySalary': int(r.monthly_salary or 0),
                     'BranchID': r.branch_id or '',
                     'Username': r.username or '',
                 }
@@ -406,11 +481,11 @@ class Repository:
             return {
                 'id': row.id,
                 'Name': row.name,
-                'TelegramID': str(row.telegram_id),
+                'TelegramID': row.telegram_id,
                 'Alias': row.alias or '',
                 'EmploymentType': row.employment_type,
-                'CommissionRate': str(row.commission_rate),
-                'MonthlySalary': str(row.monthly_salary or 0),
+                'CommissionRate': float(row.commission_rate or 0.5),
+                'MonthlySalary': int(row.monthly_salary or 0),
                 'BranchID': row.branch_id or '',
                 'Username': row.username or '',
                 'password_hash': row.password_hash or '',
@@ -488,6 +563,36 @@ class Repository:
             ]
         except Exception as e:
             logger.error(f"Failed to get capster transactions: {e}")
+            return []
+
+    def get_product_sales_by_capster_month(self, capster_name: str, alias: str,
+                                           year: int, month: int) -> List[Dict[str, Any]]:
+        """Product sales for a capster in a given month."""
+        try:
+            names_lower = [capster_name.lower()]
+            if alias:
+                names_lower.append(alias.lower())
+            with get_db() as db:
+                rows = db.query(ProductSale).filter(
+                    func.lower(ProductSale.capster_name).in_(names_lower),
+                    extract('year',  ProductSale.date) == year,
+                    extract('month', ProductSale.date) == month,
+                ).order_by(ProductSale.date.desc()).all()
+            return [
+                {
+                    'id':         r.id,
+                    'date':       r.date,
+                    'service':    f"{r.product_name} (x{r.quantity})",
+                    'price':      r.price_each * r.quantity,   # harga jual (omset)
+                    'commission': r.commission_earned,          # komisi capster
+                    'payment':    '-',
+                    'branch':     r.branch_id or '',
+                    'type':       'produk',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get capster product sales: {e}")
             return []
 
     def remove_capster(self, telegram_id: int) -> bool:
@@ -572,7 +677,7 @@ class Repository:
                 rows = db.query(Service).all()
             return [
                 {'ServiceID': r.service_id, 'Name': r.name, 'Category': r.category,
-                 'Price': str(r.price),
+                 'Price': int(r.price),
                  'CommissionRate': float(getattr(r, 'commission_rate', 0.5) or 0.5)}
                 for r in rows
             ]
@@ -628,6 +733,19 @@ class Repository:
             logger.error(f"Failed to remove service: {e}", exc_info=True)
             return False
 
+    def get_service_popularity(self) -> dict:
+        """Return {service_name_lower: transaction_count} for all time."""
+        try:
+            with get_db() as db:
+                rows = db.query(
+                    Transaction.service_name,
+                    func.count(Transaction.id).label('cnt'),
+                ).group_by(Transaction.service_name).all()
+            return {r.service_name.lower(): r.cnt for r in rows}
+        except Exception as e:
+            logger.error(f"Failed to get service popularity: {e}")
+            return {}
+
     # ------------------------------------------------------------------ #
     # Branches                                                             #
     # ------------------------------------------------------------------ #
@@ -664,12 +782,12 @@ class Repository:
                     'Name': r.name,
                     'Location': r.location or '',
                     'Short': r.short or '',
-                    'Employees': str(r.employees),
-                    'CommissionRate': str(r.commission_rate),
-                    'Cost_tempat': str(r.cost_tempat),
-                    'Cost_listrik_air': str(r.cost_listrik_air),
-                    'Cost_wifi': str(r.cost_wifi),
-                    'Cost_karyawan': str(r.cost_karyawan),
+                    'Employees': int(r.employees or 0),
+                    'CommissionRate': float(r.commission_rate or 0),
+                    'Cost_tempat': int(r.cost_tempat or 0),
+                    'Cost_listrik_air': int(r.cost_listrik_air or 0),
+                    'Cost_wifi': int(r.cost_wifi or 0),
+                    'Cost_karyawan': int(r.cost_karyawan or 0),
                 }
                 for r in rows
             ]
@@ -762,15 +880,24 @@ class Repository:
             with get_db() as db:
                 self._seed_products_if_empty(db)
                 rows = db.query(Product).all()
-            return [{'ProductID': r.product_id, 'Name': r.name, 'Price': str(r.price)} for r in rows]
+            return [{
+                'ProductID':      r.product_id,
+                'Name':           r.name,
+                'Price':          int(r.price),
+                'CommissionRate': float(r.commission_rate or 0),
+            } for r in rows]
         except Exception as e:
             logger.error(f"Failed to get products: {e}")
             return []
 
-    def add_product(self, product_id: str, name: str, price: int) -> bool:
+    def add_product(self, product_id: str, name: str, price: int,
+                    commission_rate: float = 0.0) -> bool:
         try:
             with get_db() as db:
-                db.add(Product(product_id=product_id, name=name, price=int(price)))
+                db.add(Product(
+                    product_id=product_id, name=name,
+                    price=int(price), commission_rate=float(commission_rate),
+                ))
             logger.info(f"Product added: {product_id}")
             return True
         except Exception as e:
@@ -790,6 +917,8 @@ class Repository:
                         row.name = value
                     elif col == 'price':
                         row.price = int(value)
+                    elif col == 'commission_rate':
+                        row.commission_rate = float(value)
             logger.info(f"Product {product_id} updated: {fields}")
             return True
         except Exception as e:
@@ -808,6 +937,252 @@ class Repository:
             return True
         except Exception as e:
             logger.error(f"Failed to remove product: {e}", exc_info=True)
+            return False
+
+    # ------------------------------------------------------------------ #
+    # Product Stock                                                        #
+    # ------------------------------------------------------------------ #
+
+    def get_product_stocks(self, branch_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return list of stocks optionally filtered by branch_id.
+        Each item: {ProductID, Name, Price, CommissionRate, BranchID, Quantity}
+        """
+        try:
+            with get_db() as db:
+                self._seed_products_if_empty(db)
+                products = db.query(Product).all()
+                product_map = {p.product_id: p for p in products}
+
+                query = db.query(ProductStock)
+                if branch_id:
+                    query = query.filter(ProductStock.branch_id == branch_id)
+                stock_rows = query.all()
+                stock_map = {(s.product_id, s.branch_id): s.quantity for s in stock_rows}
+
+            results = []
+            if branch_id:
+                # Return one row per product (stock for this branch)
+                for p in sorted(products, key=lambda x: x.name):
+                    results.append({
+                        'ProductID':      p.product_id,
+                        'Name':           p.name,
+                        'Price':          p.price,
+                        'CommissionRate': p.commission_rate,
+                        'BranchID':       branch_id,
+                        'Quantity':       stock_map.get((p.product_id, branch_id), 0),
+                    })
+            else:
+                for (pid, bid), qty in stock_map.items():
+                    p = product_map.get(pid)
+                    if p:
+                        results.append({
+                            'ProductID':      pid,
+                            'Name':           p.name,
+                            'Price':          p.price,
+                            'CommissionRate': p.commission_rate,
+                            'BranchID':       bid,
+                            'Quantity':       qty,
+                        })
+            return results
+        except Exception as e:
+            logger.error(f"Failed to get product stocks: {e}", exc_info=True)
+            return []
+
+    def set_stock(self, product_id: str, branch_id: str, quantity: int) -> bool:
+        """Upsert stock quantity for a product-branch pair."""
+        try:
+            qty = max(0, int(quantity))
+            with get_db() as db:
+                row = db.query(ProductStock).filter_by(
+                    product_id=product_id, branch_id=branch_id
+                ).first()
+                if row:
+                    row.quantity = qty
+                else:
+                    db.add(ProductStock(product_id=product_id, branch_id=branch_id, quantity=qty))
+            logger.info(f"Stock set: {product_id}@{branch_id}={qty}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set stock: {e}", exc_info=True)
+            return False
+
+    def adjust_stock(self, product_id: str, branch_id: str, delta: int) -> int:
+        """Add delta to stock (negative to subtract). Returns new quantity (floor 0)."""
+        try:
+            with get_db() as db:
+                row = db.query(ProductStock).filter_by(
+                    product_id=product_id, branch_id=branch_id
+                ).first()
+                if row:
+                    new_qty = max(0, row.quantity + delta)
+                    row.quantity = new_qty
+                else:
+                    new_qty = max(0, delta)
+                    db.add(ProductStock(product_id=product_id, branch_id=branch_id, quantity=new_qty))
+            return new_qty
+        except Exception as e:
+            logger.error(f"Failed to adjust stock: {e}", exc_info=True)
+            return 0
+
+    # ------------------------------------------------------------------ #
+    # Product Sales                                                        #
+    # ------------------------------------------------------------------ #
+
+    def add_product_sale(self, capster_name: str, product_id: str, product_name: str,
+                         price_each: int, quantity: int,
+                         commission_rate: float, branch_id: str) -> bool:
+        """Record a product sale and reduce stock."""
+        try:
+            commission_earned = int(price_each * quantity * commission_rate)
+            with get_db() as db:
+                db.add(ProductSale(
+                    date=datetime.now(),
+                    capster_name=capster_name,
+                    product_id=product_id,
+                    product_name=product_name,
+                    price_each=int(price_each),
+                    quantity=int(quantity),
+                    commission_rate=float(commission_rate),
+                    commission_earned=commission_earned,
+                    branch_id=branch_id,
+                ))
+            # Reduce stock
+            self.adjust_stock(product_id, branch_id, -quantity)
+            logger.info(f"ProductSale: {capster_name} sold {quantity}x{product_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to record product sale: {e}", exc_info=True)
+            return False
+
+    def get_product_sales_commission_total(self, capster_name: str) -> int:
+        """Total commission earned from product sales (all-time) for a capster."""
+        try:
+            with get_db() as db:
+                result = db.query(func.sum(ProductSale.commission_earned)).filter(
+                    func.lower(ProductSale.capster_name) == capster_name.lower()
+                ).scalar()
+            return int(result or 0)
+        except Exception as e:
+            logger.error(f"Failed to get product sales commission: {e}", exc_info=True)
+            return 0
+
+    def get_product_sales(self, capster_name: Optional[str] = None,
+                          year: Optional[int] = None,
+                          month_str: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List product sales, optionally filtered."""
+        try:
+            with get_db() as db:
+                query = db.query(ProductSale).order_by(ProductSale.date.desc())
+                if capster_name:
+                    query = query.filter(
+                        func.lower(ProductSale.capster_name) == capster_name.lower()
+                    )
+                if year:
+                    query = query.filter(extract('year', ProductSale.date) == year)
+                rows = query.all()
+            results = []
+            for r in rows:
+                date_str = r.date.strftime('%Y-%m-%d %H:%M') if r.date else ''
+                if month_str and date_str[:7] != month_str:
+                    continue
+                results.append({
+                    'ID':               r.id,
+                    'Date':             date_str,
+                    'CapsterName':      r.capster_name,
+                    'ProductID':        r.product_id,
+                    'ProductName':      r.product_name,
+                    'PriceEach':        r.price_each,
+                    'Quantity':         r.quantity,
+                    'CommissionRate':   r.commission_rate,
+                    'CommissionEarned': r.commission_earned,
+                    'BranchID':         r.branch_id,
+                    'Total':            r.price_each * r.quantity,
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Failed to get product sales: {e}", exc_info=True)
+            return []
+
+    def get_product_sales_by_range(self, start: datetime, end: datetime,
+                                   capster_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Product sales in a date range, optionally filtered by capster."""
+        try:
+            with get_db() as db:
+                query = db.query(ProductSale).filter(
+                    ProductSale.date >= start,
+                    ProductSale.date <= end,
+                )
+                if capster_name:
+                    query = query.filter(
+                        func.lower(ProductSale.capster_name) == capster_name.lower()
+                    )
+                rows = query.order_by(ProductSale.date.desc()).all()
+            return [{
+                'ID':               r.id,
+                'Date':             r.date.strftime('%Y-%m-%d %H:%M') if r.date else '',
+                'DateObj':          r.date,
+                'CapsterName':      r.capster_name,
+                'ProductID':        r.product_id,
+                'ProductName':      r.product_name,
+                'PriceEach':        r.price_each,
+                'Quantity':         r.quantity,
+                'CommissionRate':   r.commission_rate,
+                'CommissionEarned': r.commission_earned,
+                'BranchID':         r.branch_id,
+                'Total':            r.price_each * r.quantity,
+            } for r in rows]
+        except Exception as e:
+            logger.error(f"Failed to get product sales by range: {e}", exc_info=True)
+            return []
+
+    def update_product_sale(self, sale_id: int, date: 'datetime', capster_name: str,
+                             product_id: str, product_name: str, price_each: int,
+                             quantity: int, commission_rate: float, branch_id: str) -> bool:
+        """Update a product sale and adjust stock accordingly."""
+        try:
+            with get_db() as db:
+                row = db.query(ProductSale).filter(ProductSale.id == sale_id).first()
+                if row is None:
+                    return False
+                old_product_id = row.product_id
+                old_branch_id  = row.branch_id
+                old_qty        = row.quantity
+
+                row.date             = date
+                row.capster_name     = capster_name
+                row.product_id       = product_id
+                row.product_name     = product_name
+                row.price_each       = int(price_each)
+                row.quantity         = int(quantity)
+                row.commission_rate  = float(commission_rate)
+                row.commission_earned= int(price_each * quantity * commission_rate)
+                row.branch_id        = branch_id
+
+            # Adjust stock: restore old, reduce new
+            if old_product_id != product_id or old_branch_id != branch_id:
+                self.adjust_stock(old_product_id, old_branch_id, old_qty)
+                self.adjust_stock(product_id, branch_id, -int(quantity))
+            elif old_qty != int(quantity):
+                self.adjust_stock(product_id, branch_id, old_qty - int(quantity))
+
+            logger.info(f"ProductSale {sale_id} updated")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update product sale {sale_id}: {e}", exc_info=True)
+            return False
+
+    def delete_product_sale(self, sale_id: int) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(ProductSale).filter(ProductSale.id == sale_id).first()
+                if row is None:
+                    return False
+                # Kembalikan stok
+                self.adjust_stock(row.product_id, row.branch_id, row.quantity)
+                db.delete(row)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete product sale {sale_id}: {e}", exc_info=True)
             return False
 
     # ------------------------------------------------------------------ #
@@ -855,8 +1230,8 @@ class Repository:
                 {
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
                     'CapsterName': r.capster_name,
-                    'TelegramID': str(r.telegram_id),
-                    'Amount': str(r.amount),
+                    'TelegramID': r.telegram_id,
+                    'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',
                     'Note': r.note or '',
@@ -876,8 +1251,8 @@ class Repository:
                 {
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
                     'CapsterName': r.capster_name,
-                    'TelegramID': str(r.telegram_id),
-                    'Amount': str(r.amount),
+                    'TelegramID': r.telegram_id,
+                    'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',
                     'Note': r.note or '',
@@ -892,8 +1267,138 @@ class Repository:
         records = self.get_withdrawals(telegram_id, start_date, end_date)
         total = 0
         for r in records:
-            try:
-                total += int(float(r.get('Amount', 0)))
-            except (ValueError, TypeError):
-                pass
+            total += r.get('Amount', 0)
         return total
+
+    # ------------------------------------------------------------------ #
+    # Promos                                                               #
+    # ------------------------------------------------------------------ #
+
+    def get_all_promos(self) -> List[Dict]:
+        try:
+            with get_db() as db:
+                rows = db.query(Promo).order_by(Promo.id.desc()).all()
+            return [
+                {
+                    'id':           r.id,
+                    'name':         r.name,
+                    'discount_pct': r.discount_pct,
+                    'start_date':   r.start_date.strftime('%Y-%m-%d') if r.start_date else '',
+                    'end_date':     r.end_date.strftime('%Y-%m-%d') if r.end_date else '',
+                    'is_active':    bool(r.is_active),
+                    'service_ids':  [s.strip() for s in r.service_ids.split(',') if s.strip()],
+                    'branch_ids':   r.branch_ids or 'ALL',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get all promos: {e}")
+            return []
+
+    def get_active_promos_for_branch(self, branch_id: str, today=None) -> List[Dict]:
+        """Return promos active today for the given branch_id."""
+        if today is None:
+            today = date.today()
+        try:
+            with get_db() as db:
+                rows = db.query(Promo).filter(
+                    Promo.is_active == True,
+                    Promo.start_date <= today,
+                    Promo.end_date >= today,
+                ).all()
+            result = []
+            for r in rows:
+                b_ids = r.branch_ids or 'ALL'
+                if b_ids.strip().upper() == 'ALL' or branch_id in [x.strip() for x in b_ids.split(',')]:
+                    result.append({
+                        'id':           r.id,
+                        'name':         r.name,
+                        'discount_pct': r.discount_pct,
+                        'service_ids':  [s.strip() for s in r.service_ids.split(',') if s.strip()],
+                    })
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get active promos for branch {branch_id}: {e}")
+            return []
+
+    def add_promo(self, name: str, discount_pct: float, start_date, end_date,
+                  service_ids: list, branch_ids: list) -> bool:
+        try:
+            with get_db() as db:
+                row = Promo(
+                    name=name,
+                    discount_pct=discount_pct,
+                    start_date=start_date,
+                    end_date=end_date,
+                    is_active=True,
+                    service_ids=','.join(service_ids),
+                    branch_ids=','.join(branch_ids) if branch_ids else 'ALL',
+                )
+                db.add(row)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add promo: {e}")
+            return False
+
+    def update_promo(self, promo_id: int, **fields) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Promo).filter(Promo.id == promo_id).first()
+                if not row:
+                    return False
+                if 'name' in fields:
+                    row.name = fields['name']
+                if 'discount_pct' in fields:
+                    row.discount_pct = fields['discount_pct']
+                if 'start_date' in fields:
+                    row.start_date = fields['start_date']
+                if 'end_date' in fields:
+                    row.end_date = fields['end_date']
+                if 'is_active' in fields:
+                    row.is_active = bool(fields['is_active'])
+                if 'service_ids' in fields:
+                    ids = fields['service_ids']
+                    row.service_ids = ','.join(ids) if isinstance(ids, list) else ids
+                if 'branch_ids' in fields:
+                    ids = fields['branch_ids']
+                    row.branch_ids = ','.join(ids) if isinstance(ids, list) else ids
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update promo {promo_id}: {e}")
+            return False
+
+    def delete_promo(self, promo_id: int) -> bool:
+        try:
+            with get_db() as db:
+                row = db.query(Promo).filter(Promo.id == promo_id).first()
+                if not row:
+                    return False
+                db.delete(row)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete promo {promo_id}: {e}")
+            return False
+
+    # ------------------------------------------------------------------ #
+    # Settings (key-value store)                                           #
+    # ------------------------------------------------------------------ #
+
+    def get_setting(self, key: str, default: str = '') -> str:
+        try:
+            with get_db() as db:
+                row = db.query(Setting).filter(Setting.key == key).first()
+            return row.value if row else default
+        except Exception as e:
+            logger.error(f"Failed to get setting {key}: {e}")
+            return default
+
+    def set_setting(self, key: str, value: str) -> None:
+        try:
+            with get_db() as db:
+                row = db.query(Setting).filter(Setting.key == key).first()
+                if row:
+                    row.value = value
+                else:
+                    db.add(Setting(key=key, value=value))
+        except Exception as e:
+            logger.error(f"Failed to set setting {key}: {e}")

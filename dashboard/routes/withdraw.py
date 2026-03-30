@@ -27,22 +27,12 @@ def _build_capster_balances(db: Repository) -> list:
     result = []
 
     for c in raw_capsters:
-        name  = c.get('Name', '')
-        alias = c.get('Alias', '')
-        etype = (c.get('EmploymentType') or 'mitra').lower()
-        try:
-            rate = float(c.get('CommissionRate') or 0.5)
-        except (ValueError, TypeError):
-            rate = 0.5
-        try:
-            salary = int(float(c.get('MonthlySalary') or 0))
-        except (ValueError, TypeError):
-            salary = 0
-        try:
-            telegram_id = int(c.get('TelegramID', 0))
-        except (ValueError, TypeError):
-            telegram_id = 0
-
+        name        = c.get('Name', '')
+        alias       = c.get('Alias', '')
+        etype       = (c.get('EmploymentType') or 'mitra').lower()
+        rate        = c.get('CommissionRate', 0.5)
+        salary      = c.get('MonthlySalary', 0)
+        telegram_id = c.get('TelegramID', 0)
         branch_id   = c.get('BranchID', '') or ''
         branch_name = BRANCHES.get(branch_id, {}).get('name', branch_id) if branch_id else '-'
 
@@ -50,14 +40,14 @@ def _build_capster_balances(db: Repository) -> list:
         if alias:
             names_lower.add(alias.lower())
 
-        # All-time earned
+        # All-time service earned
         if not all_time_df.empty and 'Capster' in all_time_df.columns:
             cap_df = all_time_df[all_time_df['Capster'].str.lower().isin(names_lower)]
         else:
             cap_df = pd.DataFrame()
 
         if etype == 'mitra':
-            rev_all   = int(cap_df['Price'].sum()) if not cap_df.empty else 0
+            rev_all    = int(cap_df['Price'].sum()) if not cap_df.empty else 0
             earned_all = int(rev_all * rate)
             pay_label  = f"Komisi {int(rate * 100)}%"
         else:
@@ -65,20 +55,23 @@ def _build_capster_balances(db: Repository) -> list:
             earned_all = distinct_months * salary
             pay_label  = f"Tetap {salary:,}/bln".replace(',', '.')
 
+        # All-time product commission
+        prod_commission = db.get_product_sales_commission_total(name)
+
         # All-time withdrawn
         withdrawals   = db.get_withdrawals(telegram_id)
-        withdrawn_all = sum(int(float(w.get('Amount', 0))) for w in withdrawals)
+        withdrawn_all = sum(w.get('Amount', 0) for w in withdrawals)
 
         result.append({
-            'name':         name,
-            'alias':        alias,
-            'type':         etype,
-            'pay_label':    pay_label,
-            'branch_name':  branch_name,
-            'telegram_id':  telegram_id,
-            'earned_all':   earned_all,
-            'withdrawn_all': withdrawn_all,
-            'balance':      earned_all - withdrawn_all,
+            'name':            name,
+            'alias':           alias,
+            'type':            etype,
+            'pay_label':       pay_label,
+            'branch_name':     branch_name,
+            'telegram_id':     telegram_id,
+            'earned_all':      earned_all + prod_commission,
+            'withdrawn_all':   withdrawn_all,
+            'balance':         earned_all + prod_commission - withdrawn_all,
         })
 
     result.sort(key=lambda x: x['balance'], reverse=True)
@@ -104,7 +97,7 @@ def withdraw_list():
     if filter_month:
         records = [r for r in records if str(r['Date'])[:7] == filter_month]
 
-    total_withdrawn = sum(int(float(r.get('Amount', 0))) for r in records)
+    total_withdrawn = sum(r.get('Amount', 0) for r in records)
     capster_names   = sorted({r['CapsterName'] for r in all_records})
 
     return render_template(
@@ -134,10 +127,7 @@ def withdraw_add():
     telegram_id = 0
     for c in db.get_all_capsters():
         if c['Name'] == capster_name:
-            try:
-                telegram_id = int(c.get('TelegramID', 0))
-            except (ValueError, TypeError):
-                pass
+            telegram_id = c.get('TelegramID', 0)
             break
 
     try:

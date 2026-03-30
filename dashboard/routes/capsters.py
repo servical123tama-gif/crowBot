@@ -47,18 +47,12 @@ def capsters():
     # Build per-capster stats
     cap_stats = []
     for c in raw_capsters:
-        name   = c.get('Name', '')
-        alias  = c.get('Alias', '')
-        etype  = (c.get('EmploymentType') or 'mitra').lower()
-        try:
-            rate   = float(c.get('CommissionRate') or 0.5)
-        except (ValueError, TypeError):
-            rate = 0.5
-        try:
-            salary = int(float(c.get('MonthlySalary') or 0))
-        except (ValueError, TypeError):
-            salary = 0
-        branch_id   = c.get('BranchID', '') or ''
+        name      = c.get('Name', '')
+        alias     = c.get('Alias', '')
+        etype     = (c.get('EmploymentType') or 'mitra').lower()
+        rate      = c.get('CommissionRate', 0.5)
+        salary    = c.get('MonthlySalary', 0)
+        branch_id = c.get('BranchID', '') or ''
         branch_name = BRANCHES.get(branch_id, {}).get('name', branch_id) if branch_id else '-'
 
         # Match transactions by name or alias
@@ -100,20 +94,18 @@ def capsters():
             earned_all = distinct_months * salary
 
         # ── Withdrawals ─────────────────────────────────────────────
-        withdrawals = db.get_withdrawals(int(c.get('TelegramID', 0)))
+        withdrawals = db.get_withdrawals(c.get('TelegramID', 0))
         withdrawn_month = 0
         withdrawn_all   = 0
         for w in withdrawals:
-            try:
-                amt = int(float(w.get('Amount', 0)))
-            except (ValueError, TypeError):
-                amt = 0
+            amt = w.get('Amount', 0)
             withdrawn_all += amt
             w_date = str(w.get('Date', ''))[:7]  # 'YYYY-MM'
             if w_date == month_str:
                 withdrawn_month += amt
 
-        balance = earned_all - withdrawn_all
+        product_commission = db.get_product_sales_commission_total(name)
+        balance = earned_all + product_commission - withdrawn_all
 
         cap_stats.append({
             'name':           name,
@@ -160,16 +152,10 @@ def capster_manage():
     raw = db.get_all_capsters()
     capsters = []
     for c in raw:
-        etype = (c.get('EmploymentType') or 'mitra').lower()
-        try:
-            rate = float(c.get('CommissionRate') or 0.5)
-        except (ValueError, TypeError):
-            rate = 0.5
-        try:
-            salary = int(float(c.get('MonthlySalary') or 0))
-        except (ValueError, TypeError):
-            salary = 0
-        bid   = c.get('BranchID', '') or ''
+        etype  = (c.get('EmploymentType') or 'mitra').lower()
+        rate   = c.get('CommissionRate', 0.5)
+        salary = c.get('MonthlySalary', 0)
+        bid    = c.get('BranchID', '') or ''
         bname = BRANCHES.get(bid, {}).get('name', bid) if bid else '-'
         capsters.append({
             'name':           c.get('Name', ''),
@@ -208,7 +194,7 @@ def capster_add():
 
     # Duplicate check
     for c in db.get_all_capsters():
-        if str(c.get('TelegramID', '')) == str(telegram_id):
+        if c.get('TelegramID') == telegram_id:
             flash(f"Telegram ID {telegram_id} sudah terdaftar sebagai '{c['Name']}'.", 'warning')
             return redirect(url_for('capsters.capster_manage'))
 
@@ -217,12 +203,7 @@ def capster_add():
     if etype not in ('mitra', 'tetap'):
         etype = 'mitra'
 
-    try:
-        commission_rate = float(request.form.get('commission_rate', '50') or '50') / 100
-        if not (0 < commission_rate <= 1):
-            commission_rate = 0.5
-    except (ValueError, TypeError):
-        commission_rate = 0.5
+    commission_rate = 0.5  # komisi per layanan, bukan per capster
 
     try:
         monthly_salary = int(float(request.form.get('monthly_salary', '0') or '0'))
@@ -260,12 +241,7 @@ def capster_edit(telegram_id):
     etype = request.form.get('employment_type', '').strip().lower()
     etype = etype if etype in ('mitra', 'tetap') else None
 
-    try:
-        commission_rate = float(request.form.get('commission_rate', '') or '') / 100
-        if not (0 < commission_rate <= 1):
-            commission_rate = None
-    except (ValueError, TypeError):
-        commission_rate = None
+    commission_rate = None  # komisi per layanan, tidak di-update dari sini
 
     try:
         monthly_salary = int(float(request.form.get('monthly_salary', '0') or '0'))
@@ -319,7 +295,7 @@ def capster_set_password(telegram_id):
 def capster_delete(telegram_id):
     db = Repository()
     name = next(
-        (c['Name'] for c in db.get_all_capsters() if str(c.get('TelegramID', '')) == str(telegram_id)),
+        (c['Name'] for c in db.get_all_capsters() if c.get('TelegramID') == telegram_id),
         'Unknown',
     )
     if db.remove_capster(telegram_id):

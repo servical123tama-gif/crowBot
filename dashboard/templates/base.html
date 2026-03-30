@@ -265,12 +265,61 @@
       50%       { box-shadow: 0 0 0 5px rgba(25,135,84,0); }
     }
 
-    /* ── Alert ── */
-    .alert {
-      border-radius: 10px;
-      border: none;
-      font-size: .855rem;
-      animation: fadeSlideUp .25s var(--ease) both;
+    /* ── Alert (disembunyikan, diganti toast) ── */
+    .alert { display: none !important; }
+
+    /* ── Toast Notifikasi ── */
+    .toast-container-custom {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: .5rem;
+      max-width: 360px;
+      pointer-events: none;
+    }
+    .toast-notif {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.08);
+      padding: .85rem 1rem .85rem .9rem;
+      display: flex;
+      align-items: flex-start;
+      gap: .7rem;
+      border-left: 4px solid #ccc;
+      pointer-events: all;
+      animation: toastIn .28s var(--ease) both;
+      min-width: 280px;
+    }
+    .toast-notif.t-success { border-color: #198754; }
+    .toast-notif.t-danger  { border-color: #dc3545; }
+    .toast-notif.t-warning { border-color: #fd7e14; }
+    .toast-notif.t-info    { border-color: #0d6efd; }
+    .toast-notif .t-icon {
+      font-size: 1.05rem; flex-shrink: 0; margin-top: 1px;
+    }
+    .toast-notif.t-success .t-icon { color: #198754; }
+    .toast-notif.t-danger  .t-icon { color: #dc3545; }
+    .toast-notif.t-warning .t-icon { color: #fd7e14; }
+    .toast-notif.t-info    .t-icon { color: #0d6efd; }
+    .toast-notif .t-body   { flex: 1; font-size: .845rem; line-height: 1.45; color: #1e293b; }
+    .toast-notif .t-close  {
+      background: none; border: none; color: #94a3b8;
+      cursor: pointer; padding: 0; font-size: .95rem; line-height: 1; flex-shrink: 0;
+    }
+    .toast-notif .t-close:hover { color: #475569; }
+    .toast-notif.t-out {
+      animation: toastOut .25s var(--ease) forwards;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(24px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: none; }
+      to   { opacity: 0; transform: translateX(24px); }
     }
 
     /* ── Modal ── */
@@ -399,8 +448,18 @@
       </a>
     </li>
     <li class="nav-item">
+      <a href="/products/stock" class="nav-link {% if active_page=='product_stock' %}active{% endif %}">
+        <i class="bi bi-boxes"></i> Stok Produk
+      </a>
+    </li>
+    <li class="nav-item">
       <a href="/branches" class="nav-link {% if active_page=='branches' %}active{% endif %}">
         <i class="bi bi-building"></i> Cabang
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="/promos" class="nav-link {% if active_page=='promos' %}active{% endif %}">
+        <i class="bi bi-tag-fill"></i> Promo
       </a>
     </li>
 
@@ -423,11 +482,46 @@
       <span class="page-title">{% block page_title %}Dashboard{% endblock %}</span>
     </div>
 
-    <!-- Bot Toggle -->
+    <!-- Kanan topbar -->
     <div class="d-flex align-items-center gap-3">
       <small class="text-muted d-none d-sm-inline">
         {{ now.strftime('%d %b %Y, %H:%M') if now is defined else '' }}
       </small>
+
+      <!-- Notifikasi Lonceng -->
+      <div class="position-relative" id="notifWrapper">
+        <button id="notifBtn" onclick="toggleNotif(event)"
+                style="background:none;border:none;padding:4px 6px;cursor:pointer;position:relative;color:#475569;border-radius:8px;transition:background .15s;">
+          <i class="bi bi-bell-fill" style="font-size:1.15rem;"></i>
+          <span id="notifBadge"
+                style="display:none;position:absolute;top:0;right:0;
+                       background:#e94560;color:#fff;border-radius:99px;
+                       font-size:.6rem;font-weight:700;min-width:16px;height:16px;
+                       line-height:16px;text-align:center;padding:0 3px;">0</span>
+        </button>
+
+        <!-- Dropdown panel -->
+        <div id="notifPanel"
+             style="display:none;position:absolute;top:calc(100% + 10px);right:0;
+                    width:320px;background:#fff;border-radius:14px;
+                    box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:1050;
+                    overflow:hidden;border:1px solid #f1f5f9;">
+          <div style="padding:.75rem 1rem;border-bottom:1px solid #f1f5f9;
+                      display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:.82rem;font-weight:700;color:#1e293b;">
+              <i class="bi bi-bell-fill me-1" style="color:#e94560;"></i>Notifikasi
+            </span>
+            <a href="/customers" style="font-size:.75rem;color:#e94560;text-decoration:none;">Lihat semua</a>
+          </div>
+          <div id="notifList"
+               style="max-height:340px;overflow-y:auto;">
+            <div style="padding:2rem;text-align:center;color:#94a3b8;font-size:.82rem;">
+              <i class="bi bi-bell-slash" style="font-size:1.5rem;display:block;margin-bottom:.5rem;"></i>
+              Memuat...
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Badge status + tombol ON/OFF -->
       <div class="d-flex align-items-center gap-2">
@@ -537,7 +631,135 @@
   // Poll pertama kali langsung, lalu setiap 3 detik
   pollBotStatus();
   setInterval(pollBotStatus, 3000);
+
+  // ── Notifikasi Lonceng ─────────────────────────────────────────────────
+  let _notifLoaded = false;
+
+  function toggleNotif(e) {
+    e.stopPropagation();
+    const panel = document.getElementById('notifPanel');
+    const open  = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    if (!open && !_notifLoaded) loadNotif();
+  }
+
+  function loadNotif() {
+    fetch('/api/notifications')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        _notifLoaded = true;
+        const list  = document.getElementById('notifList');
+        const badge = document.getElementById('notifBadge');
+
+        if (data.count > 0) {
+          badge.textContent = data.count > 99 ? '99+' : data.count;
+          badge.style.display = 'block';
+        }
+
+        if (data.notifications.length === 0) {
+          list.innerHTML = `<div style="padding:2rem;text-align:center;color:#94a3b8;font-size:.82rem;">
+            <i class="bi bi-bell-slash" style="font-size:1.5rem;display:block;margin-bottom:.5rem;"></i>
+            Belum ada notifikasi</div>`;
+          return;
+        }
+
+        const colors = ['#e94560','#0f3460','#16213e','#533483','#2b9348'];
+        list.innerHTML = data.notifications.map((n, i) => `
+          <div style="padding:.65rem 1rem;display:flex;gap:.7rem;align-items:flex-start;
+                      border-bottom:1px solid #f8fafc;transition:background .12s;"
+               onmouseover="this.style.background='#f8fafc'"
+               onmouseout="this.style.background=''">
+            <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;
+                        background:${colors[i % colors.length]};
+                        display:flex;align-items:center;justify-content:center;
+                        color:#fff;font-weight:700;font-size:.8rem;">
+              ${n.name.charAt(0).toUpperCase()}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.82rem;font-weight:600;color:#1e293b;
+                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${n.name}
+              </div>
+              <div style="font-size:.75rem;color:#64748b;">
+                <i class="bi bi-phone me-1"></i>${n.phone}
+                &nbsp;·&nbsp;<i class="bi bi-person me-1"></i>${n.added_by}
+              </div>
+              <div style="font-size:.7rem;color:#94a3b8;margin-top:2px;">
+                <i class="bi bi-calendar3 me-1"></i>${n.date_str}
+                ${n.ago ? `&nbsp;·&nbsp;${n.ago}` : ''}
+              </div>
+            </div>
+          </div>`).join('');
+      })
+      .catch(() => {});
+  }
+
+  // Tutup panel saat klik di luar
+  document.addEventListener('click', function(e) {
+    const wrapper = document.getElementById('notifWrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      document.getElementById('notifPanel').style.display = 'none';
+    }
+  });
+
+  // Load badge count saat halaman buka (tanpa buka panel)
+  fetch('/api/notifications')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !data.count) return;
+      const badge = document.getElementById('notifBadge');
+      badge.textContent = data.count > 99 ? '99+' : data.count;
+      badge.style.display = 'block';
+    })
+    .catch(() => {});
 </script>
 {% block scripts %}{% endblock %}
+
+<!-- Toast Container -->
+<div class="toast-container-custom" id="toastContainer"></div>
+
+<script>
+  const _TOAST_ICONS = {
+    success: 'bi-bell-fill',
+    danger:  'bi-bell-fill',
+    warning: 'bi-bell-fill',
+    info:    'bi-bell-fill',
+  };
+
+  function showToast(msg, type) {
+    type = type || 'info';
+    const wrap = document.getElementById('toastContainer');
+    const el   = document.createElement('div');
+    el.className = `toast-notif t-${type}`;
+    el.innerHTML = `
+      <i class="bi ${_TOAST_ICONS[type]} t-icon"></i>
+      <div class="t-body">${msg}</div>
+      <button class="t-close" onclick="_rmToast(this.parentElement)">
+        <i class="bi bi-x-lg"></i>
+      </button>`;
+    wrap.appendChild(el);
+    setTimeout(() => _rmToast(el), 5000);
+  }
+
+  function _rmToast(el) {
+    if (!el || el.classList.contains('t-out')) return;
+    el.classList.add('t-out');
+    setTimeout(() => el.remove(), 280);
+  }
+
+  // Konversi semua .alert Bootstrap → toast saat halaman load
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.alert[role="alert"]').forEach(function (a) {
+      const cls  = [...a.classList].find(c => /^alert-(success|danger|warning|info)$/.test(c));
+      const type = cls ? cls.replace('alert-', '') : 'info';
+      const btn  = a.querySelector('.btn-close');
+      if (btn) btn.remove();
+      const msg = a.innerText.trim();
+      a.remove();
+      if (msg) showToast(msg, type);
+    });
+  });
+</script>
 </body>
 </html>

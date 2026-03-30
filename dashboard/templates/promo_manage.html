@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Kelola Promo{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-0" style="color:#1e293b;">Kelola Promo</h4>
+    <div class="text-muted" style="font-size:.82rem;">Diskon harga layanan untuk periode & cabang tertentu</div>
+  </div>
+  <button class="btn btn-sm text-white fw-semibold px-3"
+          style="background:#e94560;border-radius:10px;"
+          data-bs-toggle="modal" data-bs-target="#addPromoModal">
+    <i class="bi bi-plus-lg me-1"></i> Tambah Promo
+  </button>
+</div>
+
+{# ── Promo Aktif ── #}
+<h6 class="fw-semibold mb-3 text-success"><i class="bi bi-tag-fill me-1"></i>Promo Aktif</h6>
+{% if active_promos %}
+<div class="row g-3 mb-4">
+  {% for p in active_promos %}
+  <div class="col-12 col-md-6">
+    <div class="card stat-card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between mb-2">
+          <div>
+            <div class="fw-bold" style="font-size:.95rem;color:#1e293b;">{{ p.name }}</div>
+            <div class="text-success fw-semibold" style="font-size:.85rem;">
+              {{ p.discount_pct|int if p.discount_pct == p.discount_pct|int else p.discount_pct }}% diskon
+            </div>
+          </div>
+          <span class="badge bg-success rounded-pill">Aktif</span>
+        </div>
+        <div class="text-muted mb-2" style="font-size:.78rem;">
+          <i class="bi bi-calendar3 me-1"></i>
+          {{ p.start_date }} – {{ p.end_date }}
+        </div>
+        <div class="mb-1" style="font-size:.8rem;">
+          <span class="fw-semibold text-secondary"><i class="bi bi-scissors me-1"></i>Layanan:</span>
+          <span class="text-muted">
+            {% set svc_map = {} %}
+            {% for s in services %}{% set _ = svc_map.update({s.ServiceID: s.Name}) %}{% endfor %}
+            {% for sid in p.service_ids %}{{ svc_map.get(sid, sid) }}{% if not loop.last %}, {% endif %}{% endfor %}
+          </span>
+        </div>
+        <div class="mb-3" style="font-size:.8rem;">
+          <span class="fw-semibold text-secondary"><i class="bi bi-building me-1"></i>Cabang:</span>
+          <span class="text-muted">
+            {% if p.branch_ids == 'ALL' %}
+              Semua Cabang
+            {% else %}
+              {% for bid in p.branch_ids.split(',') %}{{ branches.get(bid.strip(), {}).get('short', bid.strip()) }}{% if not loop.last %}, {% endif %}{% endfor %}
+            {% endif %}
+          </span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal" data-bs-target="#editPromoModal"
+                  data-id="{{ p.id }}"
+                  data-name="{{ p.name }}"
+                  data-discount="{{ p.discount_pct }}"
+                  data-start="{{ p.start_date }}"
+                  data-end="{{ p.end_date }}"
+                  data-service-ids="{{ p.service_ids | join(',') }}"
+                  data-branch-ids="{{ p.branch_ids if p.branch_ids is string else p.branch_ids | join(',') }}"
+                  data-is-active="1">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>
+          <form method="post" action="/promos/{{ p.id }}/edit" class="d-inline">
+            <input type="hidden" name="is_active" value="0">
+            <button type="submit" class="btn btn-sm btn-outline-warning"
+                    onclick="return confirm('Nonaktifkan promo ini?')">
+              <i class="bi bi-pause-circle me-1"></i>Nonaktifkan
+            </button>
+          </form>
+          <form method="post" action="/promos/{{ p.id }}/delete" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Hapus promo ini?')">
+              <i class="bi bi-trash me-1"></i>Hapus
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light text-muted mb-4" style="font-size:.85rem;">
+  Belum ada promo aktif.
+</div>
+{% endif %}
+
+{# ── Promo Tidak Aktif ── #}
+{% if inactive_promos %}
+<h6 class="fw-semibold mb-3 text-secondary"><i class="bi bi-clock-history me-1"></i>Tidak Aktif / Expired</h6>
+<div class="row g-3">
+  {% for p in inactive_promos %}
+  <div class="col-12 col-md-6">
+    <div class="card stat-card h-100" style="opacity:.7;">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between mb-2">
+          <div>
+            <div class="fw-bold" style="font-size:.95rem;color:#64748b;">{{ p.name }}</div>
+            <div class="text-muted" style="font-size:.85rem;">
+              {{ p.discount_pct|int if p.discount_pct == p.discount_pct|int else p.discount_pct }}% diskon
+            </div>
+          </div>
+          <span class="badge bg-secondary rounded-pill">
+            {% if not p.is_active %}Dinonaktifkan{% else %}Expired{% endif %}
+          </span>
+        </div>
+        <div class="text-muted mb-3" style="font-size:.78rem;">
+          <i class="bi bi-calendar3 me-1"></i>
+          {{ p.start_date }} – {{ p.end_date }}
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% if not p.is_active %}
+          <form method="post" action="/promos/{{ p.id }}/edit" class="d-inline">
+            <input type="hidden" name="is_active" value="1">
+            <button type="submit" class="btn btn-sm btn-outline-success">
+              <i class="bi bi-play-circle me-1"></i>Aktifkan
+            </button>
+          </form>
+          {% endif %}
+          <form method="post" action="/promos/{{ p.id }}/delete" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Hapus promo ini?')">
+              <i class="bi bi-trash me-1"></i>Hapus
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+{# ══════════ Modal Tambah Promo ══════════ #}
+<div class="modal fade" id="addPromoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form method="post" action="/promos/add">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-tag-fill me-2 text-danger"></i>Tambah Promo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">Nama Promo</label>
+            <input type="text" name="name" class="form-control" placeholder="cth: Promo Lebaran, Promo A" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Diskon (%)</label>
+            <div class="input-group">
+              <input type="number" name="discount_pct" class="form-control" min="1" max="99" step="0.5" placeholder="20" required>
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Tanggal Mulai</label>
+            <input type="date" name="start_date" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Tanggal Selesai</label>
+            <input type="date" name="end_date" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Layanan yang berlaku</label>
+            <div class="row g-2">
+              {% for s in services %}
+              <div class="col-6 col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="service_ids"
+                         value="{{ s.ServiceID }}" id="add_svc_{{ s.ServiceID }}">
+                  <label class="form-check-label" for="add_svc_{{ s.ServiceID }}" style="font-size:.85rem;">
+                    {{ s.Name }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Cabang yang berlaku</label>
+            <div class="row g-2">
+              <div class="col-6 col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="branch_ids"
+                         value="ALL" id="add_branch_all" onchange="toggleAllBranches(this)">
+                  <label class="form-check-label fw-semibold" for="add_branch_all" style="font-size:.85rem;">
+                    Semua Cabang
+                  </label>
+                </div>
+              </div>
+              {% for bid, binfo in branches.items() %}
+              <div class="col-6 col-md-4 branch-check-add">
+                <div class="form-check">
+                  <input class="form-check-input branch-cb-add" type="checkbox" name="branch_ids"
+                         value="{{ bid }}" id="add_branch_{{ bid }}">
+                  <label class="form-check-label" for="add_branch_{{ bid }}" style="font-size:.85rem;">
+                    {{ binfo.short or binfo.name }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn text-white fw-semibold" style="background:#e94560;">
+          <i class="bi bi-plus-lg me-1"></i>Simpan Promo
+        </button>
+      </div>
+    </div>
+    </form>
+  </div>
+</div>
+
+
+{# ══════════ Modal Edit Promo ══════════ #}
+<div class="modal fade" id="editPromoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form method="post" id="editPromoForm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Promo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">Nama Promo</label>
+            <input type="text" name="name" id="edit_name" class="form-control" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Diskon (%)</label>
+            <div class="input-group">
+              <input type="number" name="discount_pct" id="edit_discount" class="form-control" min="1" max="99" step="0.5" required>
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Tanggal Mulai</label>
+            <input type="date" name="start_date" id="edit_start" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Tanggal Selesai</label>
+            <input type="date" name="end_date" id="edit_end" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Layanan yang berlaku</label>
+            <div class="row g-2">
+              {% for s in services %}
+              <div class="col-6 col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input edit-svc-cb" type="checkbox" name="service_ids"
+                         value="{{ s.ServiceID }}" id="edit_svc_{{ s.ServiceID }}">
+                  <label class="form-check-label" for="edit_svc_{{ s.ServiceID }}" style="font-size:.85rem;">
+                    {{ s.Name }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Cabang yang berlaku</label>
+            <div class="row g-2">
+              <div class="col-6 col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="branch_ids"
+                         value="ALL" id="edit_branch_all" onchange="toggleAllBranchesEdit(this)">
+                  <label class="form-check-label fw-semibold" for="edit_branch_all" style="font-size:.85rem;">
+                    Semua Cabang
+                  </label>
+                </div>
+              </div>
+              {% for bid, binfo in branches.items() %}
+              <div class="col-6 col-md-4 branch-check-edit">
+                <div class="form-check">
+                  <input class="form-check-input branch-cb-edit" type="checkbox" name="branch_ids"
+                         value="{{ bid }}" id="edit_branch_{{ bid }}">
+                  <label class="form-check-label" for="edit_branch_{{ bid }}" style="font-size:.85rem;">
+                    {{ binfo.short or binfo.name }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <input type="hidden" name="is_active" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-primary fw-semibold">
+          <i class="bi bi-check-lg me-1"></i>Simpan Perubahan
+        </button>
+      </div>
+    </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Toggle "Semua Cabang" checkbox in add modal ──
+function toggleAllBranches(cb) {
+  document.querySelectorAll('.branch-cb-add').forEach(el => {
+    el.disabled = cb.checked;
+    if (cb.checked) el.checked = false;
+  });
+}
+
+// ── Toggle "Semua Cabang" checkbox in edit modal ──
+function toggleAllBranchesEdit(cb) {
+  document.querySelectorAll('.branch-cb-edit').forEach(el => {
+    el.disabled = cb.checked;
+    if (cb.checked) el.checked = false;
+  });
+}
+
+// ── Populate edit modal ──
+document.getElementById('editPromoModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const id          = btn.getAttribute('data-id');
+  const name        = btn.getAttribute('data-name');
+  const discount    = btn.getAttribute('data-discount');
+  const start       = btn.getAttribute('data-start');
+  const end         = btn.getAttribute('data-end');
+  const serviceIds  = (btn.getAttribute('data-service-ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const branchIds   = (btn.getAttribute('data-branch-ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // Set form action
+  document.getElementById('editPromoForm').action = '/promos/' + id + '/edit';
+
+  // Fill fields
+  document.getElementById('edit_name').value     = name;
+  document.getElementById('edit_discount').value  = discount;
+  document.getElementById('edit_start').value     = start;
+  document.getElementById('edit_end').value       = end;
+
+  // Services
+  document.querySelectorAll('.edit-svc-cb').forEach(cb => {
+    cb.checked = serviceIds.includes(cb.value);
+  });
+
+  // Branches
+  const allBranchCb = document.getElementById('edit_branch_all');
+  if (branchIds.includes('ALL') || branchIds.length === 0) {
+    allBranchCb.checked = true;
+    toggleAllBranchesEdit(allBranchCb);
+  } else {
+    allBranchCb.checked = false;
+    document.querySelectorAll('.branch-cb-edit').forEach(cb => {
+      cb.disabled = false;
+      cb.checked  = branchIds.includes(cb.value);
+    });
+  }
+});
+</script>
+{% endblock %}

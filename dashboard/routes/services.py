@@ -16,6 +16,9 @@ def _make_service_id(name: str) -> str:
     return ''.join(w.capitalize() for w in words)
 
 
+_DEFAULT_PAKET_MEMBERS = 'Bapak,Anak 1,Anak 2,Anak 3'
+
+
 @services_bp.route('/services')
 @login_required
 def service_manage():
@@ -24,30 +27,46 @@ def service_manage():
 
     services = []
     for s in raw:
-        try:
-            price = int(float(s.get('Price', 0)))
-        except (ValueError, TypeError):
-            price = 0
         services.append({
             'service_id':      s.get('ServiceID', ''),
             'name':            s.get('Name', ''),
             'category':        (s.get('Category') or 'main').lower(),
-            'price':           price,
-            'commission_rate': float(s.get('CommissionRate') or 0.5),
+            'price':           s.get('Price', 0),
+            'commission_rate': s.get('CommissionRate', 0.5),
         })
 
     # Pisah per kategori untuk tampilan
     main_services     = [s for s in services if s['category'] == 'main']
     coloring_services = [s for s in services if s['category'] == 'coloring']
 
+    paket_members_raw = db.get_setting('paket_members', _DEFAULT_PAKET_MEMBERS)
+    paket_members = [m.strip() for m in paket_members_raw.split(',') if m.strip()]
+
     return render_template(
         'service_manage.html',
         main_services=main_services,
         coloring_services=coloring_services,
         total=len(services),
+        paket_members=paket_members,
+        paket_members_raw=paket_members_raw,
         active_page='services',
         now=datetime.now(),
     )
+
+
+@services_bp.route('/services/paket-settings', methods=['POST'])
+@login_required
+def paket_settings_save():
+    db = Repository()
+    raw = request.form.get('paket_members', '').strip()
+    # Normalize: strip each entry, remove empties, rejoin
+    members = [m.strip() for m in raw.replace('\n', ',').split(',') if m.strip()]
+    if not members:
+        flash('Minimal satu anggota paket harus diisi.', 'danger')
+        return redirect(url_for('services.service_manage'))
+    db.set_setting('paket_members', ','.join(members))
+    flash('Pilihan anggota paket berhasil disimpan.', 'success')
+    return redirect(url_for('services.service_manage'))
 
 
 @services_bp.route('/services/add', methods=['POST'])

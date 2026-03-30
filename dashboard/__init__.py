@@ -29,6 +29,7 @@ def create_app():
     from dashboard.routes.bot_control import bot_control_bp
     from dashboard.routes.customers import customers_bp
     from dashboard.routes.capster_portal import capster_portal_bp
+    from dashboard.routes.promos import promos_bp
 
     app.register_blueprint(home_bp)
     app.register_blueprint(profit_bp)
@@ -44,5 +45,6 @@ def create_app():
     app.register_blueprint(bot_control_bp)
     app.register_blueprint(customers_bp)
     app.register_blueprint(capster_portal_bp)
+    app.register_blueprint(promos_bp)
 
     return app

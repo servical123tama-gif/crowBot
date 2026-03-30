@@ -8,10 +8,17 @@
     <h5 class="fw-bold mb-0">Customer</h5>
     <small class="text-muted">Total: <strong>{{ total }}</strong> customer</small>
   </div>
-  <button class="btn btn-sm text-white" style="background:#e94560;"
-          data-bs-toggle="modal" data-bs-target="#modalAdd">
-    <i class="bi bi-person-plus me-1"></i>Tambah Customer
-  </button>
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-success"
+            data-bs-toggle="modal" data-bs-target="#modalWASettings"
+            title="Pengaturan Kirim QR via WhatsApp">
+      <i class="bi bi-whatsapp me-1"></i>Pengaturan WA
+    </button>
+    <button class="btn btn-sm text-white" style="background:#e94560;"
+            data-bs-toggle="modal" data-bs-target="#modalAdd">
+      <i class="bi bi-person-plus me-1"></i>Tambah Customer
+    </button>
+  </div>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -60,13 +67,15 @@
             <tr>
               <td class="text-muted" style="font-size:.8rem;">{{ loop.index }}</td>
               <td>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2"
+                     style="cursor:pointer;"
+                     onclick="openProfile({{ c['id'] }}, '{{ c['Name']|replace("'","\\'") }}', '{{ c['Phone'] }}', {{ c['VisitCount'] }}, '{{ c['AddedBy']|replace("'","\\'") }}', '{{ c['CreatedAt'].strftime('%d %b %Y') if c.get('CreatedAt') else '-' }}')">
                   <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
                        style="width:34px;height:34px;flex-shrink:0;font-size:.8rem;
                               background:{{ ['#e94560','#0f3460','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
                     {{ c['Name'][0].upper() }}
                   </div>
-                  <span class="fw-500">{{ c['Name'] }}</span>
+                  <span class="fw-500 text-primary" style="text-decoration:underline dotted;">{{ c['Name'] }}</span>
                 </div>
               </td>
               <td>
@@ -96,6 +105,13 @@
                 {% endif %}
               </td>
               <td class="text-end">
+                {% if c['Phone'] %}
+                <button class="btn btn-sm btn-success py-0 px-2 me-1"
+                        title="Kirim QR via WhatsApp"
+                        onclick="sendQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}')">
+                  <i class="bi bi-whatsapp"></i>
+                </button>
+                {% endif %}
                 <button class="btn btn-sm btn-outline-success py-0 px-2 me-1"
                         title="QR Code"
                         onclick="openQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
@@ -103,7 +119,7 @@
                 </button>
                 <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
                         style="font-size:.78rem;"
-                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}')">
+                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger py-0 px-2"
@@ -197,6 +213,16 @@
               <input type="text" name="phone" id="editPhone" class="form-control" placeholder="628xxxxxxxx (opsional)">
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">Jumlah Kunjungan</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-scissors"></i></span>
+              <input type="number" name="visit_count" id="editVisitCount"
+                     class="form-control" min="0" placeholder="0">
+              <span class="input-group-text">kali</span>
+            </div>
+            <div class="form-text">Ubah manual jika ada koreksi data kunjungan.</div>
+          </div>
           <div class="mb-1">
             <label class="form-label fw-500" style="font-size:.85rem;">Ditambah oleh</label>
             <div class="input-group">
@@ -280,10 +306,217 @@
   </div>
 </div>
 
+<!-- Modal Profil Customer -->
+<div class="modal fade" id="modalProfile" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content">
+      <div class="modal-body p-0">
+
+        <!-- Header berwarna -->
+        <div class="text-white text-center py-4 px-3 position-relative"
+             style="background:linear-gradient(135deg,#0f3460,#e94560);border-radius:16px 16px 0 0;">
+          <button type="button" class="btn-close btn-close-white position-absolute"
+                  style="top:.75rem;right:.75rem;" data-bs-dismiss="modal"></button>
+          <div id="profAvatar"
+               class="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center fw-bold text-white"
+               style="width:64px;height:64px;font-size:1.6rem;background:rgba(255,255,255,.2);">
+          </div>
+          <h6 class="fw-bold mb-0" id="profName" style="font-size:1.05rem;"></h6>
+          <div class="mt-1 opacity-75" style="font-size:.78rem;">
+            <i class="bi bi-scissors me-1"></i><span id="profVisits"></span> kunjungan
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div class="p-3">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <div class="p-2 rounded-3" style="background:#f8fafc;">
+                <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">No. HP</div>
+                <div id="profPhone" style="font-size:.85rem;font-weight:600;"></div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded-3" style="background:#f8fafc;">
+                <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Ditambah oleh</div>
+                <div id="profAddedBy" style="font-size:.85rem;font-weight:600;"></div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="p-2 rounded-3" style="background:#f8fafc;">
+                <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Member sejak</div>
+                <div id="profCreatedAt" style="font-size:.85rem;font-weight:600;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- QR Code -->
+          <div class="text-center mb-3">
+            <div class="text-muted mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">QR Code Member</div>
+            <img id="profQR" src="" alt="QR"
+                 style="width:160px;height:160px;border-radius:12px;border:3px solid #e2e8f0;">
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex gap-2 mb-3">
+            <a id="profQRDownload" href="#" download=""
+               class="btn btn-sm btn-outline-secondary flex-grow-1">
+              <i class="bi bi-download me-1"></i>Download QR
+            </a>
+            <a id="profWALink" href="#" target="_blank"
+               class="btn btn-sm btn-success flex-grow-1" style="display:none;">
+              <i class="bi bi-whatsapp me-1"></i>WhatsApp
+            </a>
+          </div>
+
+          <!-- Riwayat Transaksi -->
+          <div>
+            <div class="text-muted mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">
+              <i class="bi bi-clock-history me-1"></i>Riwayat Transaksi
+            </div>
+            <div id="profTxList">
+              <div class="text-center py-3 text-muted" style="font-size:.82rem;">
+                <span class="spinner-border spinner-border-sm me-1"></span>Memuat...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Pengaturan WA -->
+<div class="modal fade" id="modalWASettings" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-whatsapp me-2 text-success"></i>Pengaturan Kirim QR via WA
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/customers/wa-settings">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">
+              Token Fonnte <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="fonnte_token" class="form-control font-monospace"
+                   placeholder="Paste token dari dashboard Fonnte..."
+                   value="{{ wa_settings.fonnte_token }}">
+            <div class="form-text">
+              Dapatkan token di <strong>fonnte.com</strong> → Device → Token.
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">
+              URL Aplikasi <span class="text-danger">*</span>
+            </label>
+            <input type="url" name="app_base_url" class="form-control"
+                   placeholder="https://nama-app.onrender.com"
+                   value="{{ wa_settings.app_base_url }}">
+            <div class="form-text">
+              URL publik aplikasi ini (dari Render / domain sendiri). Dipakai untuk membuat link QR yang bisa diakses Fonnte.
+              Contoh: <code>https://barber-app.onrender.com</code>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">Template Pesan</label>
+            <textarea name="wa_template" class="form-control" rows="4"
+                      placeholder="Halo {nama}, berikut QR Code kamu...">{{ wa_settings.wa_template }}</textarea>
+            <div class="form-text">
+              Variabel: <code>{nama}</code> = nama customer, <code>{kunjungan}</code> = jumlah kunjungan.
+              QR Code akan dikirim sebagai gambar setelah pesan.
+            </div>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="wa_auto_send"
+                   id="waAutoSend" value="1"
+                   {{ 'checked' if wa_settings.wa_auto_send == '1' }}>
+            <label class="form-check-label fw-500" for="waAutoSend" style="font-size:.85rem;">
+              Kirim WA otomatis saat customer baru ditambahkan
+            </label>
+            <div class="form-text">
+              Berlaku di dashboard owner & portal capster. Membutuhkan token Fonnte & URL aplikasi diisi.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <button type="submit" class="btn btn-sm btn-success">
+            <i class="bi bi-check2 me-1"></i>Simpan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+  function openProfile(id, name, phone, visits, addedBy, createdAt) {
+    document.getElementById('profAvatar').textContent    = name.charAt(0).toUpperCase();
+    document.getElementById('profName').textContent      = name;
+    document.getElementById('profVisits').textContent    = visits;
+    document.getElementById('profPhone').textContent     = phone || '-';
+    document.getElementById('profAddedBy').textContent   = addedBy || '-';
+    document.getElementById('profCreatedAt').textContent = createdAt || '-';
+
+    const qrUrl = '/customers/' + id + '/qr.png';
+    document.getElementById('profQR').src               = qrUrl;
+    document.getElementById('profQRDownload').href       = qrUrl;
+    document.getElementById('profQRDownload').download   = 'qr-' + name.replace(/\s+/g,'-') + '.png';
+
+    const waBtn = document.getElementById('profWALink');
+    if (phone) {
+      waBtn.href         = 'https://wa.me/' + phone.replace(/[^0-9]/g,'');
+      waBtn.style.display = '';
+    } else {
+      waBtn.style.display = 'none';
+    }
+
+    new bootstrap.Modal(document.getElementById('modalProfile')).show();
+
+    // Load riwayat transaksi
+    const txList = document.getElementById('profTxList');
+    txList.innerHTML = '<div class="text-center py-3 text-muted" style="font-size:.82rem;"><span class="spinner-border spinner-border-sm me-1"></span>Memuat...</div>';
+    fetch('/api/customer/' + id + '/transactions')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.transactions.length === 0) {
+          txList.innerHTML = '<div class="text-center py-3 text-muted" style="font-size:.82rem;"><i class="bi bi-inbox me-1"></i>Belum ada transaksi tercatat</div>';
+          return;
+        }
+        txList.innerHTML = data.transactions.map(t => `
+          <div class="d-flex align-items-start gap-2 py-2 border-bottom">
+            <div style="min-width:52px;text-align:center;">
+              <div style="font-size:.75rem;font-weight:600;color:#0f3460;">${t.date}</div>
+              <div style="font-size:.68rem;color:#94a3b8;">${t.time}</div>
+            </div>
+            <div class="flex-grow-1">
+              <div style="font-size:.83rem;font-weight:600;">
+                ${t.service}
+                ${t.promo ? `<span class="badge rounded-pill ms-1" style="background:#f97316;font-size:.65rem;">${t.promo}</span>` : ''}
+              </div>
+              <div style="font-size:.74rem;color:#64748b;">
+                <i class="bi bi-person me-1"></i>${t.capster}
+                &nbsp;·&nbsp;<i class="bi bi-credit-card me-1"></i>${t.payment}
+              </div>
+            </div>
+            <div style="font-size:.83rem;font-weight:700;color:#198754;white-space:nowrap;">
+              Rp ${parseInt(t.price).toLocaleString('id-ID')}
+            </div>
+          </div>`).join('');
+      })
+      .catch(() => {
+        txList.innerHTML = '<div class="text-center py-3 text-danger" style="font-size:.82rem;">Gagal memuat transaksi</div>';
+      });
+  }
+
   function openQR(id, name, visits) {
     document.getElementById('qrCustName').textContent = name;
     document.getElementById('qrVisits').textContent   = visits + ' kunjungan tercatat';
@@ -294,14 +527,14 @@
     new bootstrap.Modal(document.getElementById('modalQR')).show();
   }
 
-  function openEdit(id, name, phone, addedBy) {
-    document.getElementById('editName').value   = name;
-    document.getElementById('editPhone').value  = phone;
-    document.getElementById('formEdit').action  = '/customers/' + id + '/edit';
-    // Set dropdown ke nilai addedBy yang sesuai
+  function openEdit(id, name, phone, addedBy, visitCount) {
+    document.getElementById('editName').value        = name;
+    document.getElementById('editPhone').value       = phone;
+    document.getElementById('editVisitCount').value  = visitCount || 0;
+    document.getElementById('formEdit').action       = '/customers/' + id + '/edit';
     const sel = document.getElementById('editAddedBy');
     sel.value = addedBy || '';
-    if (sel.value !== (addedBy || '')) sel.value = '';  // fallback jika tidak ditemukan
+    if (sel.value !== (addedBy || '')) sel.value = '';
     new bootstrap.Modal(document.getElementById('modalEdit')).show();
   }
 
@@ -309,6 +542,15 @@
     document.getElementById('deleteName').textContent = name;
     document.getElementById('formDelete').action = '/customers/' + id + '/delete';
     new bootstrap.Modal(document.getElementById('modalDelete')).show();
+  }
+
+  function sendQR(id, name) {
+    if (!confirm('Kirim QR Code ke WhatsApp ' + name + '?')) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/customers/' + id + '/send-qr';
+    document.body.appendChild(form);
+    form.submit();
   }
 </script>
 {% endblock %}

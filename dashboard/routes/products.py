@@ -1,11 +1,12 @@
-"""Product CRUD management page."""
+"""Product CRUD management page + stock management."""
 import re
 from datetime import datetime
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 
 from dashboard.auth import login_required
 from app.db.repository import Repository
+from app.config.constants import BRANCHES
 
 products_bp = Blueprint('products', __name__)
 
@@ -24,14 +25,13 @@ def product_manage():
 
     products = []
     for p in raw:
-        try:
-            price = int(float(p.get('Price', 0)))
-        except (ValueError, TypeError):
-            price = 0
+        commission_rate = p.get('CommissionRate', 0.0)
         products.append({
-            'product_id': p.get('ProductID', ''),
-            'name':       p.get('Name', ''),
-            'price':      price,
+            'product_id':      p.get('ProductID', ''),
+            'name':            p.get('Name', ''),
+            'price':           p.get('Price', 0),
+            'commission_rate': commission_rate,
+            'commission_pct':  int(commission_rate * 100),
         })
 
     products.sort(key=lambda x: x['name'])
@@ -68,7 +68,13 @@ def product_add():
         flash(f"Produk '{name}' (ID: {product_id}) sudah terdaftar.", 'warning')
         return redirect(url_for('products.product_manage'))
 
-    if db.add_product(product_id, name, price):
+    try:
+        commission_rate = float(request.form.get('commission_rate', '0') or '0') / 100
+        commission_rate = max(0.0, min(1.0, commission_rate))
+    except (ValueError, TypeError):
+        commission_rate = 0.0
+
+    if db.add_product(product_id, name, price, commission_rate=commission_rate):
         flash(f"Produk '{name}' berhasil ditambahkan.", 'success')
     else:
         flash('Gagal menambahkan produk.', 'danger')
@@ -91,6 +97,14 @@ def product_edit(product_id):
             fields['price'] = price
     except (ValueError, TypeError):
         pass
+
+    commission_rate_str = request.form.get('commission_rate', '').strip()
+    if commission_rate_str:
+        try:
+            cr = float(commission_rate_str) / 100
+            fields['commission_rate'] = max(0.0, min(1.0, cr))
+        except (ValueError, TypeError):
+            pass
 
     if not fields:
         flash('Tidak ada perubahan.', 'info')
@@ -116,3 +130,68 @@ def product_delete(product_id):
     else:
         flash('Gagal menghapus produk.', 'danger')
     return redirect(url_for('products.product_manage'))
+
+
+# ── Stock Management ────────────────────────────────────────────────────────
+
+@products_bp.route('/products/stock')
+@login_required
+def product_stock():
+    db = Repository()
+    raw_products = db.get_all_products()
+
+    branches_list = [
+        {'id': bid, 'name': bcfg.get('name', bid), 'short': bcfg.get('short', bid)}
+        for bid, bcfg in BRANCHES.items()
+    ]
+
+    # Build per-branch stock map: {branch_id: [{product_id, name, price, commission_pct, quantity}]}
+    stock_by_branch = {}
+    for b in branches_list:
+        stocks = db.get_product_stocks(branch_id=b['id'])
+        stock_map = {s['ProductID']: s['Quantity'] for s in stocks}
+        rows = []
+        for p in raw_products:
+            try:
+                price = int(float(p.get('Price', 0)))
+            except (ValueError, TypeError):
+                price = 0
+            rows.append({
+                'product_id':      p['ProductID'],
+                'name':            p['Name'],
+                'price':           price,
+                'commission_pct':  int(float(p.get('CommissionRate', 0)) * 100),
+                'quantity':        stock_map.get(p['ProductID'], 0),
+            })
+        rows.sort(key=lambda x: x['name'])
+        stock_by_branch[b['id']] = rows
+
+    return render_template(
+        'product_stock.html',
+        branches=branches_list,
+        stock_by_branch=stock_by_branch,
+        active_page='product_stock',
+        now=datetime.now(),
+    )
+
+
+@products_bp.route('/products/stock/set', methods=['POST'])
+@login_required
+def product_stock_set():
+    db         = Repository()
+    product_id = request.form.get('product_id', '').strip()
+    branch_id  = request.form.get('branch_id', '').strip()
+    try:
+        quantity = int(float(request.form.get('quantity', '0') or '0'))
+    except (ValueError, TypeError):
+        quantity = 0
+
+    if not product_id or not branch_id:
+        flash('Data tidak lengkap.', 'danger')
+        return redirect(url_for('products.product_stock'))
+
+    if db.set_stock(product_id, branch_id, quantity):
+        flash('Stok berhasil diperbarui.', 'success')
+    else:
+        flash('Gagal memperbarui stok.', 'danger')
+    return redirect(url_for('products.product_stock', branch=branch_id))

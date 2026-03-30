@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash
 
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
+from dashboard.routes.customers import _auto_send_welcome_wa
 
 capster_portal_bp = Blueprint('capster_portal', __name__, url_prefix='/portal')
 
@@ -66,11 +67,11 @@ def login():
         if capster:
             session['capster_logged_in']   = True
             session['capster_name']        = capster['Name']
-            session['capster_telegram_id'] = int(capster['TelegramID'])
+            session['capster_telegram_id'] = capster['TelegramID']
             session['capster_alias']       = capster['Alias']
             session['capster_type']        = capster['EmploymentType']
-            session['capster_rate']        = float(capster['CommissionRate'])
-            session['capster_salary']      = int(float(capster['MonthlySalary']))
+            session['capster_rate']        = capster['CommissionRate']
+            session['capster_salary']      = capster['MonthlySalary']
             session['capster_branch_id']   = capster['BranchID']
             return redirect(url_for('capster_portal.dashboard'))
         else:
@@ -97,20 +98,34 @@ def dashboard():
     now  = datetime.now()
     year, month = now.year, now.month
 
+    # Ambil salary/rate terbaru dari DB
+    all_caps  = repo.get_all_capsters()
+    fresh_cap = next((c for c in all_caps if c.get('TelegramID') == cap['telegram_id']), None)
+    if fresh_cap:
+        cap = dict(cap)
+        cap['salary'] = fresh_cap.get('MonthlySalary', cap['salary'])
+        cap['rate']   = fresh_cap.get('CommissionRate', cap['rate'])
+
     txs = repo.get_transactions_by_capster_month(
         cap['name'], cap['alias'], year, month
     )
-    revenue  = sum(t['price'] for t in txs)
-    tx_count = len(txs)
+    svc_revenue = sum(t['price'] for t in txs)
+
+    prod_sales  = repo.get_product_sales_by_capster_month(cap['name'], cap['alias'], year, month)
+    prod_revenue     = sum(s['price'] for s in prod_sales)
+    prod_commission  = sum(s.get('commission', 0) for s in prod_sales)
+
+    revenue  = svc_revenue + prod_revenue
+    tx_count = len(txs) + len(prod_sales)
 
     if cap['type'] == 'mitra':
-        earned = int(revenue * cap['rate'])
+        earned = int(svc_revenue * cap['rate']) + prod_commission
     else:
-        earned = cap['salary']
+        earned = cap['salary'] + prod_commission
 
     # All-time balance
     withdrawals = repo.get_withdrawals(cap['telegram_id'])
-    withdrawn_all = sum(int(float(w.get('Amount', 0))) for w in withdrawals)
+    withdrawn_all = sum(w.get('Amount', 0) for w in withdrawals)
 
     all_years = list(range(2024, now.year + 1))
     earned_all = 0
@@ -124,6 +139,8 @@ def dashboard():
             else:
                 months_worked = cap_df['Date'].dt.strftime('%Y-%m').nunique() if not cap_df.empty else 0
                 earned_all += months_worked * cap['salary']
+    # Tambah komisi produk all-time
+    earned_all += repo.get_product_sales_commission_total(cap['name'])
 
     balance = earned_all - withdrawn_all
 
@@ -138,6 +155,7 @@ def dashboard():
         balance=balance,
         recent_txs=txs[:10],
         branch_name=BRANCHES.get(cap['branch_id'], {}).get('name', cap['branch_id'] or '-'),
+        branches=BRANCHES,
         active_page='dashboard',
     )
 
@@ -154,7 +172,13 @@ def transactions():
     year  = int(request.args.get('year',  now.year))
     month = int(request.args.get('month', now.month))
 
-    txs      = repo.get_transactions_by_capster_month(cap['name'], cap['alias'], year, month)
+    txs_service = repo.get_transactions_by_capster_month(cap['name'], cap['alias'], year, month)
+    for t in txs_service:
+        t.setdefault('type', 'layanan')
+
+    txs_product = repo.get_product_sales_by_capster_month(cap['name'], cap['alias'], year, month)
+
+    txs      = sorted(txs_service + txs_product, key=lambda t: t['date'], reverse=True)
     revenue  = sum(t['price'] for t in txs)
     tx_count = len(txs)
 
@@ -173,6 +197,7 @@ def transactions():
         month_name=f"{MONTHS_ID[month]} {year}",
         months=months,
         years=years,
+        branches=BRANCHES,
         active_page='transactions',
     )
 
@@ -185,6 +210,17 @@ def earnings():
     cap  = _current_capster()
     repo = Repository()
     now  = datetime.now()
+
+    # Ambil salary/rate terbaru dari DB (bukan dari session yang bisa stale)
+    all_caps   = repo.get_all_capsters()
+    fresh_cap  = next((c for c in all_caps if c.get('TelegramID') == cap['telegram_id']), None)
+    if fresh_cap:
+        cap = dict(cap)
+        cap['salary'] = fresh_cap.get('MonthlySalary', cap['salary'])
+        cap['rate']   = fresh_cap.get('CommissionRate', cap['rate'])
+
+    # Ambil withdrawals sekali di luar loop (bug fix: sebelumnya dipanggil tiap iterasi)
+    withdrawals = repo.get_withdrawals(cap['telegram_id'])
 
     monthly_stats = []
     for year in range(2024, now.year + 1):
@@ -202,17 +238,22 @@ def earnings():
             else:
                 rev, count = 0, 0
 
-            if rev == 0 and count == 0:
+            # Komisi produk bulan ini
+            prod_sales_month = repo.get_product_sales_by_capster_month(
+                cap['name'], cap['alias'], year, month
+            )
+            prod_commission_month = sum(s.get('commission', 0) for s in prod_sales_month)
+
+            if rev == 0 and count == 0 and prod_commission_month == 0:
                 continue
 
             if cap['type'] == 'mitra':
-                earned = int(rev * cap['rate'])
+                earned = int(rev * cap['rate']) + prod_commission_month
             else:
-                earned = cap['salary']
+                earned = cap['salary'] + prod_commission_month
 
-            withdrawals = repo.get_withdrawals(cap['telegram_id'])
             withdrawn_month = sum(
-                int(float(w.get('Amount', 0)))
+                w.get('Amount', 0)
                 for w in withdrawals
                 if str(w.get('Date', ''))[:7] == month_str
             )
@@ -261,7 +302,7 @@ def withdraw():
         cap=cap,
         now=now,
         records=records,
-        total=sum(int(float(r.get('Amount', 0))) for r in records),
+        total=sum(r.get('Amount', 0) for r in records),
         active_page='withdraw',
     )
 
@@ -272,15 +313,7 @@ def withdraw():
 @capster_login_required
 def profile():
     cap = _current_capster()
-    repo = Repository()
     now  = datetime.now()
-    capster_data = repo.get_capster_by_username(
-        next(
-            (c['Username'] for c in repo.get_all_capsters()
-             if str(c.get('TelegramID')) == str(cap['telegram_id'])),
-            ''
-        )
-    )
     branch_name = BRANCHES.get(cap['branch_id'], {}).get('name', cap['branch_id'] or '-')
     return render_template(
         'capster_portal/profile.html',
@@ -309,6 +342,8 @@ def add_customer():
             (c for c in all_c if c['id'] == new_customer_id), None
         )
 
+    existing_phone_customer = None
+
     if request.method == 'POST':
         name  = request.form.get('name', '').strip()
         phone = request.form.get('phone', '').strip()
@@ -316,6 +351,23 @@ def add_customer():
         if not name:
             flash('Nama pengunjung wajib diisi.', 'danger')
             return redirect(url_for('capster_portal.add_customer'))
+
+        # Cek duplikat nomor HP
+        if phone:
+            dup = repo.get_customer_by_phone(phone)
+            if dup:
+                existing_phone_customer = dup
+                # Render form lagi dengan notifikasi, biarkan user memutuskan
+                return render_template(
+                    'capster_portal/add_customer.html',
+                    cap=cap,
+                    now=now,
+                    new_customer=new_customer,
+                    existing_phone_customer=existing_phone_customer,
+                    prefill_name=name,
+                    prefill_phone=phone,
+                    active_page='add_customer',
+                )
 
         class _C:
             pass
@@ -326,11 +378,24 @@ def add_customer():
         ok = repo.add_customer(c, added_by=cap.get('name', ''))
         if ok:
             # Ambil ID customer yang baru saja ditambahkan
-            all_c   = repo.get_all_customers()
-            added   = next(
-                (x for x in reversed(all_c) if x['Name'] == name), None
-            )
+            # Prioritas: cari by phone (unik), fallback by nama terbaru
+            if phone:
+                added = repo.get_customer_by_phone(phone)
+            else:
+                all_c = repo.get_all_customers()
+                added = next(
+                    (x for x in reversed(all_c) if x['Name'] == name), None
+                )
             added_id = added['id'] if added else ''
+
+            # Auto kirim WA jika diaktifkan
+            if phone and added:
+                wa_ok, wa_msg = _auto_send_welcome_wa(added['id'], name, phone, repo)
+                if wa_ok:
+                    flash(f'✅ {wa_msg}', 'success')
+                elif wa_msg not in ('disabled', 'no_token', 'no_phone'):
+                    flash(f'⚠️ {wa_msg}', 'warning')
+
             return redirect(url_for('capster_portal.add_customer', added=added_id))
         else:
             flash('Gagal menambahkan pengunjung.', 'danger')
@@ -340,6 +405,9 @@ def add_customer():
         cap=cap,
         now=now,
         new_customer=new_customer,
+        existing_phone_customer=None,
+        prefill_name='',
+        prefill_phone='',
         active_page='add_customer',
     )
 
@@ -366,7 +434,13 @@ def add_transaction():
     repo = Repository()
     now  = datetime.now()
 
-    services   = repo.get_all_services()
+    services_raw = repo.get_all_services()
+    popularity   = repo.get_service_popularity()
+    # Sort by transaction count descending within each category
+    services = sorted(
+        services_raw,
+        key=lambda s: (-popularity.get(s['Name'].lower(), 0), s['Name']),
+    )
     success    = request.args.get('success') == '1'
     today_str  = now.strftime('%Y-%m-%d')
 
@@ -384,31 +458,129 @@ def add_transaction():
         service_id     = request.form.get('service_id', '').strip()
         payment_method = request.form.get('payment_method', 'Cash').strip()
         customer_id    = request.form.get('customer_id', '').strip()
-        # Ambil cabang: override per-transaksi atau pakai daily branch
-        branch = request.form.get('branch_override', '').strip() or daily_branch or ''
+        promo_id_str   = request.form.get('promo_id', '').strip()
+        family_member  = request.form.get('family_member', '').strip()
+        family_count   = max(1, int(request.form.get('family_count', '1') or '1'))
+        branch         = request.form.get('branch_override', '').strip() or daily_branch or ''
+        sold_ids       = request.form.getlist('sell_product')
 
         svc = next((s for s in services if s['ServiceID'] == service_id), None)
-        if not svc:
+
+        # Service optional — validasi hanya jika ada service_id
+        if service_id and not svc:
             flash('Layanan tidak valid.', 'danger')
+            return redirect(url_for('capster_portal.add_transaction'))
+
+        # Wajib ada minimal layanan ATAU produk
+        if not svc and not sold_ids:
+            flash('Pilih minimal satu layanan atau produk.', 'danger')
             return redirect(url_for('capster_portal.add_transaction'))
 
         cid = int(customer_id) if customer_id.isdigit() else None
 
-        ok = repo.add_transaction_full(
-            date=now,
-            capster_name=cap['name'],
-            service_name=svc['Name'],
-            price=int(svc['Price']),
-            payment_method=payment_method,
-            branch=branch,
-            customer_id=cid,
-        )
-        if ok:
+        # ── Simpan transaksi layanan (jika ada) ──────────────────────────
+        final_price       = 0
+        chosen_promo_name = None
+        commission_preview = 0
+        ok_service        = True
+
+        if svc:
+            service_display_name = svc['Name']
+            if family_member:
+                service_display_name = f"{svc['Name']} ({family_member})"
+
+            final_price = svc['Price'] * family_count
+            if promo_id_str.isdigit():
+                all_promos = repo.get_all_promos()
+                chosen_promo = next(
+                    (p for p in all_promos
+                     if p['id'] == int(promo_id_str) and svc['ServiceID'] in p['service_ids']),
+                    None
+                )
+                if chosen_promo:
+                    price_per_orang = int(svc['Price'] * (1 - chosen_promo['discount_pct'] / 100))
+                    final_price = price_per_orang * family_count
+                    chosen_promo_name = chosen_promo['name']
+
+            ok_service = repo.add_transaction_full(
+                date=now,
+                capster_name=cap['name'],
+                service_name=service_display_name,
+                price=final_price,
+                payment_method=payment_method,
+                branch=branch,
+                customer_id=cid,
+                promo_name=chosen_promo_name,
+            )
+            if ok_service:
+                commission_preview = int(final_price * cap['rate']) if cap['type'] == 'mitra' else 0
+            else:
+                flash('Gagal menyimpan transaksi layanan.', 'danger')
+
+        if ok_service:
+            # ── Proses penjualan produk (independen dari layanan) ────────
+            all_products = repo.get_all_products()
+            prod_map = {p['ProductID']: p for p in all_products}
+            products_summary = []
+            for pid in sold_ids:
+                if pid not in prod_map:
+                    continue
+                try:
+                    qty = max(1, int(request.form.get(f'qty_{pid}', 1) or 1))
+                except (ValueError, TypeError):
+                    qty = 1
+                p = prod_map[pid]
+                price_each = p.get('Price', 0)
+                comm_rate  = p.get('CommissionRate', 0.0)
+                prod_comm  = int(price_each * qty * comm_rate)
+                repo.add_product_sale(
+                    capster_name=cap['name'],
+                    product_id=pid,
+                    product_name=p['Name'],
+                    price_each=price_each,
+                    quantity=qty,
+                    commission_rate=comm_rate,
+                    branch_id=branch,
+                )
+                products_summary.append({
+                    'name':       p['Name'],
+                    'qty':        qty,
+                    'commission': prod_comm,
+                })
+
+            session['last_tx'] = {
+                'service':      svc['Name'] if svc else None,
+                'price':        final_price,
+                'payment':      payment_method,
+                'branch_name':  BRANCHES.get(branch, {}).get('name', branch or '-'),
+                'commission':   commission_preview,
+                'products':     products_summary,
+                'had_customer': bool(cid) and bool(svc),
+                'promo_name':   chosen_promo_name,
+            }
             return redirect(url_for('capster_portal.add_transaction', success=1))
-        else:
-            flash('Gagal menyimpan transaksi.', 'danger')
+
+    # Pop success summary from session (only available right after redirect)
+    last_tx = session.pop('last_tx', None) if success else None
+
+    # Pre-select customer dari halaman tambah pengunjung
+    preset_customer = None
+    preset_cid = request.args.get('preset_customer', '').strip()
+    if preset_cid.isdigit():
+        all_c = repo.get_all_customers()
+        preset_customer = next((c for c in all_c if c['id'] == int(preset_cid)), None)
 
     branch_name = BRANCHES.get(daily_branch, {}).get('name', '') if daily_branch else ''
+
+    # Stok produk di branch ini untuk step 4
+    products_in_stock = repo.get_product_stocks(branch_id=daily_branch) if daily_branch else []
+
+    # Promo aktif untuk cabang hari ini
+    active_promos = repo.get_active_promos_for_branch(daily_branch) if daily_branch else []
+
+    # Pilihan anggota paket (dari setting owner)
+    paket_members_raw = repo.get_setting('paket_members', 'Bapak,Anak 1,Anak 2,Anak 3')
+    paket_members = [m.strip() for m in paket_members_raw.split(',') if m.strip()]
 
     return render_template(
         'capster_portal/add_transaction.html',
@@ -416,10 +588,15 @@ def add_transaction():
         now=now,
         services=services,
         success=success,
+        last_tx=last_tx,
         need_branch=need_branch,
         daily_branch=daily_branch,
         daily_branch_name=branch_name,
         branches=BRANCHES,
+        products_in_stock=products_in_stock,
+        active_promos=active_promos,
+        paket_members=paket_members,
+        preset_customer=preset_customer,
         active_page='add_transaction',
     )
 
@@ -472,7 +649,10 @@ def customer_lookup():
         return jsonify([])
 
     results = repo.search_customers(query)
-    return jsonify(results)
+    return jsonify([
+        {'id': c['id'], 'name': c['Name'], 'phone': c['Phone'], 'visits': c['VisitCount']}
+        for c in results
+    ])
 
 
 @capster_portal_bp.route('/customer/<int:cid>/qr.png')

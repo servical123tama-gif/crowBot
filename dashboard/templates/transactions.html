@@ -11,8 +11,8 @@
 {% endfor %}{% endif %}{% endwith %}
 
 <!-- Filter Form -->
-<div class="card stat-card p-3 mb-4">
-  <form method="get" class="row g-2 align-items-end">
+<div class="card stat-card p-3 mb-3">
+  <form method="get" class="row g-2 align-items-end" id="filterForm">
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Dari</label>
       <input type="date" name="start" value="{{ start_str }}" class="form-control form-control-sm">
@@ -24,40 +24,77 @@
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Capster</label>
       <input type="text" name="capster" value="{{ capster_f }}" placeholder="Semua"
-             class="form-control form-control-sm" style="width:130px">
+             list="capsterOpts" class="form-control form-control-sm" style="width:130px" autocomplete="off">
+      <datalist id="capsterOpts">
+        {% for c in all_capsters %}<option value="{{ c }}">{% endfor %}
+      </datalist>
     </div>
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Cabang</label>
       <input type="text" name="branch" value="{{ branch_f }}" placeholder="Semua"
-             class="form-control form-control-sm" style="width:120px">
+             list="branchOpts2" class="form-control form-control-sm" style="width:110px" autocomplete="off">
+      <datalist id="branchOpts2">
+        {% for b in all_branches %}<option value="{{ b }}">{% endfor %}
+      </datalist>
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Layanan / Produk</label>
+      <input type="text" name="service" value="{{ service_f }}" placeholder="Semua"
+             list="serviceOpts" class="form-control form-control-sm" style="width:160px" autocomplete="off">
+      <datalist id="serviceOpts">
+        <optgroup label="Layanan">
+        {% for s in all_service_opts %}<option value="{{ s }}">{% endfor %}
+        </optgroup>
+        <optgroup label="Produk">
+        {% for p in all_product_opts %}<option value="{{ p }}">{% endfor %}
+        </optgroup>
+      </datalist>
+    </div>
+    <div class="col-sm-auto">
+      <label class="form-label small fw-semibold mb-1">Tipe</label>
+      <select name="type" class="form-select form-select-sm" style="width:110px;">
+        <option value="" {% if not type_f %}selected{% endif %}>Semua</option>
+        <option value="layanan" {% if type_f=='layanan' %}selected{% endif %}>Layanan</option>
+        <option value="produk"  {% if type_f=='produk'  %}selected{% endif %}>Produk</option>
+      </select>
     </div>
     <div class="col-sm-auto d-flex gap-2">
       <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">Filter</button>
       <a href="/transactions" class="btn btn-sm btn-outline-secondary">Reset</a>
     </div>
-    <div class="col-sm-auto ms-auto">
+    <div class="col-sm-auto ms-sm-auto">
       <a href="/transactions/export?start={{ start_str }}&end={{ end_str }}"
          class="btn btn-sm btn-outline-success">
-        ⬇️ Export CSV
+        <i class="bi bi-download me-1"></i>Export CSV
       </a>
     </div>
   </form>
 </div>
 
 <!-- Summary -->
-<div class="row g-3 mb-3">
+<div class="row g-2 mb-3">
   <div class="col-auto">
-    <div class="card stat-card px-3 py-2">
-      <span class="text-muted small">Jumlah</span>
-      <span class="fw-bold ms-2">{{ total_count }} transaksi</span>
-    </div>
-  </div>
-  <div class="col-auto">
-    <div class="card stat-card px-3 py-2">
+    <div class="card stat-card px-3 py-2 d-flex flex-row align-items-center gap-2">
       <span class="text-muted small">Total</span>
-      <span class="fw-bold ms-2">{{ total_revenue|idr }}</span>
+      <span class="fw-bold">{{ total_count }}</span>
+      <span class="text-muted small">
+        (✂️ {{ layanan_count }} + 🛍️ {{ produk_count }})
+      </span>
     </div>
   </div>
+  <div class="col-auto">
+    <div class="card stat-card px-3 py-2 d-flex flex-row align-items-center gap-2">
+      <span class="text-muted small">Omset</span>
+      <span class="fw-bold text-success">{{ total_revenue|idr }}</span>
+    </div>
+  </div>
+  {% if service_f or type_f %}
+  <div class="col-auto d-flex align-items-center">
+    <span class="badge bg-warning text-dark">
+      Filter aktif{% if service_f %}: {{ service_f }}{% endif %}{% if type_f %} · {{ type_f }}{% endif %}
+    </span>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Table -->
@@ -68,30 +105,55 @@
         <tr>
           <th style="width:130px;">Tanggal</th>
           <th>Capster</th>
-          <th>Layanan</th>
+          <th>Layanan / Produk</th>
           <th>Cabang</th>
           <th>Pembayaran</th>
-          <th class="text-end">Harga</th>
+          <th>Harga</th>
+          <th class="text-end">Total</th>
           <th class="text-center" style="width:80px;">Aksi</th>
         </tr>
       </thead>
       <tbody>
         {% if rows %}
           {% for r in rows %}
-          <tr>
+          <tr {% if r.type == 'produk' %}style="background:#fefaf0;"{% endif %}>
             <td class="text-muted small">{{ r.date }}</td>
             <td>{{ r.capster }}</td>
-            <td>{{ r.service }}</td>
+            <td>
+              {% if r.type == 'produk' %}
+              <span class="badge bg-warning bg-opacity-15 text-warning me-1" style="font-size:.7rem;">🛍️ Produk</span>
+              {% endif %}
+              {{ r.service }}
+              {% if r.type == 'produk' and r.commission %}
+              <span class="text-success ms-1" style="font-size:.75rem;" title="Komisi capster">+{{ r.commission|idr }}</span>
+              {% endif %}
+            </td>
             <td><span class="badge bg-light text-dark">{{ r.branch }}</span></td>
             <td>
-              <span class="badge {{ 'bg-success' if r.payment == 'Cash' else 'bg-info text-dark' }}">
+              {% if r.type == 'layanan' %}
+              <span class="badge {{ 'bg-success' if r.payment == 'Cash' else ('bg-info text-dark' if r.payment == 'Transfer' else 'bg-purple') }}">
                 {{ r.payment }}
               </span>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.type == 'layanan' %}
+                {% if r.promo_name %}
+                <span class="badge rounded-pill" style="background:#f97316;font-size:.72rem;">{{ r.promo_name }}</span>
+                {% else %}
+                <span class="text-muted small">Reguler</span>
+                {% endif %}
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
             </td>
             <td class="text-end fw-semibold">{{ r.price|idr }}</td>
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
-                <!-- Edit -->
+                {% if r.type == 'layanan' %}
+                <!-- Edit (layanan only) -->
                 <button class="btn btn-xs btn-outline-primary p-1 lh-1"
                         title="Edit"
                         data-bs-toggle="modal" data-bs-target="#editModal"
@@ -101,17 +163,40 @@
                         data-service="{{ r.service }}"
                         data-price="{{ r.price }}"
                         data-payment="{{ r.payment }}"
-                        data-branch="{{ r.branch }}">
+                        data-branch-id="{{ r.branch_id }}">
                   <i class="bi bi-pencil" style="font-size:.75rem;"></i>
                 </button>
-                <!-- Hapus -->
                 <button class="btn btn-xs btn-outline-danger p-1 lh-1"
                         title="Hapus"
                         data-bs-toggle="modal" data-bs-target="#deleteModal"
                         data-id="{{ r.id }}"
+                        data-type="layanan"
                         data-info="{{ r.date }} · {{ r.capster }} · {{ r.service }}">
                   <i class="bi bi-trash" style="font-size:.75rem;"></i>
                 </button>
+                {% else %}
+                <!-- Edit produk sale -->
+                <button class="btn btn-xs btn-outline-primary p-1 lh-1"
+                        title="Edit penjualan produk"
+                        data-bs-toggle="modal" data-bs-target="#editProdukModal"
+                        data-id="{{ r.id }}"
+                        data-date="{{ r.date_input }}"
+                        data-capster="{{ r.capster }}"
+                        data-product-id="{{ r.product_id }}"
+                        data-qty="{{ r.qty }}"
+                        data-branch-id="{{ r.branch_id }}">
+                  <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                </button>
+                <!-- Hapus produk sale -->
+                <button class="btn btn-xs btn-outline-danger p-1 lh-1"
+                        title="Hapus penjualan produk"
+                        data-bs-toggle="modal" data-bs-target="#deleteModal"
+                        data-id="{{ r.id }}"
+                        data-type="produk"
+                        data-info="{{ r.date }} · {{ r.capster }} · {{ r.service }}">
+                  <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                </button>
+                {% endif %}
               </div>
             </td>
           </tr>
@@ -162,13 +247,36 @@
 
           <div class="mb-3">
             <label class="form-label form-label-sm fw-semibold">Layanan</label>
-            <input list="serviceList" name="service" id="edit_service"
-                   class="form-control form-control-sm" required autocomplete="off">
-            <datalist id="serviceList">
+            <input list="editServiceList" name="service" id="edit_service"
+                   class="form-control form-control-sm" required autocomplete="off"
+                   oninput="checkEditPaket(this.value)">
+            <datalist id="editServiceList">
               {% for s in service_names %}
               <option value="{{ s }}">
               {% endfor %}
             </datalist>
+          </div>
+
+          <!-- Pilihan anggota paket (muncul otomatis jika layanan mengandung "paket") -->
+          <div id="editPaketSection" class="mb-3 p-3 rounded-3" style="display:none;background:#f0f4ff;border:1.5px solid #c7d7f8;">
+            <div class="text-muted fw-semibold mb-2" style="font-size:.76rem;text-transform:uppercase;letter-spacing:.05em;">
+              <i class="bi bi-people-fill me-1" style="color:#0f3460;"></i>Pilih Anggota
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="editPaketOptions">
+              {% for m in paket_members %}
+              <label style="cursor:pointer;">
+                <input type="checkbox" value="{{ m }}" class="d-none edit-paket-check"
+                       onchange="updateEditPaketService()">
+                <div class="edit-paket-chip px-3 py-1 rounded-pill border"
+                     style="font-size:.82rem;font-weight:500;background:#fff;transition:.12s;">
+                  {{ m }}
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="text-muted mt-2" style="font-size:.74rem;">
+              Nama layanan akan diperbarui otomatis sesuai anggota dipilih.
+            </div>
           </div>
 
           <div class="mb-3">
@@ -191,14 +299,81 @@
             </div>
             <div class="col-6">
               <label class="form-label form-label-sm fw-semibold">Cabang</label>
-              <input list="branchList" name="branch" id="edit_branch"
-                     class="form-control form-control-sm" required autocomplete="off">
-              <datalist id="branchList">
-                {% for b in branch_shorts %}
-                <option value="{{ b }}">
+              <select name="branch" id="edit_branch" class="form-select form-select-sm" required>
+                {% for bid, bshort in branch_map.items() %}
+                <option value="{{ bid }}">{{ bshort }}</option>
                 {% endfor %}
-              </datalist>
+              </select>
             </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm text-white" style="background:#e94560;">
+            <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Edit Penjualan Produk ═══ -->
+<div class="modal fade" id="editProdukModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editProdukForm" action="">
+        <div class="modal-header">
+          <h5 class="modal-title">✏️ Edit Penjualan Produk <span class="text-muted small" id="editProdukId"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Tanggal & Waktu</label>
+            <input type="datetime-local" name="date" id="ep_date"
+                   class="form-control form-control-sm" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Capster</label>
+            <input list="epCapsterList" name="capster" id="ep_capster"
+                   class="form-control form-control-sm" required autocomplete="off">
+            <datalist id="epCapsterList">
+              {% for c in all_capsters %}<option value="{{ c }}">{% endfor %}
+            </datalist>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Produk</label>
+            <select name="product_id" id="ep_product" class="form-select form-select-sm"
+                    required onchange="epUpdateProduct()">
+              {% for p in all_products %}
+              <option value="{{ p.ProductID }}"
+                      data-price="{{ p.Price }}"
+                      data-commission="{{ p.CommissionRate }}">
+                {{ p.Name }} — {{ p.Price|int|idr }}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="mt-1 text-muted" style="font-size:.78rem;" id="ep_product_info"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Jumlah</label>
+            <input type="number" name="quantity" id="ep_qty"
+                   class="form-control form-control-sm" min="1" step="1" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label form-label-sm fw-semibold">Cabang</label>
+            <select name="branch_id" id="ep_branch" class="form-select form-select-sm" required>
+              {% for bid, bshort in branch_map.items() %}
+              <option value="{{ bid }}">{{ bshort }}</option>
+              {% endfor %}
+            </select>
           </div>
 
         </div>
@@ -245,6 +420,52 @@
 {% block scripts %}
 <script>
 // ── Edit Modal ─────────────────────────────────────────────────────────
+const PAKET_MEMBERS = {{ paket_members | tojson }};
+
+// Parse service name — pisahkan base name dan anggota dari string "Base Name (Anggota1, Anggota2)"
+function parsePaketService(svcName) {
+  const m = svcName.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (m) return { base: m[1].trim(), members: m[2].split(',').map(s => s.trim()) };
+  return { base: svcName, members: [] };
+}
+
+function checkEditPaket(val) {
+  const isPaket = val.toLowerCase().includes('paket');
+  const sec = document.getElementById('editPaketSection');
+  sec.style.display = isPaket ? '' : 'none';
+  if (!isPaket) {
+    document.querySelectorAll('.edit-paket-check').forEach(cb => { cb.checked = false; });
+    updateEditPaketChipStyle();
+  }
+}
+
+function updateEditPaketService() {
+  const base = document.getElementById('edit_service').value;
+  const parsed = parsePaketService(base);
+  const checked = [...document.querySelectorAll('.edit-paket-check:checked')].map(cb => cb.value);
+  updateEditPaketChipStyle();
+  if (checked.length > 0) {
+    document.getElementById('edit_service').value = parsed.base + ' (' + checked.join(', ') + ')';
+  } else {
+    document.getElementById('edit_service').value = parsed.base;
+  }
+}
+
+function updateEditPaketChipStyle() {
+  document.querySelectorAll('.edit-paket-check').forEach(cb => {
+    const chip = cb.nextElementSibling;
+    if (cb.checked) {
+      chip.style.background = '#0f3460';
+      chip.style.color = '#fff';
+      chip.style.borderColor = '#0f3460';
+    } else {
+      chip.style.background = '#fff';
+      chip.style.color = '';
+      chip.style.borderColor = '';
+    }
+  });
+}
+
 document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
   const btn = e.relatedTarget;
   const id = btn.dataset.id;
@@ -253,9 +474,8 @@ document.getElementById('editModal').addEventListener('show.bs.modal', function(
   document.getElementById('editForm').action = '/transactions/' + id + '/edit';
   document.getElementById('edit_date').value    = btn.dataset.date;
   document.getElementById('edit_capster').value = btn.dataset.capster;
-  document.getElementById('edit_service').value = btn.dataset.service;
   document.getElementById('edit_price').value   = btn.dataset.price;
-  document.getElementById('edit_branch').value  = btn.dataset.branch;
+  document.getElementById('edit_branch').value  = btn.dataset.branchId;
 
   // Set payment select
   const paySelect = document.getElementById('edit_payment');
@@ -265,13 +485,88 @@ document.getElementById('editModal').addEventListener('show.bs.modal', function(
       break;
     }
   }
+
+  // Parse service — pisahkan base & anggota paket
+  const svcFull   = btn.dataset.service;
+  const parsed    = parsePaketService(svcFull);
+  const isPaket   = parsed.base.toLowerCase().includes('paket');
+
+  // Set base name ke input
+  document.getElementById('edit_service').value = svcFull;
+
+  // Reset chip state
+  document.querySelectorAll('.edit-paket-check').forEach(cb => { cb.checked = false; });
+
+  if (isPaket) {
+    document.getElementById('editPaketSection').style.display = '';
+    // Pre-check members yang ada di nama layanan
+    document.querySelectorAll('.edit-paket-check').forEach(cb => {
+      if (parsed.members.includes(cb.value)) cb.checked = true;
+    });
+    updateEditPaketChipStyle();
+  } else {
+    document.getElementById('editPaketSection').style.display = 'none';
+  }
 });
+
+// ── Edit Produk Modal ────────────────────────────────────────────────────
+document.getElementById('editProdukModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const id  = btn.dataset.id;
+
+  document.getElementById('editProdukId').textContent = '#' + id;
+  document.getElementById('editProdukForm').action = '/transactions/product-sale/' + id + '/edit';
+  document.getElementById('ep_date').value    = btn.dataset.date;
+  document.getElementById('ep_capster').value = btn.dataset.capster;
+  document.getElementById('ep_qty').value     = btn.dataset.qty || 1;
+
+  // Set product select
+  const prodSel = document.getElementById('ep_product');
+  const wantPid = btn.dataset.productId;
+  for (let i = 0; i < prodSel.options.length; i++) {
+    if (prodSel.options[i].value === wantPid) {
+      prodSel.selectedIndex = i;
+      break;
+    }
+  }
+  epUpdateProduct();
+
+  // Set branch select
+  const branchSel = document.getElementById('ep_branch');
+  const wantBid   = btn.dataset.branchId;
+  for (let i = 0; i < branchSel.options.length; i++) {
+    if (branchSel.options[i].value === wantBid) {
+      branchSel.selectedIndex = i;
+      break;
+    }
+  }
+});
+
+function epUpdateProduct() {
+  const sel  = document.getElementById('ep_product');
+  const opt  = sel.options[sel.selectedIndex];
+  const price = parseInt(opt.dataset.price || 0);
+  const comm  = parseFloat(opt.dataset.commission || 0);
+  const info  = document.getElementById('ep_product_info');
+  if (price) {
+    const commPct = Math.round(comm * 100);
+    info.textContent = 'Harga: Rp ' + price.toLocaleString('id-ID') +
+      (commPct > 0 ? ' · Komisi capster: ' + commPct + '%' : '');
+  } else {
+    info.textContent = '';
+  }
+}
 
 // ── Delete Modal ────────────────────────────────────────────────────────
 document.getElementById('deleteModal').addEventListener('show.bs.modal', function(e) {
-  const btn = e.relatedTarget;
-  const id  = btn.dataset.id;
-  document.getElementById('deleteForm').action = '/transactions/' + id + '/delete';
+  const btn  = e.relatedTarget;
+  const id   = btn.dataset.id;
+  const type = btn.dataset.type || 'layanan';
+  if (type === 'produk') {
+    document.getElementById('deleteForm').action = '/transactions/product-sale/' + id + '/delete';
+  } else {
+    document.getElementById('deleteForm').action = '/transactions/' + id + '/delete';
+  }
   document.getElementById('deleteInfo').textContent = btn.dataset.info;
 });
 </script>

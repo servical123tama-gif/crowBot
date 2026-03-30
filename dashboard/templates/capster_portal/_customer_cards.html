@@ -6,22 +6,22 @@
       <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
            style="width:44px;height:44px;font-size:.95rem;
                   background:{{ ['#0f3460','#e94560','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
-        {{ c.name[0].upper() }}
+        {{ c.Name[0].upper() }}
       </div>
 
       <!-- Info -->
       <div class="flex-grow-1" style="min-width:0;">
-        <div class="fw-600" style="font-size:.93rem;">{{ c.name }}</div>
+        <div class="fw-600" style="font-size:.93rem;">{{ c.Name }}</div>
         <div class="text-muted" style="font-size:.78rem;">
-          {% if c.phone %}
-            <i class="bi bi-phone me-1"></i>{{ c.phone }}
+          {% if c.Phone %}
+            <i class="bi bi-phone me-1"></i>{{ c.Phone }}
             &nbsp;·&nbsp;
           {% endif %}
-          <i class="bi bi-scissors me-1"></i>{{ c.visits }} kunjungan
+          <i class="bi bi-scissors me-1"></i>{{ c.VisitCount }} kunjungan
         </div>
-        {% if c.added_by %}
+        {% if c.AddedBy %}
           <div style="font-size:.73rem;color:#94a3b8;margin-top:.1rem;">
-            <i class="bi bi-person-badge me-1"></i>Didaftarkan oleh {{ c.added_by }}
+            <i class="bi bi-person-badge me-1"></i>Didaftarkan oleh {{ c.AddedBy }}
           </div>
         {% endif %}
       </div>
@@ -29,7 +29,7 @@
       <!-- Tombol QR -->
       <button class="btn btn-sm btn-outline-primary flex-shrink-0"
               style="border-radius:8px;"
-              onclick="showQR({{ c.id }}, '{{ c.name|replace("'", "\\'") }}', {{ c.visits }}, '{{ c.phone }}')">
+              onclick="showQR({{ c.id }}, '{{ c.Name|replace("'", "\\'") }}', {{ c.VisitCount }}, '{{ c.Phone }}')">
         <i class="bi bi-qr-code me-1"></i>QR Code
       </button>
     </div>
