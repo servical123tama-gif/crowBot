@@ -1,66 +1,27 @@
 """
-Entry point — jalankan Flask Dashboard + Telegram Bot bersamaan.
-
-Bot dikelola oleh BotManager (bisa di-start/stop dari web).
-Flask berjalan di main thread.
-
-Usage:
-    python run_dashboard.py
+Entry point — jalankan Flask dashboard.
+  python run_dashboard.py
+  gunicorn run_dashboard:app
 """
-import os
-import sys
 import logging
+import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from dotenv import load_dotenv
-load_dotenv()
-
-# ── Logging ──────────────────────────────────────────────────────────────────
-os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
-    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
     level=logging.INFO,
-    handlers=[
-        logging.FileHandler('logs/dashboard.log', encoding='utf-8'),
-        logging.StreamHandler(),
-    ],
+    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
 )
-logger = logging.getLogger('run_dashboard')
+logger = logging.getLogger(__name__)
 
-# ── Database init (buat tabel + migrasi kolom baru jika belum ada) ────────────
 from app.db.database import init_db
 init_db()
+logger.info("Database initialized.")
 
-# ── Flask App ─────────────────────────────────────────────────────────────────
 from dashboard import create_app
-flask_app = create_app()
-app = flask_app  # alias for gunicorn: gunicorn run_dashboard:app
+app = create_app()
 
-# ── Bot manager (default OFF — nyalakan manual dari web dashboard) ─────────────
-from app.bot_manager import BotManager
-_bot_mgr = BotManager()
-logger.info("BotManager: siap, bot default OFF (nyalakan dari web).")
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', os.getenv('DASHBOARD_PORT', 5000)))
-
-    print()
-    print("=" * 55)
-    print(f"  Dashboard : http://localhost:{port}")
-    print(f"  Password  : {os.getenv('DASHBOARD_PASSWORD', 'admin123')}")
-    print(f"  Bot       : OFF (nyalakan dari web dashboard)")
-    print(f"  Stop      : Ctrl+C")
-    print("=" * 55)
-    print()
-
-    # Flask di main thread
-    # use_reloader=False wajib: reloader fork-process akan duplikasi bot thread
-    # debug=False wajib: debug mode tidak kompatibel dengan bot thread
-    flask_app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False,
-        use_reloader=False,
-    )
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('DEBUG', 'False').lower() == 'true'
+    print(f"\n  Dashboard : http://localhost:{port}")
+    print(f"  Debug     : {debug}\n")
+    app.run(host='0.0.0.0', port=port, debug=debug)

@@ -256,8 +256,8 @@
     .badge-mitra { background: #e3f2fd; color: #1565c0; }
     .badge-tetap { background: #e8f5e9; color: #2e7d32; }
 
-    /* ── Bot status badge pulse ── */
-    #botBadge.bg-success {
+    /* ── (removed bot badge) ── */
+    #__removed__ {
       animation: pulse-green 2s infinite;
     }
     @keyframes pulse-green {
@@ -523,28 +523,7 @@
         </div>
       </div>
 
-      <!-- Badge status + tombol ON/OFF -->
       <div class="d-flex align-items-center gap-2">
-        <span id="botBadge" class="badge rounded-pill px-2 py-1" style="font-size:.72rem;">
-          ⏳ Memeriksa...
-        </span>
-        <span id="botUptime" class="text-muted d-none" style="font-size:.72rem;"></span>
-
-        <!-- Form stop (ditampilkan saat running) -->
-        <form id="formStop" method="post" action="/bot/stop" style="display:none;">
-          <button type="submit" class="btn btn-sm btn-danger px-2 py-1 lh-1"
-                  style="font-size:.75rem;" title="Matikan Bot">
-            <i class="bi bi-stop-circle me-1"></i>OFF
-          </button>
-        </form>
-
-        <!-- Form start (ditampilkan saat stopped) -->
-        <form id="formStart" method="post" action="/bot/start" style="display:none;">
-          <button type="submit" class="btn btn-sm btn-success px-2 py-1 lh-1"
-                  style="font-size:.75rem;" title="Nyalakan Bot">
-            <i class="bi bi-play-circle me-1"></i>ON
-          </button>
-        </form>
 
         <!-- Tombol disabled saat transisi -->
         <button id="btnTransition" class="btn btn-sm btn-secondary px-2 py-1 lh-1 d-none"
@@ -580,57 +559,6 @@
   window.addEventListener('scroll', () => {
     topbar.classList.toggle('scrolled', window.scrollY > 8);
   }, { passive: true });
-
-  // ── Bot status polling ─────────────────────────────────────────────────
-  const botBadge       = document.getElementById('botBadge');
-  const botUptime      = document.getElementById('botUptime');
-  const formStop       = document.getElementById('formStop');
-  const formStart      = document.getElementById('formStart');
-  const btnTransition  = document.getElementById('btnTransition');
-  const btnTLabel      = document.getElementById('btnTransitionLabel');
-
-  function applyBotStatus(data) {
-    const s = data.status;
-
-    // Badge warna & teks
-    const BADGE = {
-      running:  { cls: 'bg-success',   text: '🟢 Bot ON'      },
-      stopped:  { cls: 'bg-danger',    text: '🔴 Bot OFF'     },
-      starting: { cls: 'bg-warning text-dark', text: '🟡 Menyalakan...' },
-      stopping: { cls: 'bg-warning text-dark', text: '🟡 Mematikan...'  },
-    };
-    const b = BADGE[s] || { cls: 'bg-secondary', text: '⚪ ' + s };
-    botBadge.className = 'badge rounded-pill px-2 py-1 ' + b.cls;
-    botBadge.style.fontSize = '.72rem';
-    botBadge.textContent = b.text;
-
-    // Uptime
-    if (data.uptime) {
-      botUptime.textContent = '⏱ ' + data.uptime;
-      botUptime.classList.remove('d-none');
-    } else {
-      botUptime.classList.add('d-none');
-    }
-
-    // Tombol: tampilkan sesuai status
-    formStop.style.display      = (s === 'running')  ? '' : 'none';
-    formStart.style.display     = (s === 'stopped')  ? '' : 'none';
-    btnTransition.classList.toggle('d-none', s !== 'starting' && s !== 'stopping');
-
-    if (s === 'starting') btnTLabel.textContent = 'Menyalakan...';
-    if (s === 'stopping') btnTLabel.textContent = 'Mematikan...';
-  }
-
-  function pollBotStatus() {
-    fetch('/bot/status')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) applyBotStatus(data); })
-      .catch(() => {});  // ignore network errors
-  }
-
-  // Poll pertama kali langsung, lalu setiap 3 detik
-  pollBotStatus();
-  setInterval(pollBotStatus, 3000);
 
   // ── Notifikasi Lonceng ─────────────────────────────────────────────────
   let _notifLoaded = false;

@@ -19,7 +19,6 @@ from app.config.constants import (
     DATETIME_FORMAT, DATE_FORMAT,
     SERVICES_MAIN, SERVICES_COLORING, BRANCHES, PRODUCTS,
 )
-from app.models.transaction import Transaction as TxModel
 
 logger = logging.getLogger(__name__)
 
@@ -31,20 +30,11 @@ class Repository:
     # Transactions                                                         #
     # ------------------------------------------------------------------ #
 
-    def add_transaction(self, transaction: TxModel) -> bool:
+    def _add_transaction_legacy(self) -> bool:
+        # removed — hanya dipakai bot Telegram (sudah dihapus)
+        raise NotImplementedError
         try:
-            with get_db() as db:
-                row = Transaction(
-                    date=transaction.date,
-                    capster_name=transaction.capster,
-                    service_name=transaction.service,
-                    price=int(transaction.price),
-                    payment_method=transaction.payment_method or 'Cash',
-                    branch=transaction.branch,
-                )
-                db.add(row)
-            logger.info(f"Transaction saved to DB: {transaction}")
-            return True
+            pass
         except Exception as e:
             logger.error(f"Failed to add transaction: {e}", exc_info=True)
             return False

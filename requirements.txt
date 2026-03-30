@@ -1,37 +1,22 @@
-cl# Core
-python-telegram-bot==20.7
+# Web
+flask==2.3.3
+gunicorn==21.2.0
 python-dotenv==1.0.0
 
-# Google Sheets
-gspread==5.12.0
-oauth2client==4.1.3
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9
 
 # Data Processing
 pandas==1.5.3
 openpyxl==3.1.2
 
-# Google Gemini AI
-google-generativeai>=0.8.0
-
 # Utilities
 pytz==2023.3
 python-dateutil==2.8.2
 
-# Development (optional)
-pytest==7.4.3
-black==23.12.1
-flake8==7.0.0
-
-# Web Server
-flask==2.3.3
-gunicorn==21.2.0
-
-# Database (SQLite built-in; SQLAlchemy ORM + Alembic migrations)
-sqlalchemy==2.0.25
-alembic==1.13.1
-psycopg2-binary==2.9.9
-
-# QR Code generation (free, local, no API key)
+# QR Code
 qrcode[pil]>=7.4
 
 # HTTP client (Fonnte WA gateway)

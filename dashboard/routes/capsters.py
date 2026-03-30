@@ -7,7 +7,17 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from dashboard.auth import login_required
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
-from app.models.capster import Capster as CapsterModel
+from dataclasses import dataclass, field
+
+@dataclass
+class CapsterModel:
+    name: str
+    telegram_id: int
+    alias: str = ''
+    employment_type: str = 'mitra'
+    commission_rate: float = 0.5
+    monthly_salary: int = 0
+    branch_id: str = ''
 
 capsters_bp = Blueprint('capsters', __name__)
 
