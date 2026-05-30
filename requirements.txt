@@ -21,3 +21,6 @@ qrcode[pil]>=7.4
 
 # HTTP client (Fonnte WA gateway)
 requests>=2.31.0
+
+# Telegram Bot (admin reports only)
+python-telegram-bot[job-queue]==21.7
