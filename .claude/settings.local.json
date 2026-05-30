@@ -10,7 +10,13 @@
       "Bash(python -c ':*)",
       "Read(//c/Users/tama/.claude/**)",
       "Bash(py -m py_compile app/tg/__init__.py app/tg/auth.py app/tg/formatters.py app/tg/reports.py app/tg/handlers.py app/tg/scheduler.py app/tg/bot.py run_bot.py)",
-      "Bash(where psql *)"
+      "Bash(where psql *)",
+      "Bash(git commit -m ' *)",
+      "Bash(mv -v fix_branch_data.py scripts/fix_branch_data.py)",
+      "Bash(rmdir test *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(py -m py_compile run_dashboard.py run_bot.py scripts/fix_branch_data.py scripts/migrate_from_sheets.py scripts/migrate_sqlite_to_postgres.py)",
+      "Bash(git add *)"
     ]
   }
 }
