@@ -10,6 +10,7 @@ import pandas as pd
 
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
+from app.services.reports import calc_profit
 from app.tg.formatters import fmt_idr, fmt_date, fmt_month_id
 
 
@@ -174,48 +175,35 @@ def monthly_report(year: Optional[int] = None, month: Optional[int] = None) -> s
 
 def profit_report(year: Optional[int] = None, month: Optional[int] = None) -> str:
     """
-    Profit sederhana per cabang = revenue − operational_cost (BRANCHES dict).
-    Tidak menghitung komisi capster (cek dashboard web untuk detail lengkap).
+    Profit per cabang = revenue − biaya operasional tetap − gaji capster tetap − komisi mitra.
+    Pakai service yang sama dengan dashboard web (app/services/reports.py).
     """
     now = datetime.now()
     year = year or now.year
     month = month or now.month
 
     repo = Repository()
-    df = repo.get_transactions_by_month(year, month)
+    data = calc_profit(repo, year, month)
 
     header = f"💹 Profit Per Cabang — {fmt_month_id(year, month)}"
+    if not data:
+        return f"{header}\n\nBelum ada transaksi bulan ini."
+
     lines = [header, '']
-
-    if df.empty:
-        lines.append('Belum ada transaksi bulan ini.')
-        return '\n'.join(lines)
-
-    grand_revenue = 0
-    grand_opex = 0
-
-    for branch_id, cfg in BRANCHES.items():
-        short = cfg.get('short', branch_id)
-        sub = df[df['Branch'] == branch_id] if 'Branch' in df.columns else pd.DataFrame()
-        revenue = int(sub['Price'].sum()) if not sub.empty else 0
-        opex = int(sum(cfg.get('operational_cost', {}).values()))
-        profit_kotor = revenue - opex
-
-        grand_revenue += revenue
-        grand_opex += opex
-
+    for short, b in data['branches'].items():
         lines.append(f"🏪 {short}")
-        lines.append(f"  Pendapatan : {fmt_idr(revenue)}")
-        lines.append(f"  Biaya Ops  : {fmt_idr(opex)}")
-        lines.append(f"  Profit*    : {fmt_idr(profit_kotor)}")
+        lines.append(f"  Pendapatan : {fmt_idr(b['revenue'])}")
+        lines.append(f"  Biaya Tetap: {fmt_idr(b['fixed_total'])}")
+        if b['commission']:
+            lines.append(f"  Komisi     : {fmt_idr(b['commission'])}")
+        lines.append(f"  Profit     : {fmt_idr(b['net_profit'])}  ({b['tx_count']} trx)")
         lines.append('')
 
-    lines.append(f"TOTAL Pendapatan : {fmt_idr(grand_revenue)}")
-    lines.append(f"TOTAL Biaya Ops  : {fmt_idr(grand_opex)}")
-    lines.append(f"TOTAL Profit*    : {fmt_idr(grand_revenue - grand_opex)}")
-    lines.append('')
-    lines.append('*) Profit sederhana (belum potong komisi capster).')
-    lines.append('   Lihat dashboard web untuk detail lengkap.')
+    o = data['overall']
+    lines.append(f"TOTAL Pendapatan : {fmt_idr(o['revenue'])}")
+    lines.append(f"TOTAL Biaya Tetap: {fmt_idr(o['fixed'])}")
+    lines.append(f"TOTAL Komisi     : {fmt_idr(o['commission'])}")
+    lines.append(f"TOTAL Profit     : {fmt_idr(o['net_profit'])}")
     return '\n'.join(lines)
 
 
