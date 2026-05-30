@@ -50,7 +50,7 @@ def _calc_profit(db: Repository, year: int, month: int) -> dict:
 
     for branch_id, branch_cfg in BRANCHES.items():
         short     = branch_cfg.get('short', branch_id)
-        branch_df = monthly_df[monthly_df['Branch'] == short]
+        branch_df = monthly_df[monthly_df['Branch'] == branch_id]
         revenue   = int(branch_df['Price'].sum())
 
         # Fixed operational (non-karyawan)

@@ -48,5 +48,8 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
+# Database backups (local snapshots, jangan masuk repo)
+backups/
+
 # Export files
 docs/exports/

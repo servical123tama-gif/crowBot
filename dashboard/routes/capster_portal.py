@@ -463,6 +463,7 @@ def add_transaction():
         family_count   = max(1, int(request.form.get('family_count', '1') or '1'))
         branch         = request.form.get('branch_override', '').strip() or daily_branch or ''
         sold_ids       = request.form.getlist('sell_product')
+        use_loyalty    = request.form.get('use_loyalty', '').strip()  # '50pct' | 'free' | ''
 
         svc = next((s for s in services if s['ServiceID'] == service_id), None)
 
@@ -478,11 +479,18 @@ def add_transaction():
 
         cid = int(customer_id) if customer_id.isdigit() else None
 
+        # ── Validasi loyalty claim ──
+        loyalty_status = repo.get_loyalty_status(cid, include_next=True) if cid else {'point_balance': 0, 'available': []}
+        valid_claim_types = {c['type'] for c in loyalty_status['available']}
+        if use_loyalty and use_loyalty not in valid_claim_types:
+            use_loyalty = ''  # klaim tidak valid / poin tidak cukup
+
         # ── Simpan transaksi layanan (jika ada) ──────────────────────────
-        final_price       = 0
-        chosen_promo_name = None
+        final_price        = 0
+        chosen_promo_name  = None
         commission_preview = 0
-        ok_service        = True
+        ok_service         = True
+        loyalty_label      = None
 
         if svc:
             service_display_name = svc['Name']
@@ -490,6 +498,8 @@ def add_transaction():
                 service_display_name = f"{svc['Name']} ({family_member})"
 
             final_price = svc['Price'] * family_count
+
+            # Promo diskon
             if promo_id_str.isdigit():
                 all_promos = repo.get_all_promos()
                 chosen_promo = next(
@@ -501,6 +511,16 @@ def add_transaction():
                     price_per_orang = int(svc['Price'] * (1 - chosen_promo['discount_pct'] / 100))
                     final_price = price_per_orang * family_count
                     chosen_promo_name = chosen_promo['name']
+
+            # Loyalty claim override promo (prioritas lebih tinggi)
+            if use_loyalty == 'free':
+                final_price   = 0
+                loyalty_label = 'Potong Gratis (10 poin)'
+                chosen_promo_name = None
+            elif use_loyalty == '50pct':
+                final_price   = int(final_price * 0.5)
+                loyalty_label = 'Diskon 50% (5 poin)'
+                chosen_promo_name = None
 
             ok_service = repo.add_transaction_full(
                 date=now,
@@ -548,15 +568,33 @@ def add_transaction():
                     'commission': prod_comm,
                 })
 
+            # ── Loyalty: catat klaim dan tambah poin ─────────────────────
+            new_point_balance = None
+            if cid and svc:  # poin hanya untuk transaksi layanan
+                tx_id = None
+                if use_loyalty:
+                    # Dapatkan ID transaksi yang baru disimpan untuk referensi
+                    try:
+                        all_tx = repo.get_transactions_by_customer(cid, limit=1)
+                        tx_id = all_tx[0]['id'] if all_tx and 'id' in all_tx[0] else None
+                    except Exception:
+                        pass
+                    repo.use_loyalty_claim(cid, use_loyalty, transaction_id=tx_id)
+                    new_point_balance = 0
+                else:
+                    new_point_balance = repo.add_customer_points(cid, 1)
+
             session['last_tx'] = {
-                'service':      svc['Name'] if svc else None,
-                'price':        final_price,
-                'payment':      payment_method,
-                'branch_name':  BRANCHES.get(branch, {}).get('name', branch or '-'),
-                'commission':   commission_preview,
-                'products':     products_summary,
-                'had_customer': bool(cid) and bool(svc),
-                'promo_name':   chosen_promo_name,
+                'service':           svc['Name'] if svc else None,
+                'price':             final_price,
+                'payment':           payment_method,
+                'branch_name':       BRANCHES.get(branch, {}).get('name', branch or '-'),
+                'commission':        commission_preview,
+                'products':          products_summary,
+                'had_customer':      bool(cid) and bool(svc),
+                'promo_name':        chosen_promo_name,
+                'loyalty_label':     loyalty_label,
+                'new_point_balance': new_point_balance,
             }
             return redirect(url_for('capster_portal.add_transaction', success=1))
 
@@ -634,25 +672,29 @@ def customer_lookup():
     query = request.args.get('q', '').strip()
     cid   = request.args.get('id', '').strip()
 
+    def _loyalty(c):
+        status = repo.get_loyalty_status(c['id'], include_next=True)
+        return {
+            'id':            c['id'],
+            'name':          c['Name'],
+            'phone':         c['Phone'],
+            'visits':        c['VisitCount'],
+            'point_balance': status['point_balance'],
+            'available':     status['available'],
+        }
+
     if cid.isdigit():
-        # Lookup by ID (from QR scan)
         all_c = repo.get_all_customers()
         found = next((c for c in all_c if c['id'] == int(cid)), None)
         if found:
-            return jsonify([{
-                'id': found['id'], 'name': found['Name'],
-                'phone': found['Phone'], 'visits': found['VisitCount'],
-            }])
+            return jsonify([_loyalty(found)])
         return jsonify([])
 
     if len(query) < 1:
         return jsonify([])
 
     results = repo.search_customers(query)
-    return jsonify([
-        {'id': c['id'], 'name': c['Name'], 'phone': c['Phone'], 'visits': c['VisitCount']}
-        for c in results
-    ])
+    return jsonify([_loyalty(c) for c in results])
 
 
 @capster_portal_bp.route('/customer/<int:cid>/qr.png')

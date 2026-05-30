@@ -196,6 +196,10 @@ def export_csv():
 
     start_str = request.args.get('start', now.replace(day=1).strftime('%Y-%m-%d'))
     end_str   = request.args.get('end',   now.strftime('%Y-%m-%d'))
+    capster_f = request.args.get('capster', '').strip()
+    branch_f  = request.args.get('branch',  '').strip()
+    service_f = request.args.get('service', '').strip()
+    type_f    = request.args.get('type',    '').strip()
 
     try:
         start_dt = datetime.strptime(start_str, '%Y-%m-%d')
@@ -204,28 +208,77 @@ def export_csv():
         start_dt = now.replace(day=1)
         end_dt   = now
 
-    df = db.get_transactions_by_range(start_dt, end_dt)
-    if not df.empty:
-        df = df.sort_values('Date', ascending=False)
+    rows = []
+
+    # ── Layanan ───────────────────────────────────────────────────
+    if type_f != 'produk':
+        df = db.get_transactions_by_range(start_dt, end_dt)
+        if not df.empty:
+            if capster_f and 'Capster' in df.columns:
+                df = df[df['Capster'].str.lower().str.contains(capster_f.lower(), na=False)]
+            if branch_f and 'Branch' in df.columns:
+                short_to_id = {cfg.get('short', bid): bid for bid, cfg in BRANCHES.items()}
+                branch_id_f = short_to_id.get(branch_f, branch_f)
+                df = df[df['Branch'].str.lower().str.contains(branch_id_f.lower(), na=False)]
+            if service_f and 'Service' in df.columns:
+                df = df[df['Service'].str.lower().str.contains(service_f.lower(), na=False)]
+            for _, r in df.iterrows():
+                raw_branch  = r.get('Branch', '') or ''
+                branch_disp = BRANCHES.get(raw_branch, {}).get('short', raw_branch) or raw_branch
+                date_val    = r['Date']
+                rows.append({
+                    'date':    date_val.strftime('%Y-%m-%d %H:%M') if hasattr(date_val, 'strftime') else str(date_val),
+                    'type':    'Layanan',
+                    'capster': r.get('Capster', ''),
+                    'item':    r.get('Service', ''),
+                    'qty':     1,
+                    'price':   int(r.get('Price', 0)),
+                    'payment': r.get('Payment_Method', ''),
+                    'branch':  branch_disp,
+                    'promo':   r.get('PromoName', '') or '',
+                    'sort':    date_val if isinstance(date_val, datetime) else datetime.min,
+                })
+
+    # ── Produk ────────────────────────────────────────────────────
+    if type_f != 'layanan':
+        for ps in db.get_product_sales_by_range(
+            start_dt, end_dt,
+            capster_name=capster_f if capster_f else None,
+        ):
+            if service_f and service_f.lower() not in ps['ProductName'].lower():
+                continue
+            if branch_f:
+                b_short = BRANCHES.get(ps['BranchID'], {}).get('short', ps['BranchID'])
+                if branch_f.lower() not in b_short.lower() and branch_f.lower() not in (ps['BranchID'] or '').lower():
+                    continue
+            prod_date = ps['DateObj']
+            sort_dt   = prod_date.to_pydatetime() if hasattr(prod_date, 'to_pydatetime') else (prod_date if isinstance(prod_date, datetime) else datetime.min)
+            rows.append({
+                'date':    ps['Date'],
+                'type':    'Produk',
+                'capster': ps['CapsterName'],
+                'item':    ps['ProductName'],
+                'qty':     ps['Quantity'],
+                'price':   ps['Total'],
+                'payment': '-',
+                'branch':  BRANCHES.get(ps['BranchID'], {}).get('short', ps['BranchID'] or '-'),
+                'promo':   '',
+                'sort':    sort_dt,
+            })
+
+    rows.sort(key=lambda x: x['sort'], reverse=True)
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Tanggal', 'Capster', 'Layanan', 'Harga', 'Pembayaran', 'Cabang'])
-    if not df.empty:
-        for _, r in df.iterrows():
-            writer.writerow([
-                r['Date'].strftime('%Y-%m-%d %H:%M') if hasattr(r['Date'], 'strftime') else str(r['Date']),
-                r.get('Capster', ''),
-                r.get('Service', ''),
-                int(r.get('Price', 0)),
-                r.get('Payment_Method', ''),
-                r.get('Branch', ''),
-            ])
+    writer.writerow(['Tanggal', 'Tipe', 'Capster', 'Layanan/Produk', 'Qty', 'Total (Rp)', 'Pembayaran', 'Cabang', 'Promo'])
+    for r in rows:
+        writer.writerow([r['date'], r['type'], r['capster'], r['item'],
+                         r['qty'], r['price'], r['payment'], r['branch'], r['promo']])
 
     filename = f"transaksi_{start_str}_{end_str}.csv"
     return Response(
-        output.getvalue(),
-        mimetype='text/csv',
+        '\ufeff' + output.getvalue(),   # BOM agar Excel buka UTF-8 dengan benar
+        mimetype='text/csv; charset=utf-8',
         headers={'Content-Disposition': f'attachment; filename={filename}'},
     )
 

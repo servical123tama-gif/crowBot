@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CrowBarbershop — Tampil Keren, Potong Terbaik</title>
+  <meta name="description" content="CrowBarbershop — barbershop profesional di Mojosari dan Sumput. Layanan potong rambut, coloring, dan perawatan rambut terbaik.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary:      #e94560;
+      --primary-dark: #c73652;
+      --dark:         #1a1a2e;
+      --dark-2:       #16213e;
+      --accent:       #0f3460;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; }
+
+    /* ── Navbar ── */
+    .navbar-custom {
+      background: rgba(26,26,46,.95);
+      backdrop-filter: blur(12px);
+      padding: .75rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .navbar-brand {
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--primary) !important;
+      letter-spacing: -.02em;
+    }
+    .navbar-custom .nav-link {
+      color: rgba(255,255,255,.75) !important;
+      font-weight: 500;
+      font-size: .875rem;
+      transition: color .15s;
+    }
+    .navbar-custom .nav-link:hover { color: #fff !important; }
+    .btn-book-nav {
+      background: var(--primary);
+      color: #fff !important;
+      border-radius: 8px;
+      padding: .4rem 1rem !important;
+      font-weight: 600 !important;
+      font-size: .845rem !important;
+      transition: background .15s, transform .1s;
+    }
+    .btn-book-nav:hover { background: var(--primary-dark) !important; transform: translateY(-1px); }
+    .navbar-toggler { border-color: rgba(255,255,255,.2); }
+    .navbar-toggler-icon { filter: invert(1); }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 50%, var(--accent) 100%);
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 60% at 80% 50%, rgba(233,69,96,.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 20% 80%, rgba(15,52,96,.5) 0%, transparent 70%);
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(233,69,96,.15);
+      border: 1px solid rgba(233,69,96,.3);
+      color: var(--primary);
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: .35rem .85rem;
+      border-radius: 99px;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 6vw, 4rem);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.12;
+      letter-spacing: -.03em;
+    }
+    .hero h1 span { color: var(--primary); }
+    .hero p {
+      color: rgba(255,255,255,.7);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      max-width: 480px;
+    }
+    .btn-hero-primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: .75rem 1.75rem;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      transition: background .15s, transform .12s, box-shadow .15s;
+      box-shadow: 0 4px 20px rgba(233,69,96,.35);
+    }
+    .btn-hero-primary:hover {
+      background: var(--primary-dark);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(233,69,96,.45);
+    }
+    .btn-hero-secondary {
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,.25);
+      padding: .75rem 1.75rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      transition: background .15s, transform .12s;
+      backdrop-filter: blur(6px);
+    }
+    .btn-hero-secondary:hover {
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+    .hero-stats {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .hero-stat-num {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -.03em;
+    }
+    .hero-stat-label {
+      font-size: .78rem;
+      color: rgba(255,255,255,.55);
+      font-weight: 500;
+      margin-top: 1px;
+    }
+    .hero-scissors {
+      font-size: clamp(8rem, 20vw, 14rem);
+      opacity: .06;
+      position: absolute;
+      right: 5%;
+      top: 50%;
+      transform: translateY(-50%) rotate(-20deg);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* ── Section common ── */
+    section { padding: 5rem 0; }
+    .section-label {
+      font-size: .73rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: .5rem;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      color: var(--dark);
+    }
+    .section-sub {
+      color: #64748b;
+      font-size: .95rem;
+      line-height: 1.65;
+      max-width: 500px;
+    }
+
+    /* ── Services ── */
+    .services-section { background: #f8fafc; }
+    .service-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 1.5px solid #e9ecef;
+      transition: border-color .2s, box-shadow .2s, transform .2s;
+      height: 100%;
+    }
+    .service-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 8px 28px rgba(233,69,96,.12);
+      transform: translateY(-3px);
+    }
+    .service-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #ffeef1, #fff0f3);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+    .service-name { font-weight: 700; font-size: .95rem; color: var(--dark); margin-bottom: .3rem; }
+    .service-price { font-weight: 700; font-size: 1.05rem; color: var(--primary); }
+
+    /* ── Branches ── */
+    .branch-card {
+      background: var(--dark);
+      border-radius: 16px;
+      padding: 2rem;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      height: 100%;
+    }
+    .branch-card::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      background: rgba(233,69,96,.12);
+    }
+    .branch-card-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+    }
+    .branch-name { font-size: 1.15rem; font-weight: 700; margin-bottom: .35rem; }
+    .branch-location { color: rgba(255,255,255,.6); font-size: .875rem; }
+
+    /* ── Booking ── */
+    .booking-section {
+      background: linear-gradient(135deg, var(--dark) 0%, var(--accent) 100%);
+      color: #fff;
+    }
+    .booking-section .section-title { color: #fff; }
+    .booking-section .section-sub { color: rgba(255,255,255,.65); max-width: 600px; }
+    .booking-form {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px;
+      padding: 2rem;
+      backdrop-filter: blur(12px);
+    }
+    .booking-form .form-label { color: rgba(255,255,255,.85); font-size: .845rem; font-weight: 500; }
+    .booking-form .form-control,
+    .booking-form .form-select {
+      background: rgba(255,255,255,.08);
+      border: 1.5px solid rgba(255,255,255,.18);
+      color: #fff;
+      border-radius: 10px;
+      font-size: .875rem;
+    }
+    .booking-form .form-control::placeholder { color: rgba(255,255,255,.35); }
+    .booking-form .form-control:focus,
+    .booking-form .form-select:focus {
+      background: rgba(255,255,255,.12);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(233,69,96,.2);
+      color: #fff;
+    }
+    .booking-form .form-select option { background: var(--dark-2); color: #fff; }
+    .btn-book {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: .75rem 1.5rem;
+      font-weight: 700;
+      font-size: .95rem;
+      width: 100%;
+      transition: background .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 4px 16px rgba(233,69,96,.35);
+    }
+    .btn-book:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(233,69,96,.45); }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--dark);
+      color: rgba(255,255,255,.6);
+      padding: 2.5rem 0;
+      font-size: .845rem;
+      text-align: center;
+    }
+    footer .brand { color: var(--primary); font-weight: 700; font-size: 1rem; }
+    footer a { color: rgba(255,255,255,.55); text-decoration: none; transition: color .15s; }
+    footer a:hover { color: #fff; }
+
+    /* ── WA float button ── */
+    .wa-float {
+      position: fixed;
+      bottom: 1.75rem;
+      right: 1.75rem;
+      z-index: 999;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #25d366;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      box-shadow: 0 4px 20px rgba(37,211,102,.45);
+      text-decoration: none;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .wa-float:hover { color: #fff; transform: scale(1.1); box-shadow: 0 6px 28px rgba(37,211,102,.55); }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar-custom">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between w-100">
+      <a class="navbar-brand" href="/">✂ CrowBarbershop</a>
+      <button class="navbar-toggler d-md-none" type="button" id="navToggle"
+              style="background:none;border:1px solid rgba(255,255,255,.2);color:#fff;padding:.35rem .6rem;border-radius:6px;">
+        <i class="bi bi-list" style="font-size:1.2rem;"></i>
+      </button>
+      <div class="d-none d-md-flex align-items-center gap-3" id="navMenu">
+        <a href="#layanan" class="nav-link">Layanan</a>
+        <a href="#cabang" class="nav-link">Cabang</a>
+        <a href="#booking" class="nav-link">Booking</a>
+        <a href="#booking" class="btn-book-nav nav-link">Booking Sekarang</a>
+      </div>
+    </div>
+    <!-- Mobile menu -->
+    <div id="mobileMenu" class="d-md-none" style="display:none!important;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.1);margin-top:.75rem;">
+      <a href="#layanan" class="nav-link py-2" onclick="closeMobileMenu()">Layanan</a>
+      <a href="#cabang"  class="nav-link py-2" onclick="closeMobileMenu()">Cabang</a>
+      <a href="#booking" class="nav-link py-2" onclick="closeMobileMenu()">Booking</a>
+      <a href="#booking" class="btn-book-nav nav-link py-2 mt-1 d-inline-block" onclick="closeMobileMenu()">Booking Sekarang</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="beranda">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-7 hero-content">
+        <div class="hero-badge">✂ Barbershop Profesional</div>
+        <h1>Tampil <span>Keren</span><br>dengan Potongan<br>Terbaik</h1>
+        <p class="mt-3">
+          CrowBarbershop — tempat potong rambut profesional dengan capster berpengalaman.
+          Nikmati layanan terbaik di cabang kami.
+        </p>
+        <div class="d-flex flex-wrap gap-3 mt-4">
+          <a href="#booking" class="btn-hero-primary">
+            <i class="bi bi-calendar-check"></i> Booking Sekarang
+          </a>
+          <a href="#layanan" class="btn-hero-secondary">
+            <i class="bi bi-scissors"></i> Lihat Layanan
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-num">2+</div>
+            <div class="hero-stat-label">Cabang</div>
+          </div>
+          <div>
+            <div class="hero-stat-num">100%</div>
+            <div class="hero-stat-label">Capster Profesional</div>
+          </div>
+          <div>
+            <div class="hero-stat-num">1000+</div>
+            <div class="hero-stat-label">Pelanggan Puas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-scissors">✂</div>
+</section>
+
+<!-- Layanan -->
+<section class="services-section" id="layanan">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">Layanan Kami</div>
+      <h2 class="section-title">Semua Kebutuhan<br>Rambut Anda</h2>
+      <p class="section-sub mx-auto mt-2">
+        Dari potong rambut dasar hingga coloring profesional — kami siap melayani dengan standar terbaik.
+      </p>
+    </div>
+    <div class="row g-3">
+      {% for svc in services %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="service-card">
+          <div class="service-icon">
+            {% if 'color' in svc.Name|lower or 'warna' in svc.Name|lower %}
+              <i class="bi bi-palette"></i>
+            {% elif 'cuci' in svc.Name|lower %}
+              <i class="bi bi-droplet"></i>
+            {% elif 'anak' in svc.Name|lower %}
+              <i class="bi bi-person-hearts"></i>
+            {% else %}
+              <i class="bi bi-scissors"></i>
+            {% endif %}
+          </div>
+          <div class="service-name">{{ svc.Name }}</div>
+          <div class="service-price">Rp {{ "{:,}".format(svc.Price | int).replace(",", ".") }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-center text-muted py-4">
+        <i class="bi bi-scissors" style="font-size:2rem;opacity:.3;"></i>
+        <p class="mt-2">Informasi layanan sedang dimuat.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Cabang -->
+<section id="cabang">
+  <div class="container">
+    <div class="text-center mb-5">
+      <div class="section-label">Lokasi Kami</div>
+      <h2 class="section-title">Cabang CrowBarbershop</h2>
+      <p class="section-sub mx-auto mt-2">
+        Temukan cabang terdekat kami dan kunjungi hari ini.
+      </p>
+    </div>
+    <div class="row g-4 justify-content-center">
+      {% for b in branches %}
+      <div class="col-md-6 col-lg-5">
+        <div class="branch-card">
+          <div class="branch-card-icon"><i class="bi bi-building"></i></div>
+          <div class="branch-name">{{ b.name }}</div>
+          <div class="branch-location">
+            <i class="bi bi-geo-alt" style="margin-right:.3rem;"></i>{{ b.location }}
+          </div>
+          <div class="mt-3">
+            <a href="https://wa.me/6285604011772?text=Halo+CrowBarbershop+{{ b.name }}%2C+saya+ingin+booking+potong+rambut."
+               target="_blank"
+               style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:.4rem .9rem;font-size:.83rem;font-weight:600;text-decoration:none;transition:background .15s;">
+              <i class="bi bi-whatsapp" style="color:#25d366;"></i> Hubungi Cabang
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Booking -->
+<section class="booking-section" id="booking">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-5">
+        <div class="section-label" style="color:var(--primary);">Reservasi</div>
+        <h2 class="section-title" style="color:#fff;">Booking<br>Sekarang</h2>
+        <p class="section-sub mt-3">
+          Isi form di samping dan kami akan konfirmasi via WhatsApp. Tidak perlu antri lama!
+        </p>
+        <ul class="mt-4 list-unstyled" style="color:rgba(255,255,255,.7);font-size:.9rem;">
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Konfirmasi cepat via WhatsApp</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Pilih cabang & layanan favoritmu</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Bebas antri panjang</li>
+        </ul>
+      </div>
+      <div class="col-lg-7">
+        <form class="booking-form" id="bookingForm" onsubmit="submitBooking(event)">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Nama Lengkap</label>
+              <input type="text" class="form-control" id="bookName" placeholder="Nama kamu" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">No. WhatsApp</label>
+              <input type="tel" class="form-control" id="bookPhone" placeholder="08xxxxxxxxxx" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Pilih Cabang</label>
+              <select class="form-select" id="bookBranch" required>
+                <option value="" disabled selected>— Pilih cabang —</option>
+                {% for b in branches %}
+                <option value="{{ b.name }}">{{ b.name }} · {{ b.location }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Layanan</label>
+              <select class="form-select" id="bookService" required>
+                <option value="" disabled selected>— Pilih layanan —</option>
+                {% for svc in services %}
+                <option value="{{ svc.Name }}">{{ svc.Name }} — Rp {{ "{:,}".format(svc.Price | int).replace(",", ".") }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Tanggal</label>
+              <input type="date" class="form-control" id="bookDate" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Jam (estimasi)</label>
+              <select class="form-select" id="bookTime" required>
+                <option value="" disabled selected>— Pilih jam —</option>
+                {% for h in range(9, 20) %}
+                <option value="{{ '%02d:00'|format(h) }}">{{ '%02d:00'|format(h) }}</option>
+                <option value="{{ '%02d:30'|format(h) }}">{{ '%02d:30'|format(h) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Catatan (opsional)</label>
+              <textarea class="form-control" id="bookNote" rows="2" placeholder="Referensi gaya, permintaan khusus, dll."></textarea>
+            </div>
+            <div class="col-12 mt-1">
+              <button type="submit" class="btn-book">
+                <i class="bi bi-whatsapp me-2"></i> Kirim Booking via WhatsApp
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="brand mb-1">✂ CrowBarbershop</div>
+    <p style="margin-bottom:.75rem;">Tampil keren, potong terbaik — Mojosari &amp; Sumput</p>
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
+      <a href="#layanan">Layanan</a>
+      <a href="#cabang">Cabang</a>
+      <a href="#booking">Booking</a>
+      <a href="/login" style="color:rgba(255,255,255,.25);font-size:.78rem;">Admin</a>
+    </div>
+    <p class="mt-3" style="font-size:.78rem;color:rgba(255,255,255,.3);">
+      &copy; {{ 2026 }} CrowBarbershop. All rights reserved.
+    </p>
+  </div>
+</footer>
+
+<!-- WhatsApp Float -->
+<a href="https://wa.me/6285604011772" target="_blank" class="wa-float" title="Chat WhatsApp">
+  <i class="bi bi-whatsapp"></i>
+</a>
+
+<script>
+  // Set min date for booking to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('bookDate').min = today;
+  document.getElementById('bookDate').value = today;
+
+  // Mobile nav toggle
+  document.getElementById('navToggle').addEventListener('click', () => {
+    const menu = document.getElementById('mobileMenu');
+    menu.style.display = menu.style.display === 'none' || menu.style.display === '' ? 'block' : 'none';
+  });
+  function closeMobileMenu() {
+    document.getElementById('mobileMenu').style.display = 'none';
+  }
+
+  // Booking form → WhatsApp
+  function submitBooking(e) {
+    e.preventDefault();
+    const name    = document.getElementById('bookName').value.trim();
+    const phone   = document.getElementById('bookPhone').value.trim();
+    const branch  = document.getElementById('bookBranch').value;
+    const service = document.getElementById('bookService').value;
+    const date    = document.getElementById('bookDate').value;
+    const time    = document.getElementById('bookTime').value;
+    const note    = document.getElementById('bookNote').value.trim();
+
+    const msg = `Halo CrowBarbershop! Saya ingin booking:%0A%0A`
+      + `*Nama:* ${name}%0A`
+      + `*No. WA:* ${phone}%0A`
+      + `*Cabang:* ${branch}%0A`
+      + `*Layanan:* ${service}%0A`
+      + `*Tanggal:* ${date} pukul ${time}%0A`
+      + (note ? `*Catatan:* ${note}%0A` : '')
+      + `%0ATerima kasih!`;
+
+    window.open(`https://wa.me/6285604011772?text=${msg}`, '_blank');
+  }
+
+  // Smooth scroll offset for sticky nav
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (!target) return;
+      e.preventDefault();
+      const offset = 70;
+      window.scrollTo({ top: target.offsetTop - offset, behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>

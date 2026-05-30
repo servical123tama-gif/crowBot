@@ -53,15 +53,16 @@ def _migrate_capster_auth_columns():
     is_sqlite = DATABASE_URL.startswith('sqlite')
     # (table, column, type)
     migrations = [
-        ('capsters',      'username',      'VARCHAR(50)'),
-        ('capsters',      'password_hash', 'VARCHAR(255)'),
-        ('customers',     'visit_count',   'INTEGER DEFAULT 0'),
-        ('customers',     'added_by',      "VARCHAR(100) DEFAULT ''"),
-        ('customers',     'created_at',    'TIMESTAMP'),
-        ('transactions',  'customer_id',   'INTEGER'),
-        ('transactions',  'promo_name',    "VARCHAR(100) DEFAULT ''"),
-        ('services',      'commission_rate', 'REAL DEFAULT 0.5'),
-        ('products',      'commission_rate', 'REAL DEFAULT 0.0'),
+        ('capsters',      'username',       'VARCHAR(50)'),
+        ('capsters',      'password_hash',  'VARCHAR(255)'),
+        ('customers',     'visit_count',    'INTEGER DEFAULT 0'),
+        ('customers',     'added_by',       "VARCHAR(100) DEFAULT ''"),
+        ('customers',     'created_at',     'TIMESTAMP'),
+        ('customers',     'point_balance',  'INTEGER DEFAULT 0'),
+        ('transactions',  'customer_id',    'INTEGER'),
+        ('transactions',  'promo_name',     "VARCHAR(100) DEFAULT ''"),
+        ('services',      'commission_rate','REAL DEFAULT 0.5'),
+        ('products',      'commission_rate','REAL DEFAULT 0.0'),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:
@@ -79,6 +80,20 @@ def _migrate_capster_auth_columns():
             except Exception:
                 # Column already exists — normal on second run
                 conn.rollback()
+
+        # Sync point_balance dari visit_count untuk customer lama (point_balance masih 0)
+        # Sistem baru: belum ada claim, jadi point_balance = visit_count (max 10)
+        try:
+            conn.execute(__import__('sqlalchemy').text(
+                "UPDATE customers "
+                "SET point_balance = CASE WHEN visit_count > 10 THEN 10 ELSE visit_count END "
+                "WHERE point_balance = 0 AND visit_count > 0"
+            ))
+            conn.commit()
+            logger.info("Migration: synced point_balance from visit_count")
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Migration sync point_balance skipped: {e}")
 
 
 @contextmanager

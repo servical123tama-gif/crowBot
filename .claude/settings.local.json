@@ -4,7 +4,13 @@
       "Bash(dir /s \"D:\\\\Document\\\\barber\\\\bot_barber_2\")",
       "Bash(del \"D:\\\\Document\\\\barber\\\\bot_barber_2\\\\app\\\\utils\\\\oprational_calculator.py\")",
       "Bash(cd:*)",
-      "Bash(python fix_branch_data.py)"
+      "Bash(python fix_branch_data.py)",
+      "Bash(python -m py_compile \"D:/Document/barber/bot_barber_2/dashboard/routes/capster_portal.py\")",
+      "Bash(python -m py_compile \"D:/Document/barber/bot_barber_2/app/db/repository.py\" \"D:/Document/barber/bot_barber_2/dashboard/routes/capster_portal.py\")",
+      "Bash(python -c ':*)",
+      "Read(//c/Users/tama/.claude/**)",
+      "Bash(py -m py_compile app/tg/__init__.py app/tg/auth.py app/tg/formatters.py app/tg/reports.py app/tg/handlers.py app/tg/scheduler.py app/tg/bot.py run_bot.py)",
+      "Bash(where psql *)"
     ]
   }
 }

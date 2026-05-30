@@ -31,11 +31,12 @@
     </div>
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Cabang</label>
-      <input type="text" name="branch" value="{{ branch_f }}" placeholder="Semua"
-             list="branchOpts2" class="form-control form-control-sm" style="width:110px" autocomplete="off">
-      <datalist id="branchOpts2">
-        {% for b in all_branches %}<option value="{{ b }}">{% endfor %}
-      </datalist>
+      <select name="branch" class="form-select form-select-sm" style="width:130px">
+        <option value="">Semua Cabang</option>
+        {% for bid, bshort in branch_map.items() %}
+        <option value="{{ bshort }}" {% if branch_f == bshort %}selected{% endif %}>{{ bshort }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Layanan / Produk</label>
@@ -63,7 +64,7 @@
       <a href="/transactions" class="btn btn-sm btn-outline-secondary">Reset</a>
     </div>
     <div class="col-sm-auto ms-sm-auto">
-      <a href="/transactions/export?start={{ start_str }}&end={{ end_str }}"
+      <a href="/transactions/export?start={{ start_str }}&end={{ end_str }}{% if capster_f %}&capster={{ capster_f }}{% endif %}{% if branch_f %}&branch={{ branch_f }}{% endif %}{% if service_f %}&service={{ service_f }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}"
          class="btn btn-sm btn-outline-success">
         <i class="bi bi-download me-1"></i>Export CSV
       </a>

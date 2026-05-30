@@ -66,11 +66,28 @@ class Customer(Base):
     name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True, default='')
     visit_count = Column(Integer, nullable=False, default=0)
-    added_by = Column(String(100), nullable=True, default='')  # nama capster yang menginput
+    point_balance = Column(Integer, nullable=False, default=0)  # poin loyalty (reset setelah klaim)
+    added_by = Column(String(100), nullable=True, default='')
     created_at = Column(DateTime, nullable=True, default=datetime.utcnow)
 
     def __repr__(self):
         return f"<Customer id={self.id} name={self.name}>"
+
+
+class LoyaltyClaim(Base):
+    """Riwayat klaim poin loyalty oleh customer."""
+    __tablename__ = 'loyalty_claims'
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    customer_id    = Column(Integer, nullable=False)
+    claim_type     = Column(String(20), nullable=False)   # '50pct' | 'free'
+    points_used    = Column(Integer, nullable=False)       # 5 atau 10
+    claimed_at     = Column(DateTime, nullable=False, default=datetime.utcnow)
+    transaction_id = Column(Integer, nullable=True)        # transaksi yang menggunakan klaim ini
+
+    __table_args__ = (
+        Index('ix_loyalty_customer', 'customer_id'),
+    )
 
 
 class Service(Base):

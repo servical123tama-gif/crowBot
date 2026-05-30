@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.db.database import get_db
 from app.db.models import (
     Transaction, Capster, Customer, Service, Branch, Product, SalaryWithdrawal,
-    ProductStock, ProductSale, Promo, Setting,
+    ProductStock, ProductSale, Promo, Setting, LoyaltyClaim,
 )
 from app.config.constants import (
     DATETIME_FORMAT, DATE_FORMAT,
@@ -245,6 +245,7 @@ class Repository:
             return [
                 {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
                  'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'PointBalance': getattr(r, 'point_balance', 0) or 0,
                  'AddedBy': getattr(r, 'added_by', '') or '',
                  'CreatedAt': getattr(r, 'created_at', None)}
                 for r in rows
@@ -305,6 +306,7 @@ class Repository:
             return [
                 {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
                  'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'PointBalance': getattr(r, 'point_balance', 0) or 0,
                  'AddedBy': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
@@ -324,6 +326,112 @@ class Repository:
         except Exception as e:
             logger.error(f"Failed to increment visit count for customer {customer_id}: {e}")
             return False
+
+    # ------------------------------------------------------------------ #
+    # Loyalty / Points                                                    #
+    # ------------------------------------------------------------------ #
+
+    LOYALTY_THRESHOLDS = {
+        '50pct': {'points': 5,  'label': 'Diskon 50%'},
+        'free':  {'points': 10, 'label': 'Potong Gratis'},
+    }
+    LOYALTY_MAX_POINTS = 10
+
+    def get_loyalty_status(self, customer_id: int, include_next: bool = False) -> Dict:
+        """Return point_balance and available claim types for a customer.
+
+        include_next=True → cek reward setelah +1 poin (kunjungan ini).
+        Panel muncul saat point_balance >= 4 (→ jadi 5) atau >= 9 (→ jadi 10).
+        """
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+            if not row:
+                return {'point_balance': 0, 'available': []}
+            bal = getattr(row, 'point_balance', 0) or 0
+            check_bal = min(bal + 1, self.LOYALTY_MAX_POINTS) if include_next else bal
+            # Tampilkan hanya reward terbaik yang bisa diclaim (prioritas: gratis > 50%)
+            available = []
+            if check_bal >= self.LOYALTY_THRESHOLDS['free']['points']:
+                t = self.LOYALTY_THRESHOLDS['free']
+                available.append({'type': 'free', 'label': t['label'], 'points': t['points']})
+            elif check_bal >= self.LOYALTY_THRESHOLDS['50pct']['points']:
+                t = self.LOYALTY_THRESHOLDS['50pct']
+                available.append({'type': '50pct', 'label': t['label'], 'points': t['points']})
+            return {'point_balance': bal, 'available': available}
+        except Exception as e:
+            logger.error(f"Failed to get loyalty status: {e}")
+            return {'point_balance': 0, 'available': []}
+
+    def add_customer_points(self, customer_id: int, points: int = 1) -> int:
+        """Add loyalty points to customer. Returns new balance."""
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+                if not row:
+                    return 0
+                bal = min((getattr(row, 'point_balance', 0) or 0) + points, self.LOYALTY_MAX_POINTS)
+                row.point_balance = bal
+            return bal
+        except Exception as e:
+            logger.error(f"Failed to add points to customer {customer_id}: {e}")
+            return 0
+
+    def use_loyalty_claim(self, customer_id: int, claim_type: str,
+                          transaction_id: Optional[int] = None) -> bool:
+        """Tambah +1 poin kunjungan ini, validasi threshold, reset ke 0, catat klaim."""
+        cfg = self.LOYALTY_THRESHOLDS.get(claim_type)
+        if not cfg:
+            return False
+        try:
+            with get_db() as db:
+                row = db.query(Customer).filter(Customer.id == customer_id).first()
+                if not row:
+                    return False
+                bal = min((getattr(row, 'point_balance', 0) or 0) + 1, self.LOYALTY_MAX_POINTS)
+                if bal < cfg['points']:
+                    return False
+                row.point_balance = 0
+                db.add(LoyaltyClaim(
+                    customer_id=customer_id,
+                    claim_type=claim_type,
+                    points_used=cfg['points'],
+                    claimed_at=datetime.utcnow(),
+                    transaction_id=transaction_id,
+                ))
+            return True
+        except Exception as e:
+            logger.error(f"Failed to use loyalty claim: {e}")
+            return False
+
+    def get_loyalty_history(self, customer_id: Optional[int] = None,
+                            limit: int = 50) -> List[Dict]:
+        """Return loyalty claim history, optionally filtered by customer."""
+        try:
+            with get_db() as db:
+                q = db.query(LoyaltyClaim, Customer.name).join(
+                    Customer, LoyaltyClaim.customer_id == Customer.id, isouter=True
+                )
+                if customer_id:
+                    q = q.filter(LoyaltyClaim.customer_id == customer_id)
+                rows = q.order_by(LoyaltyClaim.claimed_at.desc()).limit(limit).all()
+            result = []
+            for claim, cname in rows:
+                label = self.LOYALTY_THRESHOLDS.get(claim.claim_type, {}).get('label', claim.claim_type)
+                result.append({
+                    'id':             claim.id,
+                    'customer_id':    claim.customer_id,
+                    'customer_name':  cname or '-',
+                    'claim_type':     claim.claim_type,
+                    'label':          label,
+                    'points_used':    claim.points_used,
+                    'claimed_at':     claim.claimed_at,
+                    'transaction_id': claim.transaction_id,
+                })
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get loyalty history: {e}")
+            return []
 
     def add_transaction_full(self, date: 'datetime', capster_name: str, service_name: str,
                              price: int, payment_method: str, branch: str,

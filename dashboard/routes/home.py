@@ -30,7 +30,7 @@ def logout():
     return redirect(url_for('home.login'))
 
 
-@home_bp.route('/')
+@home_bp.route('/admin')
 @login_required
 def index():
     db = Repository()

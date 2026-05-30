@@ -76,12 +76,23 @@
     </div>
     {% endif %}
 
-    <!-- Info customer -->
+    <!-- Info customer & loyalty -->
     {% if last_tx.had_customer %}
-    <div class="d-flex align-items-center gap-1 mb-3 text-success" style="font-size:.82rem;">
+    <div class="d-flex align-items-center gap-1 mb-2 text-success" style="font-size:.82rem;">
       <i class="bi bi-person-check-fill"></i>
-      <span>Kunjungan customer tercatat +1</span>
+      <span>Kunjungan customer tercatat</span>
     </div>
+    {% if last_tx.loyalty_label %}
+    <div class="d-flex align-items-center gap-1 mb-2" style="font-size:.82rem;color:#92400e;background:#fffbeb;padding:.4rem .6rem;border-radius:8px;border:1px solid #fcd34d;">
+      <i class="bi bi-gift-fill"></i>
+      <span>Reward diklaim: <strong>{{ last_tx.loyalty_label }}</strong> — poin direset ke 0</span>
+    </div>
+    {% elif last_tx.new_point_balance is not none %}
+    <div class="d-flex align-items-center gap-1 mb-2" style="font-size:.82rem;color:#1d4ed8;background:#eff6ff;padding:.4rem .6rem;border-radius:8px;border:1px solid #bfdbfe;">
+      <i class="bi bi-star-fill"></i>
+      <span>Poin loyalty: <strong>{{ last_tx.new_point_balance }}</strong> poin</span>
+    </div>
+    {% endif %}
     {% endif %}
 
     <!-- Action buttons -->
@@ -268,8 +279,12 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
                style="width:36px;height:36px;background:#0f3460;font-size:.85rem;flex-shrink:0;"
                id="custAvatar">{% if preset_customer %}{{ preset_customer['Name'][0].upper() }}{% else %}?{% endif %}</div>
           <div class="flex-grow-1">
-            <div class="fw-600" id="custName" style="font-size:.9rem;">
-              {% if preset_customer %}{{ preset_customer['Name'] }}{% else %}-{% endif %}
+            <div class="fw-600 d-flex align-items-center gap-2" id="custName" style="font-size:.9rem;">
+              <span id="custNameText">{% if preset_customer %}{{ preset_customer['Name'] }}{% else %}-{% endif %}</span>
+              <span id="custPointBadge" class="badge rounded-pill"
+                    style="font-size:.68rem;display:none;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;">
+                <i class="bi bi-star-fill" style="font-size:.6rem;"></i> <span id="custPointVal">0</span> poin
+              </span>
             </div>
             <div class="text-muted" id="custMeta" style="font-size:.77rem;">
               {% if preset_customer %}
@@ -282,6 +297,16 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
             <i class="bi bi-x"></i> Ganti
           </button>
         </div>
+
+        <!-- Loyalty claim options (muncul jika poin cukup) -->
+        <div id="loyaltyClaimBox" style="display:none;margin-top:.5rem;padding:.6rem .75rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;">
+          <div style="font-size:.78rem;font-weight:700;color:#92400e;margin-bottom:.4rem;">
+            <i class="bi bi-gift-fill me-1"></i> Reward tersedia!
+          </div>
+          <div id="loyaltyOptions"></div>
+          <input type="hidden" name="use_loyalty" id="useLoyaltyInput" value="">
+        </div>
+
         <input type="hidden" name="customer_id" id="customerIdInput"
                value="{% if preset_customer %}{{ preset_customer['id'] }}{% endif %}">
       </div>
@@ -644,24 +669,37 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
       dd.style.display = 'block';
       return;
     }
-    dd.innerHTML = items.map(c => `
+    dd.innerHTML = items.map(c => {
+      const pts = c.point_balance || 0;
+      const ptsBadge = pts > 0
+        ? `<span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:99px;padding:1px 6px;font-size:.68rem;font-weight:700;margin-left:4px;">★ ${pts} poin</span>`
+        : '';
+      // Simpan loyalty JSON di data-attribute (aman dari konflik kutip)
+      const loyaltyEncoded = encodeURIComponent(JSON.stringify(c.available || []));
+      return `
       <div class="px-3 py-2 d-flex align-items-center gap-2 search-item"
            style="cursor:pointer;font-size:.85rem;"
            onmouseenter="this.style.background='#f8f9ff'"
            onmouseleave="this.style.background=''"
-           onclick="selectCustomer(${c.id}, '${c.name.replace(/'/g,"\\'")}', '${c.phone}', ${c.visits})">
+           data-cid="${c.id}"
+           data-name="${c.name.replace(/"/g,'&quot;')}"
+           data-phone="${(c.phone||'').replace(/"/g,'&quot;')}"
+           data-visits="${c.visits}"
+           data-pts="${pts}"
+           data-loyalty="${loyaltyEncoded}"
+           onclick="selectFromDropdown(this)">
         <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
              style="width:30px;height:30px;background:#0f3460;font-size:.75rem;flex-shrink:0;">
           ${c.name[0].toUpperCase()}
         </div>
         <div>
-          <div class="fw-500">${c.name}</div>
+          <div class="fw-500">${c.name}${ptsBadge}</div>
           <div class="text-muted" style="font-size:.75rem;">
             ${c.phone || 'No HP belum diisi'} &nbsp;·&nbsp; ${c.visits} kunjungan
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     dd.style.display = 'block';
   }
 
@@ -675,29 +713,77 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
     }
   });
 
-  function selectCustomer(id, name, phone, visits) {
+  function selectFromDropdown(el) {
+    const available = JSON.parse(decodeURIComponent(el.dataset.loyalty || '%5B%5D'));
+    selectCustomer(el.dataset.cid, el.dataset.name, el.dataset.phone,
+                   el.dataset.visits, parseInt(el.dataset.pts)||0, available);
+  }
+
+  function selectCustomer(id, name, phone, visits, points, available) {
     document.getElementById('customerIdInput').value = id;
-    document.getElementById('custName').textContent  = name;
-    document.getElementById('custMeta').textContent  =
-      (phone || 'No HP -') + '  ·  ' + visits + ' kunjungan sebelumnya';
     document.getElementById('custAvatar').textContent = name[0].toUpperCase();
+    document.getElementById('custNameText').textContent = name;
+    document.getElementById('custMeta').textContent =
+      (phone || 'No HP -') + '  ·  ' + visits + ' kunjungan sebelumnya';
+
+    // Point badge
+    const badge = document.getElementById('custPointBadge');
+    const val   = document.getElementById('custPointVal');
+    if (points > 0) {
+      val.textContent = points;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    // Loyalty claim options
+    renderLoyaltyOptions(available || []);
+
     document.getElementById('customerSelected').style.display = '';
     document.getElementById('customerInput').style.display    = 'none';
     document.getElementById('searchBox').value = '';
     hideDropdown();
   }
 
+  function renderLoyaltyOptions(available) {
+    const box  = document.getElementById('loyaltyClaimBox');
+    const opts = document.getElementById('loyaltyOptions');
+    document.getElementById('useLoyaltyInput').value = '';
+
+    if (!available || available.length === 0) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = '';
+    opts.innerHTML = available.map(a => `
+      <label class="d-flex align-items-center gap-2 mb-1" style="cursor:pointer;font-size:.82rem;">
+        <input type="radio" name="_loyalty_radio" value="${a.type}"
+               onchange="document.getElementById('useLoyaltyInput').value=this.value"
+               style="accent-color:#d97706;">
+        <span>${a.label} <span style="color:#6b7280;">(${a.points} poin)</span></span>
+      </label>
+    `).join('') + `
+      <label class="d-flex align-items-center gap-2 mt-1" style="cursor:pointer;font-size:.82rem;">
+        <input type="radio" name="_loyalty_radio" value="" checked
+               onchange="document.getElementById('useLoyaltyInput').value=''">
+        <span class="text-muted">Tidak klaim sekarang</span>
+      </label>`;
+  }
+
   function clearCustomer() {
     document.getElementById('customerIdInput').value = '';
     document.getElementById('customerSelected').style.display = 'none';
     document.getElementById('customerInput').style.display    = '';
+    document.getElementById('custPointBadge').style.display   = 'none';
+    document.getElementById('loyaltyClaimBox').style.display  = 'none';
+    document.getElementById('useLoyaltyInput').value = '';
   }
 
   function skipCustomer() {
     clearCustomer();
     document.getElementById('customerSelected').style.display = '';
     document.getElementById('customerInput').style.display    = 'none';
-    document.getElementById('custName').textContent  = 'Walk-in (tanpa data customer)';
+    document.getElementById('custNameText').textContent = 'Walk-in (tanpa data customer)';
     document.getElementById('custMeta').textContent  = 'Kunjungan tidak akan terhitung';
     document.getElementById('custAvatar').textContent = '?';
     document.getElementById('customerIdInput').value = '';
@@ -725,7 +811,8 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
             .then(r => r.json())
             .then(data => {
               if (data.length) {
-                selectCustomer(data[0].id, data[0].name, data[0].phone, data[0].visits);
+                const d = data[0];
+                selectCustomer(d.id, d.name, d.phone, d.visits, d.point_balance||0, d.available||[]);
               } else {
                 alert('Customer tidak ditemukan di database.');
                 resetScannerUI();

@@ -15,6 +15,7 @@ def create_app():
     # Currency filter for Jinja2
     app.jinja_env.filters['idr'] = lambda x: f"Rp {int(x or 0):,}".replace(',', '.')
 
+    from dashboard.routes.public import public_bp
     from dashboard.routes.home import home_bp
     from dashboard.routes.profit import profit_bp
     from dashboard.routes.transactions import transactions_bp
@@ -30,6 +31,7 @@ def create_app():
     from dashboard.routes.capster_portal import capster_portal_bp
     from dashboard.routes.promos import promos_bp
 
+    app.register_blueprint(public_bp)
     app.register_blueprint(home_bp)
     app.register_blueprint(profit_bp)
     app.register_blueprint(transactions_bp)
