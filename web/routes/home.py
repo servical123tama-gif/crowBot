@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from flask import Blueprint, render_template, request, session, redirect, url_for
 
+from web import limiter
 from web.auth import login_required, check_dashboard_password
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
@@ -12,6 +13,7 @@ home_bp = Blueprint('home', __name__)
 
 
 @home_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=['POST'], error_message='Terlalu banyak percobaan login. Coba lagi dalam 1 menit.')
 def login():
     if session.get('logged_in'):
         return redirect(url_for('home.index'))

@@ -34,9 +34,11 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
   - SECURE conditional pada `DEBUG` env (True kalau prod via Cloudflare HTTPS, False di dev).
   - HTTPONLY=True, SAMESITE='Lax' selalu aktif.
 
-- [ ] **#5 Rate limit di `/login` & `/portal/login`**
-  - Fix: `Flask-Limiter` dengan limit misal `5/minute per IP` untuk login endpoints.
-  - Test: brute-force script harus kena 429.
+- [x] **#5 Rate limit di `/login` & `/portal/login`** — fixed
+  - File: `web/__init__.py`, `web/routes/home.py`, `web/routes/capster_portal.py`
+  - Solusi: `Flask-Limiter==3.8.0` + ProxyFix supaya rate limit pakai IP asli dari Cloudflare X-Forwarded-For (bukan 127.0.0.1).
+  - Limit: 5/menit per IP untuk POST login. Test client buktikan 6th request kena 429.
+  - Storage: in-memory (cocok untuk single-process Flask dev server di laptop).
 
 ---
 
@@ -135,12 +137,12 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 ## 📊 Progress tracker
 
 Hitung manual setelah update:
-- Critical: ☑ 3 / ☐ 2 (sisa: #2 CSRF, #5 rate limit)
+- Critical: ☑ 4 / ☐ 1 (sisa: #2 CSRF)
 - High: ☐ 6
 - Medium: ☐ 6
 - Low: ☐ 5
 
-Total: **22 item** (3 selesai).
+Total: **22 item** (4 selesai).
 
 ---
 

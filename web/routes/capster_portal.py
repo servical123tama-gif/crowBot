@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash
 
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
+from web import limiter
 from web.routes.customers import _auto_send_welcome_wa
 
 capster_portal_bp = Blueprint('capster_portal', __name__, url_prefix='/portal')
@@ -54,6 +55,7 @@ def _capster_names(cap):
 # ── Login / Logout ────────────────────────────────────────────────────────── #
 
 @capster_portal_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=['POST'], error_message='Terlalu banyak percobaan login. Coba lagi dalam 1 menit.')
 def login():
     if session.get('capster_logged_in'):
         return redirect(url_for('capster_portal.dashboard'))
