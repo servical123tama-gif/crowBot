@@ -511,7 +511,7 @@ def add_transaction():
                     flash('Gagal mendaftarkan customer baru. Transaksi tetap dilanjutkan sebagai walk-in.', 'warning')
 
         # ── Validasi loyalty claim ──
-        loyalty_status = repo.get_loyalty_status(cid) if cid else {'point_balance': 0, 'available': []}
+        loyalty_status = repo.get_loyalty_status(cid, include_next=True) if cid else {'point_balance': 0, 'available': []}
         valid_claim_types = {c['type'] for c in loyalty_status['available']}
         if use_loyalty and use_loyalty not in valid_claim_types:
             use_loyalty = ''  # klaim tidak valid / poin tidak cukup
@@ -709,7 +709,7 @@ def customer_lookup():
     cid   = request.args.get('id', '').strip()
 
     def _loyalty(c):
-        status = repo.get_loyalty_status(c['id'])
+        status = repo.get_loyalty_status(c['id'], include_next=True)
         return {
             'id':            c['id'],
             'name':          c['Name'],

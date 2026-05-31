@@ -348,12 +348,13 @@ class Repository:
     LOYALTY_MAX_POINTS = 10
 
     def get_loyalty_status(self, customer_id: int, include_next: bool = False) -> Dict:
-        """Return point_balance dan claim yang BISA dipakai sekarang.
+        """Return point_balance dan claim yang BISA dipakai.
 
-        Reward muncul saat point_balance sudah cukup: 5 → 50%, 10 → gratis.
-        Param include_next dipertahankan untuk backward-compat tapi diabaikan
-        (skema lama "anticipate +1 next visit" tidak relevan dengan model
-        subtractive).
+        include_next=True → antisipasi +1 untuk visit ini (visibility lenient).
+        Mis. balance=4 + include_next=True → check_bal=5 → "Diskon 50%" tampil.
+        Saat klaim, balance dikurangi threshold (di-clamp ke 0).
+
+        include_next=False → strict, hanya tampil kalau stored balance >= threshold.
         """
         try:
             with get_db() as db:
@@ -361,12 +362,13 @@ class Repository:
             if not row:
                 return {'point_balance': 0, 'available': []}
             bal = getattr(row, 'point_balance', 0) or 0
+            check_bal = min(bal + 1, self.LOYALTY_MAX_POINTS) if include_next else bal
             # Tampilkan reward terbaik yang bisa diclaim (prioritas: gratis > 50%)
             available = []
-            if bal >= self.LOYALTY_THRESHOLDS['free']['points']:
+            if check_bal >= self.LOYALTY_THRESHOLDS['free']['points']:
                 t = self.LOYALTY_THRESHOLDS['free']
                 available.append({'type': 'free', 'label': t['label'], 'points': t['points']})
-            elif bal >= self.LOYALTY_THRESHOLDS['50pct']['points']:
+            elif check_bal >= self.LOYALTY_THRESHOLDS['50pct']['points']:
                 t = self.LOYALTY_THRESHOLDS['50pct']
                 available.append({'type': '50pct', 'label': t['label'], 'points': t['points']})
             return {'point_balance': bal, 'available': available}
@@ -390,16 +392,22 @@ class Repository:
 
     def use_loyalty_claim(self, customer_id: int, claim_type: str,
                           transaction_id: Optional[int] = None) -> Optional[int]:
-        """Klaim reward — subtract threshold dari point_balance.
+        """Klaim reward — sisa = max(0, balance - threshold).
 
         Contoh:
-          - Balance 6, klaim '50pct' (5 poin) → balance 1.
-          - Balance 10, klaim 'free' (10 poin) → balance 0.
-          - Balance 4, klaim '50pct' → return None (poin kurang).
+          - Balance 6, klaim '50pct' (5 poin) → sisa 1.
+          - Balance 5, klaim '50pct' → sisa 0.
+          - Balance 4, klaim '50pct' → sisa 0 (clamp; visit ini dianggap mencapai 5).
+          - Balance 10, klaim 'free' (10 poin) → sisa 0.
+          - Balance 9, klaim 'free' → sisa 0 (clamp).
+          - Balance 0, klaim apa pun → sisa 0 (clamp; tidak negatif).
+
+        Validasi minimum: balance + 1 >= threshold (sinkron dengan visibility
+        get_loyalty_status(include_next=True)). Lebih rendah dari itu → gagal.
 
         Returns:
           int — new point_balance setelah klaim
-          None — gagal (claim_type invalid / customer tidak ada / poin kurang)
+          None — gagal (claim_type invalid / customer tidak ada / poin terlalu jauh dari threshold)
         """
         cfg = self.LOYALTY_THRESHOLDS.get(claim_type)
         if not cfg:
@@ -410,9 +418,10 @@ class Repository:
                 if not row:
                     return None
                 current = getattr(row, 'point_balance', 0) or 0
-                if current < cfg['points']:
+                # Sync dengan UI: kalau even with +1 (visit ini) tidak cukup → tolak
+                if current + 1 < cfg['points']:
                     return None
-                new_balance = current - cfg['points']
+                new_balance = max(0, current - cfg['points'])
                 row.point_balance = new_balance
                 db.add(LoyaltyClaim(
                     customer_id=customer_id,
