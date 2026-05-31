@@ -230,11 +230,14 @@ class Repository:
         """
         try:
             with get_db() as db:
+                # visit_count=0: daftar saja bukan kunjungan. Setiap transaksi akan
+                # `increment_visit_count()` di add_transaction_full. Begitu customer
+                # transaksi pertama, visit_count jadi 1 (bukan 2 seperti versi lama).
                 new_row = Customer(
                     name=customer.name,
                     phone=customer.phone,
                     added_by=added_by,
-                    visit_count=1,
+                    visit_count=0,
                 )
                 db.add(new_row)
                 db.flush()              # populate new_row.id sebelum commit
