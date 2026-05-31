@@ -10,7 +10,21 @@ load_dotenv()
 
 def create_app():
     app = Flask(__name__, template_folder='templates', static_folder='static')
-    app.secret_key = os.getenv('DASHBOARD_SECRET_KEY', 'barbershop-dashboard-2026')
+
+    secret_key = os.getenv('DASHBOARD_SECRET_KEY')
+    if not secret_key:
+        raise RuntimeError(
+            "DASHBOARD_SECRET_KEY belum diset di .env. "
+            "Generate dengan: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    app.secret_key = secret_key
+
+    debug = os.getenv('DEBUG', 'False').lower() == 'true'
+    app.config.update(
+        SESSION_COOKIE_SECURE=not debug,   # True di prod (HTTPS via Cloudflare), False di dev (http://localhost)
+        SESSION_COOKIE_HTTPONLY=True,      # JS tidak bisa baca cookie session
+        SESSION_COOKIE_SAMESITE='Lax',     # mitigasi CSRF dasar — minimal kalau ada link dari domain lain
+    )
 
     # Currency filter for Jinja2
     app.jinja_env.filters['idr'] = lambda x: f"Rp {int(x or 0):,}".replace(',', '.')
