@@ -1,8 +1,11 @@
 """Capster self-service portal — private view per capster."""
+import logging
 from datetime import datetime
 from functools import wraps
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, session, jsonify, Response,
@@ -460,6 +463,8 @@ def add_transaction():
         service_id     = request.form.get('service_id', '').strip()
         payment_method = request.form.get('payment_method', 'Cash').strip()
         customer_id    = request.form.get('customer_id', '').strip()
+        new_cust_name  = request.form.get('new_customer_name', '').strip()
+        new_cust_phone = request.form.get('new_customer_phone', '').strip()
         promo_id_str   = request.form.get('promo_id', '').strip()
         family_member  = request.form.get('family_member', '').strip()
         family_count   = max(1, int(request.form.get('family_count', '1') or '1'))
@@ -480,6 +485,30 @@ def add_transaction():
             return redirect(url_for('capster_portal.add_transaction'))
 
         cid = int(customer_id) if customer_id.isdigit() else None
+
+        # ── Mode "Customer Baru": create customer dulu, pakai ID-nya ────────
+        # Trigger: ada new_customer_name DAN tidak ada customer_id pilihan.
+        # Cek duplikasi nomor HP supaya tidak double-register.
+        if new_cust_name and not cid:
+            existing = repo.get_customer_by_phone(new_cust_phone) if new_cust_phone else None
+            if existing:
+                cid = existing['id']
+                flash(f"Nomor HP {new_cust_phone} sudah terdaftar atas nama "
+                      f"{existing['Name']} — transaksi dilink ke customer tersebut.", 'info')
+            else:
+                from types import SimpleNamespace
+                new_c = SimpleNamespace(name=new_cust_name, phone=new_cust_phone)
+                new_id = repo.add_customer(new_c, added_by=cap.get('name', ''))
+                if new_id:
+                    cid = new_id
+                    # Auto-kirim WA welcome kalau ada nomor HP
+                    if new_cust_phone:
+                        try:
+                            _auto_send_welcome_wa(new_id, new_cust_name, new_cust_phone, repo)
+                        except Exception as e:
+                            logger.warning(f"Welcome WA gagal: {e}")
+                else:
+                    flash('Gagal mendaftarkan customer baru. Transaksi tetap dilanjutkan sebagai walk-in.', 'warning')
 
         # ── Validasi loyalty claim ──
         loyalty_status = repo.get_loyalty_status(cid, include_next=True) if cid else {'point_balance': 0, 'available': []}

@@ -223,20 +223,27 @@ class Repository:
             logger.error(f"Failed to get customer by phone: {e}")
             return None
 
-    def add_customer(self, customer, added_by: str = '') -> bool:
+    def add_customer(self, customer, added_by: str = '') -> Optional[int]:
+        """Insert customer. Return new ID kalau sukses, None kalau gagal.
+
+        Note: caller lama yang pakai `if ok:` tetap jalan karena None falsy & int truthy.
+        """
         try:
             with get_db() as db:
-                db.add(Customer(
+                new_row = Customer(
                     name=customer.name,
                     phone=customer.phone,
                     added_by=added_by,
                     visit_count=1,
-                ))
-            logger.info(f"Customer added: {customer.name} by {added_by or 'unknown'}")
-            return True
+                )
+                db.add(new_row)
+                db.flush()              # populate new_row.id sebelum commit
+                new_id = new_row.id
+            logger.info(f"Customer added id={new_id}: {customer.name} by {added_by or 'unknown'}")
+            return new_id
         except Exception as e:
             logger.error(f"Failed to add customer: {e}", exc_info=True)
-            return False
+            return None
 
     def get_all_customers(self) -> List[Dict[str, Any]]:
         try:

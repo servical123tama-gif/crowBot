@@ -314,7 +314,7 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
                value="{% if preset_customer %}{{ preset_customer['id'] }}{% endif %}">
       </div>
 
-      <!-- Scan / Search -->
+      <!-- Scan / Search / New -->
       <div id="customerInput"
            style="{% if preset_customer %}display:none;{% endif %}">
         <div class="d-flex gap-2 mb-2">
@@ -338,6 +338,15 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
           </div>
         </div>
 
+        <!-- CTA: Customer Baru (inline form) -->
+        <div class="mt-3 p-2 rounded-3" style="background:#fff8f0;border:1.5px dashed #f97316;">
+          <button type="button" class="btn btn-sm w-100 fw-semibold"
+                  style="background:#f97316;color:#fff;border-radius:8px;"
+                  onclick="openNewCustomer()">
+            <i class="bi bi-person-plus me-1"></i>Customer Baru (Daftar + Transaksi sekaligus)
+          </button>
+        </div>
+
         <div class="text-center mt-2">
           <small class="text-muted">— atau —</small>
         </div>
@@ -346,6 +355,44 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
                   style="font-size:.82rem;" onclick="skipCustomer()">
             Lanjut tanpa customer (walk-in)
           </button>
+        </div>
+      </div>
+
+      <!-- Inline form: Customer Baru (hidden by default) -->
+      <div id="newCustomerBox" style="display:none;" class="mt-2 p-3 rounded-3"
+           style="background:#fff8f0;border:1.5px solid #f97316;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-bold" style="font-size:.88rem;color:#c2410c;">
+            <i class="bi bi-person-plus me-1"></i>Daftar Customer Baru
+          </span>
+          <button type="button" class="btn btn-sm btn-link text-muted p-0"
+                  style="font-size:.78rem;" onclick="cancelNewCustomer()">
+            <i class="bi bi-x"></i> Batal
+          </button>
+        </div>
+        <div class="mb-2">
+          <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;">
+            Nama <span class="text-danger">*</span>
+          </label>
+          <input type="text" name="new_customer_name" id="newCustNameInput"
+                 class="form-control form-control-sm"
+                 placeholder="Nama lengkap customer"
+                 oninput="updateNewCustomerPreview()">
+        </div>
+        <div class="mb-2">
+          <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;">
+            No. HP / WhatsApp <span class="text-muted fw-normal">(opsional)</span>
+          </label>
+          <input type="tel" name="new_customer_phone" id="newCustPhoneInput"
+                 class="form-control form-control-sm"
+                 placeholder="628xxxxxxxx">
+          <small class="text-muted" style="font-size:.72rem;">
+            <i class="bi bi-info-circle"></i> Kalau diisi, QR auto-kirim WA setelah simpan.
+          </small>
+        </div>
+        <div class="alert alert-warning py-2 mb-0" style="font-size:.78rem;">
+          <i class="bi bi-magic me-1"></i>
+          Customer akan didaftar otomatis saat tombol "Simpan Transaksi" ditekan.
         </div>
       </div>
 
@@ -780,6 +827,27 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
     document.getElementById('custPointBadge').style.display   = 'none';
     document.getElementById('loyaltyClaimBox').style.display  = 'none';
     document.getElementById('useLoyaltyInput').value = '';
+    cancelNewCustomer();  // sekalian reset mode customer baru
+  }
+
+  // ── Customer Baru (inline form) ───────────────────────────────────────
+  function openNewCustomer() {
+    document.getElementById('customerInput').style.display     = 'none';
+    document.getElementById('newCustomerBox').style.display    = '';
+    document.getElementById('customerSelected').style.display  = 'none';
+    document.getElementById('customerIdInput').value = '';        // pastikan tidak ada cid lama
+    document.getElementById('newCustNameInput').focus();
+  }
+
+  function cancelNewCustomer() {
+    document.getElementById('newCustomerBox').style.display = 'none';
+    document.getElementById('newCustNameInput').value  = '';
+    document.getElementById('newCustPhoneInput').value = '';
+    document.getElementById('customerInput').style.display = '';
+  }
+
+  function updateNewCustomerPreview() {
+    // Reserved untuk validasi inline di masa depan (cek nomor HP duplikat dll.)
   }
 
   function skipCustomer() {
@@ -866,6 +934,19 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
       alert('Pilih minimal satu layanan atau produk sebelum menyimpan.');
       return;
     }
+
+    // Mode "Customer Baru" aktif tapi nama kosong → error
+    const newCustBox = document.getElementById('newCustomerBox');
+    if (newCustBox && newCustBox.style.display !== 'none') {
+      const newName = document.getElementById('newCustNameInput').value.trim();
+      if (!newName) {
+        e.preventDefault();
+        alert('Nama customer baru wajib diisi. Klik "Batal" kalau tidak jadi mendaftar customer.');
+        document.getElementById('newCustNameInput').focus();
+        return;
+      }
+    }
+
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('submitBtn').innerHTML =
       '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
