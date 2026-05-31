@@ -68,6 +68,7 @@
             </button>
             <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
                   onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>
           </td>
@@ -124,6 +125,7 @@
             </button>
             <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
                   onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>
           </td>
@@ -163,6 +165,7 @@
     </div>
 
     <form method="post" action="/services/paket-settings" class="d-flex align-items-end gap-2 flex-wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="flex-grow-1">
         <label class="form-label form-label-sm fw-semibold">Daftar Anggota
           <span class="text-muted fw-normal">(pisahkan dengan koma)</span>
@@ -185,6 +188,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" action="/services/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="addModalLabel">Tambah Layanan</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -240,6 +244,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="editForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="editModalLabel">Edit Layanan</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

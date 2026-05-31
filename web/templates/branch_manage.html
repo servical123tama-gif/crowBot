@@ -59,6 +59,7 @@
           </button>
           <form method="post" action="/branches/delete/{{ b.branch_id }}"
                 onsubmit="return confirm('Hapus cabang \'{{ b.name }}\'?\n\nData capster yang ter-assign ke cabang ini tidak ikut terhapus.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>
         </div>
@@ -135,6 +136,7 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form method="post" action="/branches/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="addModalLabel">Tambah Cabang Baru</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -222,6 +224,7 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form method="post" id="editForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="editModalLabel">Edit Cabang</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

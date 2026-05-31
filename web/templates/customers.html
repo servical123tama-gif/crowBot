@@ -32,6 +32,7 @@
 
 <!-- Search -->
 <form method="get" class="mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="input-group input-group-sm" style="max-width:320px;">
     <span class="input-group-text bg-white border-end-0">
       <i class="bi bi-search text-muted"></i>
@@ -161,6 +162,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="/customers/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-500" style="font-size:.85rem;">
@@ -199,6 +201,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" id="formEdit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-500" style="font-size:.85rem;">
@@ -265,6 +268,7 @@
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
         <form method="post" id="formDelete" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-sm btn-danger">
             <i class="bi bi-trash me-1"></i>Hapus
           </button>
@@ -398,6 +402,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="/customers/wa-settings">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-500" style="font-size:.85rem;">

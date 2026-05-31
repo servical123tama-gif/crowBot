@@ -93,6 +93,7 @@
             </button>
             <form method="post" action="/capsters/delete/{{ c.telegram_id }}" class="d-inline"
                   onsubmit="return confirm('Hapus capster {{ c.name }}? Aksi ini tidak bisa dibatalkan.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>
           </td>
@@ -112,6 +113,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" action="/capsters/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="addModalLabel">Tambah Capster</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -181,6 +183,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="editForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="editModalLabel">Edit Capster</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -241,6 +244,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="post" id="setPwdForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="bi bi-key me-2" style="color:#e94560;"></i>Set Akun Portal

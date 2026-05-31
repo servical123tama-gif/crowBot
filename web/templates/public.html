@@ -488,6 +488,7 @@
       </div>
       <div class="col-lg-7">
         <form class="booking-form" id="bookingForm" onsubmit="submitBooking(event)">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="row g-3">
             <div class="col-sm-6">
               <label class="form-label">Nama Lengkap</label>

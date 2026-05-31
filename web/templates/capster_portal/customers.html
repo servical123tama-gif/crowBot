@@ -6,6 +6,7 @@
 
 <!-- Search form -->
 <form method="get" class="mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="d-flex gap-2">
     <div class="input-group">
       <span class="input-group-text bg-white">

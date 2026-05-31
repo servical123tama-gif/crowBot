@@ -95,6 +95,7 @@
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
       <form method="post" action="/products/stock/set">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" id="stock_product_id" name="product_id">
         <input type="hidden" id="stock_branch_id"  name="branch_id">
         <div class="modal-header">

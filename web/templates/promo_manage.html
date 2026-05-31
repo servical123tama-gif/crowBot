@@ -67,6 +67,7 @@
             <i class="bi bi-pencil me-1"></i>Edit
           </button>
           <form method="post" action="/promos/{{ p.id }}/edit" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="is_active" value="0">
             <button type="submit" class="btn btn-sm btn-outline-warning"
                     onclick="return confirm('Nonaktifkan promo ini?')">
@@ -74,6 +75,7 @@
             </button>
           </form>
           <form method="post" action="/promos/{{ p.id }}/delete" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger"
                     onclick="return confirm('Hapus promo ini?')">
               <i class="bi bi-trash me-1"></i>Hapus
@@ -117,6 +119,7 @@
         <div class="d-flex gap-2 flex-wrap">
           {% if not p.is_active %}
           <form method="post" action="/promos/{{ p.id }}/edit" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="is_active" value="1">
             <button type="submit" class="btn btn-sm btn-outline-success">
               <i class="bi bi-play-circle me-1"></i>Aktifkan
@@ -124,6 +127,7 @@
           </form>
           {% endif %}
           <form method="post" action="/promos/{{ p.id }}/delete" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger"
                     onclick="return confirm('Hapus promo ini?')">
               <i class="bi bi-trash me-1"></i>Hapus
@@ -142,6 +146,7 @@
 <div class="modal fade" id="addPromoModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <form method="post" action="/promos/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title fw-bold"><i class="bi bi-tag-fill me-2 text-danger"></i>Tambah Promo</h5>
@@ -227,6 +232,7 @@
 <div class="modal fade" id="editPromoModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <form method="post" id="editPromoForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>Edit Promo</h5>

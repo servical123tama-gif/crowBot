@@ -57,6 +57,7 @@
             </button>
             <form method="post" action="/products/delete/{{ p.product_id }}" class="d-inline"
                   onsubmit="return confirm('Hapus produk \'{{ p.name }}\'?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>
           </td>
@@ -75,6 +76,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" action="/products/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">Tambah Produk</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -117,6 +119,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="editForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">Edit Produk</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

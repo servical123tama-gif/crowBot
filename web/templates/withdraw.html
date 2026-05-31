@@ -103,6 +103,7 @@
 
     <!-- Filter riwayat -->
     <form method="get" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-auto">
         <label class="form-label small fw-semibold mb-1">Capster</label>
         <select name="capster" class="form-select form-select-sm">
@@ -183,6 +184,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" action="/withdraw/add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">Tarik Saldo</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

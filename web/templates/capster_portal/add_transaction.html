@@ -140,6 +140,7 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
       {% for bid, binfo in branches.items() %}
       <div class="col-6 col-sm-4">
         <form method="post" action="/portal/set-daily-branch">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="branch_id" value="{{ bid }}">
           <button type="submit" class="btn w-100 text-start branch-pick-btn"
                   style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:.65rem .85rem;transition:.15s;">
@@ -168,6 +169,7 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
     <span class="text-muted" style="font-size:.78rem;">cabang hari ini</span>
   </div>
   <form method="post" action="/portal/set-daily-branch" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="branch_id" value="">
     <button type="submit" class="btn btn-sm btn-link text-muted p-0"
             style="font-size:.78rem;"
@@ -179,6 +181,7 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
 {% endif %}
 
 <form method="post" id="txForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <!-- ── Step 1: Layanan ── -->
   <div class="card stat-card mb-3">

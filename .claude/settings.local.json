@@ -18,7 +18,8 @@
       "Bash(py -m py_compile run_dashboard.py run_bot.py scripts/fix_branch_data.py scripts/migrate_from_sheets.py scripts/migrate_sqlite_to_postgres.py)",
       "Bash(git add *)",
       "Bash(git mv *)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

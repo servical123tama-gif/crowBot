@@ -6,6 +6,7 @@
 <!-- Filter -->
 <div class="card stat-card p-3 mb-4">
   <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="col-auto">
       <label class="form-label small fw-semibold mb-1">Bulan</label>
       <select name="month" class="form-select form-select-sm">

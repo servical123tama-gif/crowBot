@@ -13,6 +13,7 @@
 <!-- Filter Form -->
 <div class="card stat-card p-3 mb-3">
   <form method="get" class="row g-2 align-items-end" id="filterForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="col-sm-auto">
       <label class="form-label small fw-semibold mb-1">Dari</label>
       <input type="date" name="start" value="{{ start_str }}" class="form-control form-control-sm">
@@ -223,6 +224,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="editForm" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">✏️ Edit Transaksi <span class="text-muted small" id="editModalId"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -326,6 +328,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post" id="editProdukForm" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title">✏️ Edit Penjualan Produk <span class="text-muted small" id="editProdukId"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -395,6 +398,7 @@
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
       <form method="post" id="deleteForm" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title text-danger">🗑️ Hapus Transaksi</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

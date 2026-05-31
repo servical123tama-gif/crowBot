@@ -149,6 +149,7 @@
     <div class="card-body p-4">
       <h6 class="fw-bold mb-3">Tambah tanpa nomor HP</h6>
       <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="name" value="{{ prefill_name }}">
         <input type="hidden" name="phone" value="">
         <p class="text-muted mb-3" style="font-size:.83rem;">
@@ -173,6 +174,7 @@
     </p>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label fw-500" style="font-size:.85rem;">
           Nama <span class="text-danger">*</span>

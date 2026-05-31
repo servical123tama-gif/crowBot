@@ -7,6 +7,7 @@ from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -19,6 +20,11 @@ limiter = Limiter(
     storage_uri="memory://",
     strategy="fixed-window",
 )
+
+# CSRF protection — global. Setiap form POST harus punya hidden input csrf_token.
+# API endpoint GET-only di /api/* tidak terpengaruh karena CSRF default cuma cek
+# methods POST/PUT/DELETE/PATCH.
+csrf = CSRFProtect()
 
 
 def create_app():
@@ -47,6 +53,9 @@ def create_app():
 
     # Inisialisasi rate limiter (decorator @limiter.limit dipakai di route /login)
     limiter.init_app(app)
+
+    # Inisialisasi CSRF protection (template form sudah punya {{ csrf_token() }})
+    csrf.init_app(app)
 
     # Currency filter for Jinja2
     app.jinja_env.filters['idr'] = lambda x: f"Rp {int(x or 0):,}".replace(',', '.')

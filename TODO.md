@@ -19,10 +19,11 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
     # copy output, paste ke .env DASHBOARD_SECRET_KEY=...
     ```
 
-- [ ] **#2 CSRF protection di semua form POST**
-  - Affected: `/login`, `/portal/login`, semua POST di transactions/customers/withdraw/profit/promos
-  - Fix: `Flask-WTF` atau `flask-seasurf`. Tambahkan `{{ csrf_token() }}` ke semua form template.
-  - Risk: PR besar — bertahap per blueprint, atau global setting + opt-out per endpoint.
+- [x] **#2 CSRF protection di semua form POST** — fixed
+  - File: `web/__init__.py` (CSRFProtect global), 21 template (`<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">` di 48 form)
+  - Solusi: `Flask-WTF==1.2.1` CSRFProtect, auto-validate semua POST/PUT/DELETE/PATCH. GET endpoint (termasuk /api/*) tidak terpengaruh.
+  - Test client buktikan POST tanpa token → 400, POST dengan token + password benar → 302 redirect.
+  - Untuk AJAX POST di masa depan: tambah header `X-CSRFToken` dari meta tag — saat ini tidak ada AJAX POST, jadi belum disetup.
 
 - [x] **#3 Admin password compare plain-text** — fixed
   - File: `web/auth.py`, `web/routes/home.py`
@@ -137,12 +138,12 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 ## 📊 Progress tracker
 
 Hitung manual setelah update:
-- Critical: ☑ 4 / ☐ 1 (sisa: #2 CSRF)
+- Critical: ☑ 5 / ☐ 0 — semua selesai 🎉
 - High: ☐ 6
 - Medium: ☐ 6
 - Low: ☐ 5
 
-Total: **22 item** (4 selesai).
+Total: **22 item** (5 selesai).
 
 ---
 
