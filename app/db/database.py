@@ -80,20 +80,10 @@ def _migrate_capster_auth_columns():
             except Exception:
                 # Column already exists — normal on second run
                 conn.rollback()
-
-        # Sync point_balance dari visit_count untuk customer lama (point_balance masih 0)
-        # Sistem baru: belum ada claim, jadi point_balance = visit_count (max 10)
-        try:
-            conn.execute(__import__('sqlalchemy').text(
-                "UPDATE customers "
-                "SET point_balance = CASE WHEN visit_count > 10 THEN 10 ELSE visit_count END "
-                "WHERE point_balance = 0 AND visit_count > 0"
-            ))
-            conn.commit()
-            logger.info("Migration: synced point_balance from visit_count")
-        except Exception as e:
-            conn.rollback()
-            logger.warning(f"Migration sync point_balance skipped: {e}")
+    # Catatan: dulu di sini ada auto-sync `point_balance = visit_count` setiap startup.
+    # Sudah dihapus karena re-trigger setelah klaim Free (point=0) bikin balance balik
+    # ke visit_count lagi. Sync awal sekarang via scripts/sync_loyalty_points.py
+    # (idempotent, manual run).
 
 
 @contextmanager
