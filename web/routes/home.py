@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from flask import Blueprint, render_template, request, session, redirect, url_for
 
-from web.auth import login_required, DASHBOARD_PASSWORD
+from web.auth import login_required, check_dashboard_password
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
 
@@ -17,7 +17,7 @@ def login():
         return redirect(url_for('home.index'))
     error = None
     if request.method == 'POST':
-        if request.form.get('password') == DASHBOARD_PASSWORD:
+        if check_dashboard_password(request.form.get('password', '')):
             session['logged_in'] = True
             return redirect(url_for('home.index'))
         error = 'Password salah'

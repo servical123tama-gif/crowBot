@@ -10,32 +10,29 @@ Daftar pekerjaan terorganisasi by priority. Update saat selesai (centang `[x]`).
 
 Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori `project_security_audit.md`.
 
-- [ ] **#1 Default secret key & admin password fallback**
-  - File: `web/__init__.py` (`secret_key = os.getenv('DASHBOARD_SECRET_KEY', 'barbershop-dashboard-2026')`), `web/auth.py` (`DASHBOARD_PASSWORD` default `'admin123'`)
-  - Fix: `os.environ['DASHBOARD_SECRET_KEY']` (raise kalau kosong, fail loud). Hapus default `admin123`.
-  - Test: jalankan tanpa env var → harus error eksplisit.
+- [x] **#1 Default secret key & admin password fallback** — fixed `d4d8088`
+  - File: `web/__init__.py`, `web/auth.py`
+  - Solusi: raise RuntimeError kalau env kosong (fail-loud), pesan kasih command untuk generate.
+  - ⚠️ **Action item kamu**: rotate `DASHBOARD_SECRET_KEY` ke nilai random 32-byte. Sekarang masih 14 char weak.
+    ```bash
+    py -c "import secrets; print(secrets.token_hex(32))"
+    # copy output, paste ke .env DASHBOARD_SECRET_KEY=...
+    ```
 
 - [ ] **#2 CSRF protection di semua form POST**
   - Affected: `/login`, `/portal/login`, semua POST di transactions/customers/withdraw/profit/promos
   - Fix: `Flask-WTF` atau `flask-seasurf`. Tambahkan `{{ csrf_token() }}` ke semua form template.
   - Risk: PR besar — bertahap per blueprint, atau global setting + opt-out per endpoint.
 
-- [ ] **#3 Admin password compare plain-text + no rate limit**
-  - File: `web/routes/home.py` (login handler)
-  - Fix: hash `DASHBOARD_PASSWORD` di setup script, simpan di env sebagai hash. Gunakan `check_password_hash`. Tambah `Flask-Limiter` rate limit di `/login`.
-  - Bonus: pertimbangkan migrasi ke akun admin di tabel DB (mirip capster).
+- [x] **#3 Admin password compare plain-text** — fixed
+  - File: `web/auth.py`, `web/routes/home.py`
+  - Solusi: ganti `DASHBOARD_PASSWORD` plain → `DASHBOARD_PASSWORD_HASH` (pbkdf2:sha256, 1M iter). Pakai `werkzeug.security.check_password_hash` (built-in constant-time).
+  - Rate limit (terpisah, masih open di #5 di bawah).
 
-- [ ] **#4 Session cookie flags absent**
+- [x] **#4 Session cookie flags absent** — fixed `d4d8088`
   - File: `web/__init__.py`
-  - Fix: tambahkan setelah `app.secret_key = ...`:
-    ```python
-    app.config.update(
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Lax',
-    )
-    ```
-  - Caveat: `SECURE=True` butuh HTTPS — set ke `False` dev only via env flag.
+  - SECURE conditional pada `DEBUG` env (True kalau prod via Cloudflare HTTPS, False di dev).
+  - HTTPONLY=True, SAMESITE='Lax' selalu aktif.
 
 - [ ] **#5 Rate limit di `/login` & `/portal/login`**
   - Fix: `Flask-Limiter` dengan limit misal `5/minute per IP` untuk login endpoints.
@@ -138,12 +135,12 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 ## 📊 Progress tracker
 
 Hitung manual setelah update:
-- Critical: ☐ 5
-- High: ☐ 5
+- Critical: ☑ 3 / ☐ 2 (sisa: #2 CSRF, #5 rate limit)
+- High: ☐ 6
 - Medium: ☐ 6
 - Low: ☐ 5
 
-Total: **22 item**.
+Total: **22 item** (3 selesai).
 
 ---
 
