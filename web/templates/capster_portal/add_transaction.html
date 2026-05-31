@@ -85,7 +85,11 @@
     {% if last_tx.loyalty_label %}
     <div class="d-flex align-items-center gap-1 mb-2" style="font-size:.82rem;color:#92400e;background:#fffbeb;padding:.4rem .6rem;border-radius:8px;border:1px solid #fcd34d;">
       <i class="bi bi-gift-fill"></i>
-      <span>Reward diklaim: <strong>{{ last_tx.loyalty_label }}</strong> — poin direset ke 0</span>
+      <span>Reward diklaim: <strong>{{ last_tx.loyalty_label }}</strong>
+        {% if last_tx.new_point_balance is not none %}
+        — sisa <strong>{{ last_tx.new_point_balance }}</strong> poin
+        {% endif %}
+      </span>
     </div>
     {% elif last_tx.new_point_balance is not none %}
     <div class="d-flex align-items-center gap-1 mb-2" style="font-size:.82rem;color:#1d4ed8;background:#eff6ff;padding:.4rem .6rem;border-radius:8px;border:1px solid #bfdbfe;">

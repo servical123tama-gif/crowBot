@@ -511,7 +511,7 @@ def add_transaction():
                     flash('Gagal mendaftarkan customer baru. Transaksi tetap dilanjutkan sebagai walk-in.', 'warning')
 
         # ── Validasi loyalty claim ──
-        loyalty_status = repo.get_loyalty_status(cid, include_next=True) if cid else {'point_balance': 0, 'available': []}
+        loyalty_status = repo.get_loyalty_status(cid) if cid else {'point_balance': 0, 'available': []}
         valid_claim_types = {c['type'] for c in loyalty_status['available']}
         if use_loyalty and use_loyalty not in valid_claim_types:
             use_loyalty = ''  # klaim tidak valid / poin tidak cukup
@@ -599,19 +599,24 @@ def add_transaction():
                     'commission': prod_comm,
                 })
 
-            # ── Loyalty: catat klaim dan tambah poin ─────────────────────
+            # ── Loyalty: catat klaim atau tambah poin ────────────────────
+            # Kalau klaim → poin BERKURANG (subtract threshold). Visit ini tidak +1 poin.
+            # Kalau tidak klaim → poin BERTAMBAH +1.
             new_point_balance = None
             if cid and svc:  # poin hanya untuk transaksi layanan
                 tx_id = None
                 if use_loyalty:
-                    # Dapatkan ID transaksi yang baru disimpan untuk referensi
                     try:
                         all_tx = repo.get_transactions_by_customer(cid, limit=1)
                         tx_id = all_tx[0]['id'] if all_tx and 'id' in all_tx[0] else None
                     except Exception:
                         pass
-                    repo.use_loyalty_claim(cid, use_loyalty, transaction_id=tx_id)
-                    new_point_balance = 0
+                    new_point_balance = repo.use_loyalty_claim(cid, use_loyalty, transaction_id=tx_id)
+                    if new_point_balance is None:
+                        # Claim gagal (race condition: poin sudah berkurang sejak validasi)
+                        # Fallback: tambah poin normal supaya tidak hilang
+                        new_point_balance = repo.add_customer_points(cid, 1)
+                        loyalty_label = None  # batalkan label klaim di success page
                 else:
                     new_point_balance = repo.add_customer_points(cid, 1)
 
@@ -704,7 +709,7 @@ def customer_lookup():
     cid   = request.args.get('id', '').strip()
 
     def _loyalty(c):
-        status = repo.get_loyalty_status(c['id'], include_next=True)
+        status = repo.get_loyalty_status(c['id'])
         return {
             'id':            c['id'],
             'name':          c['Name'],

@@ -348,10 +348,12 @@ class Repository:
     LOYALTY_MAX_POINTS = 10
 
     def get_loyalty_status(self, customer_id: int, include_next: bool = False) -> Dict:
-        """Return point_balance and available claim types for a customer.
+        """Return point_balance dan claim yang BISA dipakai sekarang.
 
-        include_next=True → cek reward setelah +1 poin (kunjungan ini).
-        Panel muncul saat point_balance >= 4 (→ jadi 5) atau >= 9 (→ jadi 10).
+        Reward muncul saat point_balance sudah cukup: 5 → 50%, 10 → gratis.
+        Param include_next dipertahankan untuk backward-compat tapi diabaikan
+        (skema lama "anticipate +1 next visit" tidak relevan dengan model
+        subtractive).
         """
         try:
             with get_db() as db:
@@ -359,13 +361,12 @@ class Repository:
             if not row:
                 return {'point_balance': 0, 'available': []}
             bal = getattr(row, 'point_balance', 0) or 0
-            check_bal = min(bal + 1, self.LOYALTY_MAX_POINTS) if include_next else bal
-            # Tampilkan hanya reward terbaik yang bisa diclaim (prioritas: gratis > 50%)
+            # Tampilkan reward terbaik yang bisa diclaim (prioritas: gratis > 50%)
             available = []
-            if check_bal >= self.LOYALTY_THRESHOLDS['free']['points']:
+            if bal >= self.LOYALTY_THRESHOLDS['free']['points']:
                 t = self.LOYALTY_THRESHOLDS['free']
                 available.append({'type': 'free', 'label': t['label'], 'points': t['points']})
-            elif check_bal >= self.LOYALTY_THRESHOLDS['50pct']['points']:
+            elif bal >= self.LOYALTY_THRESHOLDS['50pct']['points']:
                 t = self.LOYALTY_THRESHOLDS['50pct']
                 available.append({'type': '50pct', 'label': t['label'], 'points': t['points']})
             return {'point_balance': bal, 'available': available}
@@ -388,20 +389,31 @@ class Repository:
             return 0
 
     def use_loyalty_claim(self, customer_id: int, claim_type: str,
-                          transaction_id: Optional[int] = None) -> bool:
-        """Tambah +1 poin kunjungan ini, validasi threshold, reset ke 0, catat klaim."""
+                          transaction_id: Optional[int] = None) -> Optional[int]:
+        """Klaim reward — subtract threshold dari point_balance.
+
+        Contoh:
+          - Balance 6, klaim '50pct' (5 poin) → balance 1.
+          - Balance 10, klaim 'free' (10 poin) → balance 0.
+          - Balance 4, klaim '50pct' → return None (poin kurang).
+
+        Returns:
+          int — new point_balance setelah klaim
+          None — gagal (claim_type invalid / customer tidak ada / poin kurang)
+        """
         cfg = self.LOYALTY_THRESHOLDS.get(claim_type)
         if not cfg:
-            return False
+            return None
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
                 if not row:
-                    return False
-                bal = min((getattr(row, 'point_balance', 0) or 0) + 1, self.LOYALTY_MAX_POINTS)
-                if bal < cfg['points']:
-                    return False
-                row.point_balance = 0
+                    return None
+                current = getattr(row, 'point_balance', 0) or 0
+                if current < cfg['points']:
+                    return None
+                new_balance = current - cfg['points']
+                row.point_balance = new_balance
                 db.add(LoyaltyClaim(
                     customer_id=customer_id,
                     claim_type=claim_type,
@@ -409,10 +421,10 @@ class Repository:
                     claimed_at=datetime.utcnow(),
                     transaction_id=transaction_id,
                 ))
-            return True
+            return new_balance
         except Exception as e:
             logger.error(f"Failed to use loyalty claim: {e}")
-            return False
+            return None
 
     def get_loyalty_history(self, customer_id: Optional[int] = None,
                             limit: int = 50) -> List[Dict]:
