@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from flask import Blueprint, render_template, request
 
-from dashboard.auth import login_required
+from web.auth import login_required
 from app.db.repository import Repository
 
 report_daily_bp = Blueprint('report_daily', __name__)

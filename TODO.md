@@ -45,13 +45,14 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 
 ## 🟠 High Priority — Operational
 
-- [ ] **Bot Telegram belum di-deploy**
-  - Status: hanya jalan di laptop owner saat dijalankan manual.
-  - Opsi deploy (pilih satu):
-    - Azure Container App (1 worker, persistent)
-    - Cloud Run (cold start jadi delay polling)
-    - VPS murah (Hetzner / Contabo) — paling fleksibel, sekitar $5/bulan
-  - Setelah deploy, tambah systemd / supervisor untuk auto-restart.
+- [ ] **Bot Telegram jarang nyala — bikin auto-start di Windows**
+  - Status: jalan di laptop owner yang sama dengan web, tapi cuma dinyalakan manual.
+  - Opsi (pilih satu):
+    - **Windows Task Scheduler** — trigger "At log on" → `python run_bot.py`. Paling gampang, no extra tool.
+    - **NSSM** (Non-Sucking Service Manager) — wrap `run_bot.py` jadi Windows Service. Auto-restart kalau crash. Recommended.
+    - **PowerShell startup script** — taruh di Startup folder, sederhana tapi log management manual.
+  - Sebelum auto-start: pastikan log rotation di place (lihat item logging di bawah).
+  - Bukan target deploy ke cloud — single-host adalah keputusan desain.
 
 - [ ] **`.env.example` masih punya legacy var**
   - File: `.env.example`
@@ -63,10 +64,21 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
   - Aksi: hapus + redirect ke `README.md` + `ARCHITECTURE.md`, atau tulis ulang.
   - Rekomendasi: hapus saja, info sudah ada di root docs baru.
 
-- [ ] **GitHub Actions: tambah CI lint + test**
-  - File: `.github/workflows/ci.yml` (baru)
+- [ ] **Backup DB otomatis harian (PowerShell Task Scheduler)**
+  - Single-host → kalau laptop rusak / DB corrupt, data hilang.
+  - Setup: scheduled task harian jam 02:00 → `pg_dump` ke `backups/auto_YYYYMMDD.sql`.
+  - Retention: simpan 30 hari terakhir, sisanya autodelete.
+  - Bonus: sync ke OneDrive / cloud storage lain untuk off-site copy.
+
+- [ ] **Cloudflare Tunnel jalan sebagai Windows service**
+  - Kalau belum: `cloudflared service install` supaya tunnel auto-start saat boot.
+  - Verify: reboot laptop → URL publik harus tetap reachable tanpa intervensi manual.
+
+- [ ] **GitHub Actions: tambah CI lint + test (opsional)**
+  - File: `.github/workflows/ci.yml` (baru — folder sudah dihapus karena Azure deploy legacy juga dibuang)
   - Jalankan: `py_compile` semua file, `ruff check`, `pytest` (kalau sudah ada test).
   - Trigger: PR ke `dev`, `staging`, `main`.
+  - Catatan: bukan untuk deploy (production = local), murni untuk catch bug sebelum merge.
 
 - [ ] **Belum ada test sama sekali**
   - Folder `test/` sudah dihapus karena semua broken.
@@ -131,7 +143,7 @@ Hitung manual setelah update:
 - Medium: ☐ 6
 - Low: ☐ 5
 
-Total: **21 item**.
+Total: **22 item**.
 
 ---
 

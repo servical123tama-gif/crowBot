@@ -22,5 +22,5 @@ from app.db.database import init_db
 init_db()
 logger.info("Database initialized.")
 
-from app.tg.bot import run
+from bot import run
 run()

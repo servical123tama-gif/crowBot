@@ -11,7 +11,7 @@ import pandas as pd
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
 from app.services.reports import calc_profit
-from app.tg.formatters import fmt_idr, fmt_date, fmt_month_id
+from bot.formatters import fmt_idr, fmt_date, fmt_month_id
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────── #

@@ -5,8 +5,8 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from app.tg.auth import admin_only
-from app.tg.reports import (
+from bot.auth import admin_only
+from bot.reports import (
     daily_report, weekly_report, monthly_report,
     profit_report, capster_report,
 )

@@ -48,8 +48,6 @@ bot_barber_2/
 │
 ├── run_dashboard.py           # entry point web
 ├── run_bot.py                 # entry point bot
-├── wsgi.py / application.py   # Azure App Service entry
-├── startup.sh                 # Azure startup script
 ├── alembic.ini
 ├── requirements.txt
 └── .env.example
@@ -116,11 +114,6 @@ python run_dashboard.py
 # http://localhost:5000
 ```
 
-Production (gunicorn):
-```bash
-gunicorn run_dashboard:app --bind=0.0.0.0:8000 --workers 2
-```
-
 Login admin: `/login` (pakai `DASHBOARD_PASSWORD`).
 Portal capster: `/portal/login` (pakai `username` + `password` dari DB).
 
@@ -146,19 +139,45 @@ Notifikasi otomatis ringkasan harian dikirim ke semua `OWNER_IDS` setiap
 
 ## Deploy
 
-### Azure App Service
+Production = **laptop owner + Cloudflare Tunnel**. Tidak ada cloud
+deploy. Web + bot + PostgreSQL semua di mesin yang sama.
 
-Sudah dikonfigurasi:
-- `startup.sh` — jalankan gunicorn `run_dashboard:app`
-- `wsgi.py` (Linux) & `application.py` (Windows) — entry point
+### Cloudflare Tunnel (web)
 
-Bot Telegram tidak ter-deploy ke Azure. Jalankan terpisah (VPS, Cloud
-Run, atau laptop owner).
+Tunnel sudah dikonfigurasi di dashboard Cloudflare Zero Trust,
+forward URL publik → `localhost:5000`. Untuk menjalankan production:
 
-### Lain (Render, Railway, dll.)
+```bash
+# Terminal 1 — dashboard web
+python run_dashboard.py
 
-Sama saja: `gunicorn run_dashboard:app` untuk web. Untuk bot, perlu
-worker process terpisah.
+# Terminal 2 — tunnel (kalau pakai cloudflared CLI)
+cloudflared tunnel run <tunnel-name>
+```
+
+Atau pakai Cloudflare Tunnel service (cloudflared di-install sebagai
+Windows service via `cloudflared service install`), supaya tunnel
+auto-start saat boot.
+
+### Bot Telegram
+
+```bash
+python run_bot.py
+```
+
+Saat ini dijalankan manual saat dibutuhkan. Rencananya auto-start
+lewat Windows Task Scheduler atau NSSM (lihat TODO.md).
+
+### Backup DB
+
+Ingat: ini single-host. Backup PostgreSQL harian wajib:
+
+```powershell
+# PowerShell scheduled task harian
+& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" `
+   -h localhost -U postgres -d barbershop_db `
+   -f "D:\Document\barber\bot_barber_2\backups\auto_$(Get-Date -Format yyyyMMdd).sql"
+```
 
 ## Migrations
 

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, render_template, request, Response, redirect, url_for, flash
 
-from dashboard.auth import login_required
+from web.auth import login_required
 from app.db.repository import Repository
 from app.config.constants import ALL_SERVICES, PAYMENT_METHODS, BRANCHES
 

@@ -128,12 +128,13 @@ Bot tidak punya kelas role — semua admin/owner punya hak sama. Hanya `OWNER_ID
 
 ## Lifecycle web request
 
-1. `gunicorn run_dashboard:app` → load `wsgi.py` / `application.py`
-2. `from run_dashboard import app` → `from web import create_app` → `create_app()`
+1. `python run_dashboard.py` → Flask dev server bind ke `0.0.0.0:5000`
+2. `run_dashboard.py`: `load_dotenv()` → `init_db()` → `from web import create_app` → `app = create_app()`
 3. `create_app()` register 15 blueprints
-4. Request masuk: Flask routing → blueprint handler (`web/routes/*.py`)
-5. Handler: parse params → panggil `Repository` (atau service di `app/services/`) → render Jinja2 template
-6. Response keluar
+4. Cloudflare Tunnel forward request publik → `localhost:5000`
+5. Request masuk: Flask routing → blueprint handler (`web/routes/*.py`)
+6. Handler: parse params → panggil `Repository` (atau service di `app/services/`) → render Jinja2 template
+7. Response keluar lewat tunnel kembali ke browser
 
 ## Lifecycle bot
 
@@ -147,36 +148,42 @@ Bot tidak punya kelas role — semua admin/owner punya hak sama. Hanya `OWNER_ID
 ## Deploy topology
 
 ```
-                    Internet
-                       │
-            ┌──────────┴──────────┐
-            │                     │
-            ▼                     ▼
-   ┌─────────────────┐   ┌───────────────────┐
-   │  Azure App      │   │  Telegram Bot API │
-   │  Service (Win)  │   │  (managed)        │
-   │  ─ gunicorn     │   │                   │
-   │  ─ Python 3.11  │   └────────┬──────────┘
-   └────────┬────────┘            │ polling
-            │                     ▼
-            │            ┌────────────────────┐
-            │            │ Owner's laptop /   │
-            │            │ VPS (belum diatur) │
-            │            │ ─ python run_bot.py│
-            │            └────────┬───────────┘
-            │                     │
-            └──────────┬──────────┘
-                       ▼
-            ┌──────────────────────┐
-            │  PostgreSQL          │
-            │  (mana? — lihat env) │
-            └──────────────────────┘
+                       Internet
+                          │
+                          ▼
+            ┌────────────────────────────┐
+            │   Cloudflare Tunnel        │
+            │   (public URL → localhost) │
+            └────────────┬───────────────┘
+                         │
+            ┌────────────▼───────────────┐
+            │  Owner's laptop (Windows)  │
+            │  D:\Document\barber\...    │
+            │                            │
+            │  ┌──────────────────────┐  │
+            │  │ python run_dashboard │  │  Flask :5000
+            │  └──────────────────────┘  │
+            │                            │
+            │  ┌──────────────────────┐  │
+            │  │ python run_bot.py    │  │  Telegram polling
+            │  │ (jarang nyala)       │  │  → api.telegram.org
+            │  └──────────────────────┘  │
+            │                            │
+            │  ┌──────────────────────┐  │
+            │  │ PostgreSQL 18        │  │  localhost:5432
+            │  │ barbershop_db        │  │
+            │  └──────────────────────┘  │
+            └────────────────────────────┘
 ```
 
 **Catatan deploy:**
-- **Web**: sudah aktif di Azure App Service. Auto-deploy dari branch `main` (lihat `.github/workflows/`).
-- **Bot**: belum di-deploy. Saat ini cuma jalan di laptop owner saat manual. Untuk auto-run 24/7 perlu VPS / Azure Container Apps / Cloud Run / Worker process.
-- **PostgreSQL**: env `DATABASE_URL` menentukan. Local dev pakai `localhost:5432`, prod sebaiknya managed DB (Azure Database for PostgreSQL atau Supabase).
+- **Single host**: web + bot + DB jalan di laptop yang sama. Tidak ada cloud deploy.
+- **Cloudflare Tunnel**: traffic publik masuk lewat tunnel ke `localhost:5000`. URL publik dikelola di dashboard Cloudflare Zero Trust. Tunnel ini sekaligus dipakai pentest lab (lihat memori `project_security_audit`).
+- **Bot**: jalan di laptop yang sama, polling ke `api.telegram.org`. Saat ini sering off — kandidat auto-start via Windows Task Scheduler atau NSSM (lihat [TODO.md](TODO.md)).
+- **Implikasi single host**:
+  - Laptop mati = web + bot mati → SPOF (single point of failure)
+  - DB tidak punya off-site replica → backup harian via `pg_dump` ke disk lain wajib
+  - Tidak ada gunicorn / WSGI server di prod (Flask dev server cukup untuk traffic kecil; bisa ditingkatkan dengan `waitress` Windows-native kalau perlu)
 
 ## Constants legacy (`app/config/constants.py`)
 

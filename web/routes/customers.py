@@ -6,7 +6,7 @@ import os
 import requests as _requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort
 
-from dashboard.auth import login_required
+from web.auth import login_required
 from app.db.repository import Repository
 
 _QR_SECRET = os.getenv('SECRET_KEY', 'barbershop-qr-secret-2026')

@@ -4,13 +4,13 @@ import os
 
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 
-from app.tg.handlers import (
+from bot.handlers import (
     cmd_start, cmd_help,
     cmd_harian, cmd_mingguan, cmd_bulanan,
     cmd_profit, cmd_capster,
     on_button,
 )
-from app.tg.scheduler import setup_daily_push
+from bot.scheduler import setup_daily_push
 
 logger = logging.getLogger(__name__)
 

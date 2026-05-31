@@ -6,8 +6,8 @@ from datetime import time as dt_time
 import pytz
 from telegram.ext import Application, ContextTypes
 
-from app.tg.auth import owner_ids
-from app.tg.reports import daily_report
+from bot.auth import owner_ids
+from bot.reports import daily_report
 
 logger = logging.getLogger(__name__)
 

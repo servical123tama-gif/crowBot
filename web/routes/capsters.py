@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
-from dashboard.auth import login_required
+from web.auth import login_required
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
 from dataclasses import dataclass, field

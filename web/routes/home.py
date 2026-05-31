@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from flask import Blueprint, render_template, request, session, redirect, url_for
 
-from dashboard.auth import login_required, DASHBOARD_PASSWORD
+from web.auth import login_required, DASHBOARD_PASSWORD
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
 

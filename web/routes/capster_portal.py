@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash
 
 from app.db.repository import Repository
 from app.config.constants import BRANCHES
-from dashboard.routes.customers import _auto_send_welcome_wa
+from web.routes.customers import _auto_send_welcome_wa
 
 capster_portal_bp = Blueprint('capster_portal', __name__, url_prefix='/portal')
 

@@ -18,7 +18,7 @@ from app.db.database import init_db
 init_db()
 logger.info("Database initialized.")
 
-from dashboard import create_app
+from web import create_app
 app = create_app()
 
 if __name__ == '__main__':

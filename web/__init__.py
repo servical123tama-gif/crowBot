@@ -15,21 +15,21 @@ def create_app():
     # Currency filter for Jinja2
     app.jinja_env.filters['idr'] = lambda x: f"Rp {int(x or 0):,}".replace(',', '.')
 
-    from dashboard.routes.public import public_bp
-    from dashboard.routes.home import home_bp
-    from dashboard.routes.profit import profit_bp
-    from dashboard.routes.transactions import transactions_bp
-    from dashboard.routes.capsters import capsters_bp
-    from dashboard.routes.services import services_bp
-    from dashboard.routes.branches import branches_bp
-    from dashboard.routes.products import products_bp
-    from dashboard.routes.withdraw import withdraw_bp
-    from dashboard.routes.report_daily import report_daily_bp
-    from dashboard.routes.compare import compare_bp
-    from dashboard.routes.api import api_bp
-    from dashboard.routes.customers import customers_bp
-    from dashboard.routes.capster_portal import capster_portal_bp
-    from dashboard.routes.promos import promos_bp
+    from web.routes.public import public_bp
+    from web.routes.home import home_bp
+    from web.routes.profit import profit_bp
+    from web.routes.transactions import transactions_bp
+    from web.routes.capsters import capsters_bp
+    from web.routes.services import services_bp
+    from web.routes.branches import branches_bp
+    from web.routes.products import products_bp
+    from web.routes.withdraw import withdraw_bp
+    from web.routes.report_daily import report_daily_bp
+    from web.routes.compare import compare_bp
+    from web.routes.api import api_bp
+    from web.routes.customers import customers_bp
+    from web.routes.capster_portal import capster_portal_bp
+    from web.routes.promos import promos_bp
 
     app.register_blueprint(public_bp)
     app.register_blueprint(home_bp)

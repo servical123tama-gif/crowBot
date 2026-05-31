@@ -6,9 +6,11 @@
 
 **Barbershop Management System** — sistem manajemen barbershop multi-cabang. Dua channel terpisah, satu shared core:
 
-- **Web dashboard** (`web/`) — admin & capster portal. Production di Azure App Service.
-- **Bot Telegram** (`bot/`) — read-only laporan untuk admin. Lokal/VPS only.
+- **Web dashboard** (`web/`) — admin & capster portal.
+- **Bot Telegram** (`bot/`) — read-only laporan untuk admin.
 - **Shared core** (`app/`) — config, db (SQLAlchemy), services (business logic).
+
+**Production = laptop owner + Cloudflare Tunnel.** Tidak ada cloud deploy. Web & bot keduanya jalan dari mesin lokal yang sama. Bot saat ini jarang dinyalakan tapi rencananya rutin.
 
 Owner: arsybejo@gmail.com. Bisnis aktif (bukan sandbox).
 
@@ -28,8 +30,6 @@ Business logic letakkan di `app/services/`. Route web & handler bot harus **tipi
 |------|-----------|
 | `run_dashboard.py` | Jalankan Flask dashboard (`python run_dashboard.py`) |
 | `run_bot.py` | Jalankan Telegram bot (`python run_bot.py`) |
-| `wsgi.py` / `application.py` | Azure App Service (gunicorn `run_dashboard:app`) |
-| `startup.sh` | Azure startup script |
 
 Jangan buat entry point baru di root. Tambahkan script one-off ke `scripts/`.
 
@@ -93,7 +93,7 @@ Jangan push langsung ke `main` — selalu PR dari `dev` atau `staging`.
 2. **Jangan commit `.env` atau `credentials.json`** — sudah di-gitignore, tapi jangan iseng `git add -f`.
 3. **Jangan delete `backups/`** — dump DB lokal, kalau hilang tidak bisa dikembalikan.
 4. **Jangan hidupkan kembali Google Sheets** — sudah dimigrasi ke SQLAlchemy, balik = downgrade.
-5. **Jangan rename `run_dashboard.py`** — Azure (`wsgi.py`, `startup.sh`) hardcoded ke nama ini.
+5. **Jangan rename `run_dashboard.py` / `run_bot.py`** — Cloudflare Tunnel config & shortcut owner mengasumsikan nama ini.
 
 ## Kerentanan known (HARUS verify sebelum lanjut)
 
@@ -118,5 +118,5 @@ Memori itu untuk preferensi user. CLAUDE.md ini untuk konteks proyek (commit ke 
 
 - Arsitektur detail: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Pekerjaan pending: [TODO.md](TODO.md)
-- Setup awal: [README.md](README.md)
-- Deploy: `docs/DEPLOYMENT.md` (⚠️ versi v1, tunggu rewrite)
+- Setup awal & cara jalankan (web + bot + tunnel): [README.md](README.md)
+- `docs/*.md` — semua versi v1 (Telegram bot + Google Sheets era), abaikan / tunggu dihapus
