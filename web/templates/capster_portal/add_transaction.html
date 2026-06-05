@@ -389,11 +389,37 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
           </label>
           <input type="tel" name="new_customer_phone" id="newCustPhoneInput"
                  class="form-control form-control-sm"
-                 placeholder="628xxxxxxxx">
+                 placeholder="628xxxxxxxx"
+                 oninput="debounceCheckPhone(this.value)">
           <small class="text-muted" style="font-size:.72rem;">
             <i class="bi bi-info-circle"></i> Kalau diisi, QR auto-kirim WA setelah simpan.
           </small>
         </div>
+
+        <!-- Warning kalau nomor sudah terdaftar -->
+        <div id="phoneExistsWarn" style="display:none;" class="alert alert-warning py-2 mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1" style="font-size:.82rem;">
+            <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+            <strong style="color:#c2410c;">Nomor sudah terdaftar!</strong>
+          </div>
+          <div style="font-size:.78rem;" class="mb-2">
+            Atas nama: <strong id="phoneExistsName">-</strong>
+            <span class="text-muted" id="phoneExistsMeta"></span>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm flex-grow-1 text-white"
+                    style="background:#0f3460;border-radius:8px;font-size:.78rem;"
+                    onclick="usePhoneExistingCustomer()">
+              <i class="bi bi-check2 me-1"></i>Pakai customer ini
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1"
+                    style="font-size:.78rem;"
+                    onclick="dismissPhoneWarn()">
+              Beda orang, lanjut daftar baru
+            </button>
+          </div>
+        </div>
+
         <div class="alert alert-warning py-2 mb-0" style="font-size:.78rem;">
           <i class="bi bi-magic me-1"></i>
           Customer akan didaftar otomatis saat tombol "Simpan Transaksi" ditekan.
@@ -847,11 +873,60 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
     document.getElementById('newCustomerBox').style.display = 'none';
     document.getElementById('newCustNameInput').value  = '';
     document.getElementById('newCustPhoneInput').value = '';
+    dismissPhoneWarn();
     document.getElementById('customerInput').style.display = '';
   }
 
   function updateNewCustomerPreview() {
-    // Reserved untuk validasi inline di masa depan (cek nomor HP duplikat dll.)
+    // Reserved untuk validasi inline di masa depan
+  }
+
+  // ── Cek duplikasi nomor HP secara real-time ──────────────────────────
+  let _phoneCheckTimer = null;
+  let _phoneCheckExisting = null;   // simpan hasil terakhir kalau capster mau switch
+
+  function debounceCheckPhone(value) {
+    clearTimeout(_phoneCheckTimer);
+    dismissPhoneWarn();
+    const phone = (value || '').trim();
+    if (phone.length < 6) return;   // belum cukup digit
+    _phoneCheckTimer = setTimeout(() => checkPhoneExists(phone), 400);
+  }
+
+  function checkPhoneExists(phone) {
+    fetch('/portal/customer/check-phone?phone=' + encodeURIComponent(phone))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.found) return;
+        _phoneCheckExisting = data.customer;
+        document.getElementById('phoneExistsName').textContent = data.customer.name;
+        const meta = ` · ${data.customer.visits} kunjungan`
+                   + (data.customer.added_by ? ` · ditambahkan ${data.customer.added_by}` : '');
+        document.getElementById('phoneExistsMeta').textContent = meta;
+        document.getElementById('phoneExistsWarn').style.display = '';
+      })
+      .catch(() => {});  // diam saja kalau network gagal
+  }
+
+  function usePhoneExistingCustomer() {
+    if (!_phoneCheckExisting) return;
+    // Switch mode: dari "Customer Baru" → "Existing dipilih"
+    cancelNewCustomer();
+    // Auto-load via lookup endpoint untuk dapat loyalty info
+    fetch('/portal/customer/lookup?id=' + _phoneCheckExisting.id)
+      .then(r => r.json())
+      .then(data => {
+        if (data.length) {
+          const d = data[0];
+          selectCustomer(d.id, d.name, d.phone, d.visits,
+                         d.point_balance || 0, d.available || []);
+        }
+      });
+  }
+
+  function dismissPhoneWarn() {
+    document.getElementById('phoneExistsWarn').style.display = 'none';
+    _phoneCheckExisting = null;
   }
 
   function skipCustomer() {

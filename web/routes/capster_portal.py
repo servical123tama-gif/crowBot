@@ -645,6 +645,38 @@ def customer_lookup():
     return jsonify([_loyalty(c) for c in results])
 
 
+@capster_portal_bp.route('/customer/check-phone')
+@capster_login_required
+def check_phone():
+    """Cek apakah nomor HP sudah terdaftar — dipanggil AJAX dari form
+    Customer Baru sebelum submit, supaya capster tahu kalau bakal double.
+
+    Returns:
+        {found: false}                                   bila belum ada
+        {found: true, customer: {id, name, phone,        bila sudah ada
+                                  visits, added_by}}
+    """
+    phone = (request.args.get('phone') or '').strip()
+    if len(phone) < 6:                  # minimum sanity; nomor HP biasanya >= 9 digit
+        return jsonify({'found': False})
+
+    repo = Repository()
+    existing = repo.get_customer_by_phone(phone)
+    if not existing:
+        return jsonify({'found': False})
+
+    return jsonify({
+        'found': True,
+        'customer': {
+            'id':       existing['id'],
+            'name':     existing['Name'],
+            'phone':    existing['Phone'],
+            'visits':   existing.get('VisitCount', 0),
+            'added_by': existing.get('AddedBy', ''),
+        },
+    })
+
+
 @capster_portal_bp.route('/customer/<int:cid>/qr.png')
 @capster_login_required
 def customer_qr(cid):
