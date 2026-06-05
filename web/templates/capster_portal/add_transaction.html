@@ -910,18 +910,45 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
 
   function usePhoneExistingCustomer() {
     if (!_phoneCheckExisting) return;
-    // Switch mode: dari "Customer Baru" → "Existing dipilih"
-    cancelNewCustomer();
-    // Auto-load via lookup endpoint untuk dapat loyalty info
-    fetch('/portal/customer/lookup?id=' + _phoneCheckExisting.id)
+    const ec = _phoneCheckExisting;
+
+    // ① Set customer_id SECARA SYNC supaya kalau capster langsung klik submit,
+    //    transaksi tetap ke-link (tidak race condition dengan fetch).
+    document.getElementById('customerIdInput').value = ec.id;
+
+    // ② Reset state mode "Customer Baru"
+    document.getElementById('newCustomerBox').style.display = 'none';
+    document.getElementById('newCustNameInput').value  = '';
+    document.getElementById('newCustPhoneInput').value = '';
+    dismissPhoneWarn();
+    document.getElementById('customerInput').style.display = 'none';
+
+    // ③ Tampilkan card "Customer Terpilih" dengan data yang sudah ada (dari warning)
+    document.getElementById('customerSelected').style.display = '';
+    document.getElementById('custAvatar').textContent  = ec.name[0].toUpperCase();
+    document.getElementById('custNameText').textContent = ec.name;
+    document.getElementById('custMeta').textContent =
+      (ec.phone || 'No HP -') + ' · ' + ec.visits + ' kunjungan sebelumnya';
+    // Reset point badge / loyalty box ke default (akan diupdate oleh fetch)
+    document.getElementById('custPointBadge').style.display  = 'none';
+    document.getElementById('loyaltyClaimBox').style.display = 'none';
+    document.getElementById('useLoyaltyInput').value = '';
+
+    // ④ Async lookup untuk loyalty (point_balance & reward yang bisa diklaim)
+    //    Kalau gagal / pending, transaksi tetap bisa di-submit dengan customer_id yang sudah ada.
+    fetch('/portal/customer/lookup?id=' + ec.id)
       .then(r => r.json())
       .then(data => {
-        if (data.length) {
-          const d = data[0];
-          selectCustomer(d.id, d.name, d.phone, d.visits,
-                         d.point_balance || 0, d.available || []);
+        if (!data.length) return;
+        const d = data[0];
+        const points = d.point_balance || 0;
+        if (points > 0) {
+          document.getElementById('custPointVal').textContent = points;
+          document.getElementById('custPointBadge').style.display = '';
         }
-      });
+        renderLoyaltyOptions(d.available || []);
+      })
+      .catch(() => {});
   }
 
   function dismissPhoneWarn() {
