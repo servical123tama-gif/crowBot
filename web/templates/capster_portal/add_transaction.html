@@ -406,17 +406,13 @@ const ACTIVE_PROMOS = {{ active_promos | tojson }};
             Atas nama: <strong id="phoneExistsName">-</strong>
             <span class="text-muted" id="phoneExistsMeta"></span>
           </div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm flex-grow-1 text-white"
-                    style="background:#0f3460;border-radius:8px;font-size:.78rem;"
-                    onclick="usePhoneExistingCustomer()">
-              <i class="bi bi-check2 me-1"></i>Pakai customer ini
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1"
-                    style="font-size:.78rem;"
-                    onclick="dismissPhoneWarn()">
-              Beda orang, lanjut daftar baru
-            </button>
+          <button type="button" class="btn btn-sm w-100 text-white"
+                  style="background:#0f3460;border-radius:8px;font-size:.78rem;"
+                  onclick="usePhoneExistingCustomer()">
+            <i class="bi bi-check2 me-1"></i>Pakai customer ini
+          </button>
+          <div class="text-muted text-center mt-1" style="font-size:.72rem;">
+            <i class="bi bi-info-circle"></i> Salah nomor? Edit angka HP di atas, warning hilang otomatis.
           </div>
         </div>
 
