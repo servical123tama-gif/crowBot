@@ -58,6 +58,7 @@
             <th>Nama</th>
             <th>No. Telepon</th>
             <th class="text-center">Kunjungan</th>
+            <th class="text-center">Poin</th>
             <th>Ditambah oleh</th>
             <th style="width:150px; text-align:right;">Aksi</th>
           </tr>
@@ -94,6 +95,17 @@
                       style="background:#e8f4fd;color:#0f3460;font-size:.8rem;">
                   <i class="bi bi-scissors me-1"></i>{{ c['VisitCount'] }}x
                 </span>
+              </td>
+              <td class="text-center">
+                {% set pts = c.get('PointBalance', 0) %}
+                {% if pts > 0 %}
+                <span class="badge rounded-pill px-2"
+                      style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;font-size:.8rem;">
+                  <i class="bi bi-star-fill me-1"></i>{{ pts }}
+                </span>
+                {% else %}
+                <span class="text-muted" style="font-size:.8rem;">—</span>
+                {% endif %}
               </td>
               <td>
                 {% if c['AddedBy'] %}
@@ -133,7 +145,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="5" class="text-center py-5 text-muted">
+              <td colspan="7" class="text-center py-5 text-muted">
                 <i class="bi bi-person-x" style="font-size:2.5rem;opacity:.3;"></i>
                 <p class="mt-2 mb-0">
                   {% if search %}

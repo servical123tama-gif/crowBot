@@ -295,7 +295,8 @@ class Repository:
                 ).order_by(Customer.name).all()
             return [
                 {'id': r.id, 'Name': r.name, 'Phone': r.phone or '',
-                 'VisitCount': getattr(r, 'visit_count', 0) or 0,
+                 'VisitCount':   getattr(r, 'visit_count',   0) or 0,
+                 'PointBalance': getattr(r, 'point_balance', 0) or 0,
                  'AddedBy': getattr(r, 'added_by', '') or ''}
                 for r in rows
             ]
