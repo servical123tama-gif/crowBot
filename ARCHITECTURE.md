@@ -73,23 +73,24 @@ Dokumentasi arsitektur teknis. Untuk konteks singkat lihat [CLAUDE.md](CLAUDE.md
 - **`web/` dan `bot/` adalah edge**: boleh impor dari `app/`, tidak boleh saling impor.
 - Pelanggaran aturan ini langsung jadi indikator code smell — duplikasi atau coupling salah arah.
 
-## Data model (12 tabel)
+## Data model (13 tabel)
 
 Definisi di `app/db/models.py`. Yang penting:
 
 | Tabel | Isi | Catatan |
 |-------|-----|---------|
-| `transactions` | Setiap transaksi layanan | Index by `date`, `branch`, `(capster, date)` |
+| `transactions` | Setiap transaksi layanan | Index by `date`, `branch`, `(capster, date)`. `promo_name` juga simpan "Loyalty 50%/Gratis" untuk klaim |
 | `capsters` | Master capster | `telegram_id` warisan (UNIQUE), `username` untuk login web |
-| `customers` | Pelanggan | `point_balance` untuk loyalty |
-| `loyalty_claims` | Riwayat klaim poin | `claim_type` = `50pct` atau `free` |
+| `customers` | Pelanggan | `point_balance` & `visit_count` independen |
+| `loyalty_claims` | Riwayat klaim poin | `claim_type` = `50pct` atau `free`, `transaction_id` linked |
+| `loyalty_audits` | Audit trail per perubahan poin | reason: `transaction`/`claim_*`/`manual_edit`/`sync`, actor tercatat |
 | `services` | Master layanan | `commission_rate` per layanan (mitra) |
 | `branches` | Master cabang | `commission_rate` per cabang (fallback) |
 | `products` | Master produk | Punya `commission_rate` sendiri |
 | `product_stocks` | Stok produk per cabang | Composite PK |
 | `product_sales` | Penjualan produk | Tracking komisi capster |
 | `promos` | Promo aktif | `service_ids` & `branch_ids` comma-separated |
-| `settings` | Key-value config app | Misal token Fonnte |
+| `settings` | Key-value config app | Misal token Fonnte, WA template |
 | `salary_withdrawals` | Penarikan gaji capster | Period tracking |
 
 Constants in-memory (`BRANCHES`, `SERVICES_MAIN`, dll) di `app/config/constants.py` di-mutate saat runtime dari DB (seed pada `init_db`). Ini design legacy — idealnya selalu load dari DB.
@@ -234,11 +235,45 @@ Owner          Telegram          PTB           bot/handlers   bot/reports   app/
   │◀──notif──────┤                │                │              │              │             │            │
 ```
 
+## Loyalty system semantic
+
+- `customers.visit_count` & `customers.point_balance` adalah dua kolom **independen**:
+  - `visit_count`: monotonic counter, +1 per transaksi-dengan-customer
+  - `point_balance`: wallet poin, +1 per transaksi normal, -threshold saat klaim
+- Threshold: 5 poin = Diskon 50%, 10 poin = Potong Gratis. MAX_POINTS=10.
+- **Visibility lenient**: UI tampilkan opsi klaim kalau `balance + 1 >= threshold`
+  (mengantisipasi +1 dari visit ini). Customer 4 poin sudah bisa lihat opsi 50%.
+- **Klaim subtractive**: sisa = `max(0, balance - threshold)`. Customer 6 poin
+  klaim 50% → sisa 1. Customer 4 poin klaim 50% → sisa 0 (clamp).
+- **Saat klaim, visit ini TIDAK +1 poin** (tidak earn & spend bareng).
+- Semua mutasi poin auto-log di `loyalty_audits` dengan actor (capster/admin/system)
+  & reason (`transaction`/`claim_50pct`/`claim_free`/`manual_edit`/`sync`). View via
+  `/customers/<id>/loyalty`.
+- Sync masal data lama: `python scripts/sync_loyalty_points.py [--apply]`.
+  Tidak ada auto-sync di startup (sebelumnya pernah, dihapus karena bug).
+
+## Customer registration flow (capster portal)
+
+Inline di `/portal/add-transaction` Step 2 — tidak ada halaman terpisah
+"Tambah Pengunjung" lagi:
+
+1. Capster pilih layanan + buka "Customer" section.
+2. Tiga opsi: Scan QR, Cari Nama/HP, **Customer Baru**.
+3. Klik "Customer Baru" → muncul inline form (nama + HP).
+4. Capster ketik nomor HP → AJAX `/portal/customer/check-phone` → kalau
+   sudah terdaftar, warning muncul dengan tombol "Pakai customer ini".
+5. Tombol set `customer_id` sync (tidak race condition) lalu fetch loyalty
+   info async untuk update badge poin & opsi klaim.
+6. Submit form → server membuat customer (kalau bener-bener baru) + tx
+   atomik. Dua mutasi dalam 1 request.
+
 ## Glossary
 
 - **Capster**: tukang potong rambut. Dua tipe: **mitra** (komisi %) & **tetap** (gaji bulanan).
 - **Branch**: cabang barbershop. Punya biaya operasional bulanan.
-- **Loyalty claim**: penukaran poin customer — `50pct` (10 visit → diskon 50%) atau `free` (20 visit → gratis).
+- **Loyalty claim**: penukaran poin customer — `50pct` (5 poin → diskon 50%) atau `free` (10 poin → gratis).
 - **Promo**: diskon yang berlaku untuk service & branch tertentu, dalam rentang tanggal.
 - **Mitra**: capster yang dibayar % dari layanan/produk yang dia jual.
 - **Tetap**: capster gajian bulanan flat.
+- **Walk-in**: transaksi tanpa link ke customer (tidak earn poin, tidak +visit).
+- **Audit log**: row di `loyalty_audits`. Read-only history setiap perubahan poin.

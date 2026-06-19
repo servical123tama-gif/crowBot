@@ -37,8 +37,9 @@ Jangan buat entry point baru di root. Tambahkan script one-off ke `scripts/`.
 
 - Python 3.11+ (venv di `venv/`)
 - Flask 2.3, SQLAlchemy 2.0, Alembic, python-telegram-bot 21.7
+- Flask-Limiter 3.8 (rate limit login), Flask-WTF 1.2 (CSRF)
 - DB: PostgreSQL 18 (prod & local), SQLite (fallback dev) — pilih lewat `DATABASE_URL`
-- Pandas (laporan), Werkzeug (auth hashing), Fonnte (WhatsApp gateway)
+- Pandas (laporan), Werkzeug (auth hashing + check_password_hash), Fonnte (WhatsApp gateway)
 
 ## Common commands
 
@@ -76,16 +77,18 @@ Format mengikuti Conventional Commits versi singkat:
 
 Bahasa: Indonesia. Subject ≤ 72 char.
 
-## Branch strategy (sudah jalan)
+## Branch strategy
 
 ```
-main      → production (auto-deploy ke Azure)
+main      → production (langsung jalan dari laptop owner, tidak auto-deploy)
 staging   → pre-production / QA
 dev       → integration
 feature/* → fitur individual (PR ke dev)
 ```
 
-Jangan push langsung ke `main` — selalu PR dari `dev` atau `staging`.
+Ideal: push langsung ke `main` cuma untuk fix kecil. Refactor besar lewat PR
+dari `dev` → `staging` → `main`. Tapi sekarang sering langsung ke `main` karena
+single-developer & no CI.
 
 ## Hal yang TIDAK boleh dilakukan
 
@@ -95,17 +98,31 @@ Jangan push langsung ke `main` — selalu PR dari `dev` atau `staging`.
 4. **Jangan hidupkan kembali Google Sheets** — sudah dimigrasi ke SQLAlchemy, balik = downgrade.
 5. **Jangan rename `run_dashboard.py` / `run_bot.py`** — Cloudflare Tunnel config & shortcut owner mengasumsikan nama ini.
 
-## Kerentanan known (HARUS verify sebelum lanjut)
+## Security — semua audit findings sudah di-fix
 
-Audit 2026-04-18 menemukan 5 issue. Beberapa mungkin sudah di-patch — cek dulu sebelum klaim solved:
+5 temuan audit 2026-04-18 sudah selesai semua (commit `d4d8088`, `661af37`,
+`6bb1635`, `6e5c512`). Tetap berhati-hati:
 
-1. Default `DASHBOARD_SECRET_KEY` / `DASHBOARD_PASSWORD` fallback di `web/__init__.py` & `web/auth.py`
-2. Tidak ada CSRF protection di form POST
-3. Admin password compare plain-text (no hash, no rate limit)
-4. Session cookie flags (SECURE/HTTPONLY/SAMESITE) belum diset
-5. Tidak ada rate limit di `/login` & `/portal/login`
+- `DASHBOARD_SECRET_KEY` & `DASHBOARD_PASSWORD_HASH` di `.env` — tanpa default
+  fallback. Kalau kosong, app raise RuntimeError di startup.
+- CSRF aktif global via Flask-WTF. Semua form POST harus include
+  `{{ csrf_token() }}` (sudah injected di 21 template).
+- Rate limit 5/menit di `/login` & `/portal/login` pakai Flask-Limiter +
+  ProxyFix supaya ambil real IP dari Cloudflare Tunnel.
+- Session cookies: SECURE conditional (HTTPS prod), HTTPONLY=True, SAMESITE=Lax.
 
-Detail di [TODO.md](TODO.md) → "Security".
+Detail di [TODO.md](TODO.md) → "Security" section (semua centang).
+
+## Loyalty system — aturan
+
+- `point_balance` & `visit_count` adalah dua kolom independen di `customers`.
+- Per transaksi customer (tanpa klaim): +1 visit, +1 poin (cap di 10).
+- Klaim 50%: -5 poin (`max(0, balance - 5)`). Klaim Free: -10 poin (`max(0, balance - 10)`).
+- Visibility lenient (anticipate +1): customer 4 poin sudah lihat opsi klaim 50%.
+- Setiap mutasi poin auto-log di tabel `loyalty_audits`. Lihat
+  `/customers/<id>/loyalty` untuk history per customer.
+- Tidak ada auto-sync `point = visit_count` di `init_db()` (sudah dihapus,
+  pernah jadi sumber bug). Sync manual via `scripts/sync_loyalty_points.py`.
 
 ## Memori auto-load
 

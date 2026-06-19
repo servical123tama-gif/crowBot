@@ -9,12 +9,14 @@ Sistem manajemen barbershop multi-cabang. Terdiri dari dua channel:
 
 - **Python 3.11+**
 - **Flask 2.3** — web framework
+- **Flask-WTF 1.2** — CSRF protection global di semua form POST
+- **Flask-Limiter 3.8** — rate limit login (5/menit per IP)
 - **SQLAlchemy 2.0** — ORM
 - **Alembic** — database migrations
 - **PostgreSQL** (production) / **SQLite** (dev) — pilih lewat `DATABASE_URL`
 - **python-telegram-bot 21.7** — bot
 - **pandas** — kalkulasi laporan
-- **gunicorn** — WSGI server (production)
+- **Werkzeug** — `check_password_hash` (admin & capster login)
 
 ## Struktur Folder
 
@@ -86,14 +88,18 @@ Edit `.env`. Variabel penting:
 | Variabel | Wajib | Keterangan |
 |----------|-------|------------|
 | `DATABASE_URL` | ✅ | `sqlite:///./barbershop.db` (dev) atau `postgresql://...` (prod) |
-| `DASHBOARD_PASSWORD` | ✅ | Password admin dashboard |
-| `DASHBOARD_SECRET_KEY` | ✅ | Random string untuk session Flask |
+| `DASHBOARD_PASSWORD_HASH` | ✅ | Hash admin password. Generate: `py -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('YOUR_PWD'))"` |
+| `DASHBOARD_SECRET_KEY` | ✅ | Random 32-byte hex. Generate: `py -c "import secrets; print(secrets.token_hex(32))"` |
 | `TELEGRAM_BOT_TOKEN` | ⚠️ | Wajib kalau pakai bot. Dapat dari [@BotFather](https://t.me/BotFather) |
 | `OWNER_IDS` | ⚠️ | Telegram user IDs owner (koma-separated). Bot auth & notifikasi 23:00 |
 | `ADMIN_IDS` | ⚠️ | Telegram user IDs admin (koma-separated) |
 | `TIMEZONE` | – | Default `Asia/Jakarta` (untuk scheduler bot) |
 | `FONNTE_TOKEN` | – | WhatsApp gateway (kirim QR member otomatis) |
 | `BASE_URL` | – | Untuk link QR ke aplikasi |
+| `DEBUG` | – | `True` untuk dev (cookie SECURE off). Default `False` |
+
+> **Tanpa `DASHBOARD_SECRET_KEY` atau `DASHBOARD_PASSWORD_HASH`, app raise
+> `RuntimeError` di startup** (intentional fail-loud, tidak ada default fallback).
 
 ### 3. Initialize database
 
@@ -194,12 +200,25 @@ alembic downgrade -1
 
 ## Folder `scripts/`
 
-Arsip script migrasi historis (one-off, sudah dijalankan):
-- `migrate_from_sheets.py` — migrasi Google Sheets → SQLite (Februari 2026)
-- `migrate_sqlite_to_postgres.py` — migrasi SQLite → PostgreSQL
-- `fix_branch_data.py` — normalisasi kolom branch (April 2026)
+Mix arsip historis + maintenance script aktif:
 
-Disimpan sebagai referensi. Jangan jalankan ulang kecuali butuh.
+| Script | Status | Apa |
+|---|---|---|
+| `migrate_from_sheets.py` | Arsip | Migrasi Google Sheets → SQLite (Feb 2026) |
+| `migrate_sqlite_to_postgres.py` | Arsip | Migrasi SQLite → PostgreSQL |
+| `fix_branch_data.py` | Arsip | Normalisasi kolom branch (Apr 2026) |
+| `sync_loyalty_points.py` | **Aktif** | Sync `point_balance` dari `visit_count − klaim_used`. Idempotent. Run dengan `--apply` untuk write. Pakai kalau ada inkonsistensi data atau setelah import bulk. |
+
+## Loyalty rules (singkat)
+
+- Tiap transaksi-dengan-customer: +1 visit + +1 poin (cap 10).
+- Klaim 50% (5 poin): sisa = `max(0, balance − 5)`.
+- Klaim Free (10 poin): sisa = `max(0, balance − 10)`.
+- Visibility lenient: customer 4 poin sudah bisa klaim 50% (antisipasi +1 visit).
+- Setiap mutasi poin auto-log di tabel `loyalty_audits`. Lihat per customer di
+  `/customers/<id>/loyalty` atau ikon ⭐ di tabel customer.
+
+Detail lengkap di [ARCHITECTURE.md](ARCHITECTURE.md) → "Loyalty system semantic".
 
 ## License
 
