@@ -455,17 +455,20 @@ def add_transaction():
                     final_price = price_per_orang * family_count
                     chosen_promo_name = chosen_promo['name']
 
-            # Loyalty claim override promo (prioritas lebih tinggi)
+            # Loyalty claim override promo (prioritas lebih tinggi).
+            # Label loyalty disimpan sebagai promo_name di tabel transactions
+            # supaya muncul jelas di history (sebelumnya tx terlihat seperti harga
+            # diskon tanpa keterangan, capster kira diskon tidak terapply).
             if use_loyalty == 'free':
                 final_price   = 0
                 loyalty_label = 'Potong Gratis (10 poin)'
-                chosen_promo_name = None
+                chosen_promo_name = 'Loyalty Gratis'
             elif use_loyalty == '50pct':
                 final_price   = int(final_price * 0.5)
                 loyalty_label = 'Diskon 50% (5 poin)'
-                chosen_promo_name = None
+                chosen_promo_name = 'Loyalty 50%'
 
-            ok_service = repo.add_transaction_full(
+            new_tx_id = repo.add_transaction_full(
                 date=now,
                 capster_name=cap['name'],
                 service_name=service_display_name,
@@ -475,6 +478,7 @@ def add_transaction():
                 customer_id=cid,
                 promo_name=chosen_promo_name,
             )
+            ok_service = new_tx_id is not None
             if ok_service:
                 commission_preview = int(final_price * cap['rate']) if cap['type'] == 'mitra' else 0
             else:
@@ -516,14 +520,11 @@ def add_transaction():
             # Kalau tidak klaim → poin BERTAMBAH +1.
             new_point_balance = None
             if cid and svc:  # poin hanya untuk transaksi layanan
-                tx_id = None
                 if use_loyalty:
-                    try:
-                        all_tx = repo.get_transactions_by_customer(cid, limit=1)
-                        tx_id = all_tx[0]['id'] if all_tx and 'id' in all_tx[0] else None
-                    except Exception:
-                        pass
-                    new_point_balance = repo.use_loyalty_claim(cid, use_loyalty, transaction_id=tx_id)
+                    # Pakai new_tx_id langsung dari add_transaction_full di atas
+                    # (sebelumnya lookup via get_transactions_by_customer yang return-nya
+                    # tidak punya 'id' → LoyaltyClaim.tx_id selalu None).
+                    new_point_balance = repo.use_loyalty_claim(cid, use_loyalty, transaction_id=new_tx_id)
                     if new_point_balance is None:
                         # Claim gagal (race condition: poin sudah berkurang sejak validasi)
                         # Fallback: tambah poin normal supaya tidak hilang

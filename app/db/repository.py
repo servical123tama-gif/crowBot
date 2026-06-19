@@ -272,6 +272,7 @@ class Repository:
                 ).order_by(Transaction.date.desc()).limit(limit).all()
             return [
                 {
+                    'id':      r.id,
                     'date':    r.date,
                     'service': r.service_name,
                     'price':   r.price,
@@ -467,8 +468,12 @@ class Repository:
     def add_transaction_full(self, date: 'datetime', capster_name: str, service_name: str,
                              price: int, payment_method: str, branch: str,
                              customer_id: Optional[int] = None,
-                             promo_name: Optional[str] = None) -> bool:
-        """Add transaction and optionally increment customer visit count."""
+                             promo_name: Optional[str] = None) -> Optional[int]:
+        """Add transaction and optionally increment customer visit count.
+
+        Returns new Transaction.id kalau sukses, None kalau gagal.
+        Caller lama yang pakai `if ok:` tetap jalan karena None falsy & int truthy.
+        """
         try:
             with get_db() as db:
                 row = Transaction(
@@ -482,13 +487,15 @@ class Repository:
                     promo_name=promo_name or '',
                 )
                 db.add(row)
+                db.flush()              # populate row.id sebelum commit
+                new_id = row.id
             if customer_id:
                 self.increment_visit_count(customer_id)
-            logger.info(f"Transaction added: {capster_name} - {service_name} - customer={customer_id}")
-            return True
+            logger.info(f"Transaction added id={new_id}: {capster_name} - {service_name} - customer={customer_id}")
+            return new_id
         except Exception as e:
             logger.error(f"Failed to add transaction_full: {e}", exc_info=True)
-            return False
+            return None
 
     def generate_customer_qr_png(self, customer_id: int) -> bytes:
         """Generate QR code PNG bytes for a customer. Content: BARBER:<id>"""
