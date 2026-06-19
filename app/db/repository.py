@@ -532,7 +532,8 @@ class Repository:
             return None
 
     def update_customer(self, customer_id: int, name: str, phone: str,
-                        added_by: str = None, visit_count: int = None) -> bool:
+                        added_by: str = None, visit_count: int = None,
+                        point_balance: int = None) -> bool:
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -543,7 +544,10 @@ class Repository:
                 if added_by is not None:
                     row.added_by = added_by
                 if visit_count is not None:
-                    row.visit_count = visit_count
+                    row.visit_count = max(0, int(visit_count))
+                if point_balance is not None:
+                    # Clamp ke [0, LOYALTY_MAX_POINTS] supaya tidak melanggar threshold
+                    row.point_balance = max(0, min(self.LOYALTY_MAX_POINTS, int(point_balance)))
             logger.info(f"Customer {customer_id} updated")
             return True
         except Exception as e:

@@ -132,7 +132,7 @@
                 </button>
                 <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
                         style="font-size:.78rem;"
-                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
+                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}', {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger py-0 px-2"
@@ -237,6 +237,21 @@
               <span class="input-group-text">kali</span>
             </div>
             <div class="form-text">Ubah manual jika ada koreksi data kunjungan.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-500" style="font-size:.85rem;">Poin Loyalty</label>
+            <div class="input-group">
+              <span class="input-group-text" style="background:#fef3c7;border-color:#fcd34d;">
+                <i class="bi bi-star-fill" style="color:#92400e;"></i>
+              </span>
+              <input type="number" name="point_balance" id="editPointBalance"
+                     class="form-control" min="0" max="10" placeholder="0">
+              <span class="input-group-text">poin (max 10)</span>
+            </div>
+            <div class="form-text">
+              Threshold reward: <strong>5 poin = Diskon 50%</strong>, <strong>10 poin = Potong Gratis</strong>.
+              Diatas 10 otomatis ke-clamp ke 10.
+            </div>
           </div>
           <div class="mb-1">
             <label class="form-label fw-500" style="font-size:.85rem;">Ditambah oleh</label>
@@ -544,10 +559,11 @@
     new bootstrap.Modal(document.getElementById('modalQR')).show();
   }
 
-  function openEdit(id, name, phone, addedBy, visitCount) {
+  function openEdit(id, name, phone, addedBy, visitCount, pointBalance) {
     document.getElementById('editName').value        = name;
     document.getElementById('editPhone').value       = phone;
     document.getElementById('editVisitCount').value  = visitCount || 0;
+    document.getElementById('editPointBalance').value = pointBalance || 0;
     document.getElementById('formEdit').action       = '/customers/' + id + '/edit';
     const sel = document.getElementById('editAddedBy');
     sel.value = addedBy || '';

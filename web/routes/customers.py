@@ -160,13 +160,16 @@ def customer_edit(cid):
     added_by  = request.form.get('added_by', '').strip()
     visit_count_str = request.form.get('visit_count', '').strip()
     visit_count = int(visit_count_str) if visit_count_str.isdigit() else None
+    point_balance_str = request.form.get('point_balance', '').strip()
+    point_balance = int(point_balance_str) if point_balance_str.isdigit() else None
 
     if not name:
         flash('Nama customer wajib diisi.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
     repo = Repository()
-    ok = repo.update_customer(cid, name, phone, added_by=added_by, visit_count=visit_count)
+    ok = repo.update_customer(cid, name, phone, added_by=added_by,
+                              visit_count=visit_count, point_balance=point_balance)
 
     if ok:
         flash(f'Customer "{name}" berhasil diupdate.', 'success')
