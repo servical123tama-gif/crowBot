@@ -523,7 +523,8 @@ class Repository:
                 return None
             return {
                 'id': row.id, 'Name': row.name, 'Phone': row.phone or '',
-                'VisitCount': getattr(row, 'visit_count', 0) or 0,
+                'VisitCount':   getattr(row, 'visit_count',   0) or 0,
+                'PointBalance': getattr(row, 'point_balance', 0) or 0,
                 'AddedBy': getattr(row, 'added_by', '') or '',
                 'CreatedAt': getattr(row, 'created_at', None),
             }
