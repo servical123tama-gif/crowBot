@@ -27,7 +27,7 @@ load_dotenv()
 
 from sqlalchemy import func
 from app.db.database import get_db, init_db
-from app.db.models import Customer, LoyaltyClaim
+from app.db.models import Customer, LoyaltyClaim, LoyaltyAudit
 
 
 def compute_new_point(visits: int, claims_used: int, max_points: int = 10) -> int:
@@ -55,6 +55,12 @@ def main(apply: bool = False, max_points: int = 10) -> int:
                 changed.append((c.id, c.name, visits, kl, old_p, new_p))
                 if apply:
                     c.point_balance = new_p
+                    db.add(LoyaltyAudit(
+                        customer_id=c.id, delta=new_p - old_p,
+                        before_balance=old_p, after_balance=new_p,
+                        reason='sync', actor='system',
+                        note=f'sync_loyalty_points.py: visits={visits} claims_used={kl}',
+                    ))
         # commit happens at context exit when no exception
 
     mode = 'APPLY' if apply else 'DRY-RUN'

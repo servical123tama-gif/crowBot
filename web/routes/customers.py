@@ -178,6 +178,24 @@ def customer_edit(cid):
     return redirect(url_for('customers.customers_list'))
 
 
+@customers_bp.route('/customers/<int:cid>/loyalty')
+@login_required
+def customer_loyalty(cid):
+    """Halaman audit log perubahan poin untuk satu customer."""
+    repo = Repository()
+    customer = repo.get_customer_by_id(cid)
+    if not customer:
+        flash('Customer tidak ditemukan.', 'danger')
+        return redirect(url_for('customers.customers_list'))
+    audit = repo.get_loyalty_audit(cid, limit=200)
+    return render_template(
+        'customer_loyalty.html',
+        customer=customer,
+        audit=audit,
+        active_page='customers',
+    )
+
+
 @customers_bp.route('/customers/<int:cid>/qr.png')
 @login_required
 def customer_qr(cid):

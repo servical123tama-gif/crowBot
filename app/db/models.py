@@ -90,6 +90,31 @@ class LoyaltyClaim(Base):
     )
 
 
+class LoyaltyAudit(Base):
+    """Audit trail setiap perubahan point_balance customer.
+
+    Setiap row = 1 event delta. Read-only (jangan UPDATE/DELETE).
+    Reasons: 'transaction', 'claim_50pct', 'claim_free', 'manual_edit', 'sync'.
+    """
+    __tablename__ = 'loyalty_audits'
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    customer_id     = Column(Integer, nullable=False)
+    delta           = Column(Integer, nullable=False)        # +1, -5, dll.
+    before_balance  = Column(Integer, nullable=False)
+    after_balance   = Column(Integer, nullable=False)
+    reason          = Column(String(30), nullable=False)
+    actor           = Column(String(100), nullable=True, default='')
+    transaction_id  = Column(Integer, nullable=True)
+    note            = Column(Text, nullable=True, default='')
+    created_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('ix_loyalty_audit_customer', 'customer_id'),
+        Index('ix_loyalty_audit_created', 'created_at'),
+    )
+
+
 class Service(Base):
     __tablename__ = 'services'
 

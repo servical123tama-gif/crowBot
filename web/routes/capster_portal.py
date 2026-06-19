@@ -524,14 +524,23 @@ def add_transaction():
                     # Pakai new_tx_id langsung dari add_transaction_full di atas
                     # (sebelumnya lookup via get_transactions_by_customer yang return-nya
                     # tidak punya 'id' → LoyaltyClaim.tx_id selalu None).
-                    new_point_balance = repo.use_loyalty_claim(cid, use_loyalty, transaction_id=new_tx_id)
+                    new_point_balance = repo.use_loyalty_claim(
+                        cid, use_loyalty,
+                        transaction_id=new_tx_id, actor=cap['name'],
+                    )
                     if new_point_balance is None:
                         # Claim gagal (race condition: poin sudah berkurang sejak validasi)
                         # Fallback: tambah poin normal supaya tidak hilang
-                        new_point_balance = repo.add_customer_points(cid, 1)
+                        new_point_balance = repo.add_customer_points(
+                            cid, 1, actor=cap['name'],
+                            transaction_id=new_tx_id, reason='transaction',
+                        )
                         loyalty_label = None  # batalkan label klaim di success page
                 else:
-                    new_point_balance = repo.add_customer_points(cid, 1)
+                    new_point_balance = repo.add_customer_points(
+                        cid, 1, actor=cap['name'],
+                        transaction_id=new_tx_id, reason='transaction',
+                    )
 
             session['last_tx'] = {
                 'service':           svc['Name'] if svc else None,

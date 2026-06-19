@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.db.database import get_db
 from app.db.models import (
     Transaction, Capster, Customer, Service, Branch, Product, SalaryWithdrawal,
-    ProductStock, ProductSale, Promo, Setting, LoyaltyClaim,
+    ProductStock, ProductSale, Promo, Setting, LoyaltyClaim, LoyaltyAudit,
 )
 from app.config.constants import (
     DATETIME_FORMAT, DATE_FORMAT,
@@ -378,22 +378,39 @@ class Repository:
             logger.error(f"Failed to get loyalty status: {e}")
             return {'point_balance': 0, 'available': []}
 
-    def add_customer_points(self, customer_id: int, points: int = 1) -> int:
-        """Add loyalty points to customer. Returns new balance."""
+    def add_customer_points(self, customer_id: int, points: int = 1,
+                            actor: str = '', reason: str = 'transaction',
+                            transaction_id: Optional[int] = None,
+                            note: str = '') -> int:
+        """Add loyalty points to customer. Returns new balance.
+
+        Auto-log ke loyalty_audits dengan actor/reason untuk trace siapa yang
+        nambah poin & kenapa (default reason='transaction').
+        """
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
                 if not row:
                     return 0
-                bal = min((getattr(row, 'point_balance', 0) or 0) + points, self.LOYALTY_MAX_POINTS)
+                before = getattr(row, 'point_balance', 0) or 0
+                bal = min(before + points, self.LOYALTY_MAX_POINTS)
                 row.point_balance = bal
+                delta = bal - before
+                if delta != 0:
+                    db.add(LoyaltyAudit(
+                        customer_id=customer_id, delta=delta,
+                        before_balance=before, after_balance=bal,
+                        reason=reason, actor=actor or '',
+                        transaction_id=transaction_id, note=note or '',
+                    ))
             return bal
         except Exception as e:
             logger.error(f"Failed to add points to customer {customer_id}: {e}")
             return 0
 
     def use_loyalty_claim(self, customer_id: int, claim_type: str,
-                          transaction_id: Optional[int] = None) -> Optional[int]:
+                          transaction_id: Optional[int] = None,
+                          actor: str = '') -> Optional[int]:
         """Klaim reward — sisa = max(0, balance - threshold).
 
         Contoh:
@@ -432,10 +449,44 @@ class Repository:
                     claimed_at=datetime.utcnow(),
                     transaction_id=transaction_id,
                 ))
+                db.add(LoyaltyAudit(
+                    customer_id=customer_id,
+                    delta=new_balance - current,
+                    before_balance=current,
+                    after_balance=new_balance,
+                    reason=f'claim_{claim_type}',
+                    actor=actor or '',
+                    transaction_id=transaction_id,
+                ))
             return new_balance
         except Exception as e:
             logger.error(f"Failed to use loyalty claim: {e}")
             return None
+
+    def get_loyalty_audit(self, customer_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return audit log perubahan point_balance untuk customer, terbaru dulu."""
+        try:
+            with get_db() as db:
+                rows = db.query(LoyaltyAudit).filter(
+                    LoyaltyAudit.customer_id == customer_id
+                ).order_by(LoyaltyAudit.created_at.desc()).limit(limit).all()
+            return [
+                {
+                    'id':             r.id,
+                    'delta':          r.delta,
+                    'before':         r.before_balance,
+                    'after':          r.after_balance,
+                    'reason':         r.reason,
+                    'actor':          r.actor or '',
+                    'transaction_id': r.transaction_id,
+                    'note':           r.note or '',
+                    'created_at':     r.created_at,
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get loyalty audit: {e}")
+            return []
 
     def get_loyalty_history(self, customer_id: Optional[int] = None,
                             limit: int = 50) -> List[Dict]:
@@ -534,7 +585,7 @@ class Repository:
 
     def update_customer(self, customer_id: int, name: str, phone: str,
                         added_by: str = None, visit_count: int = None,
-                        point_balance: int = None) -> bool:
+                        point_balance: int = None, actor: str = 'admin') -> bool:
         try:
             with get_db() as db:
                 row = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -548,7 +599,19 @@ class Repository:
                     row.visit_count = max(0, int(visit_count))
                 if point_balance is not None:
                     # Clamp ke [0, LOYALTY_MAX_POINTS] supaya tidak melanggar threshold
-                    row.point_balance = max(0, min(self.LOYALTY_MAX_POINTS, int(point_balance)))
+                    before = getattr(row, 'point_balance', 0) or 0
+                    new_p = max(0, min(self.LOYALTY_MAX_POINTS, int(point_balance)))
+                    row.point_balance = new_p
+                    if new_p != before:
+                        db.add(LoyaltyAudit(
+                            customer_id=customer_id,
+                            delta=new_p - before,
+                            before_balance=before,
+                            after_balance=new_p,
+                            reason='manual_edit',
+                            actor=actor or 'admin',
+                            note='Edit via /customers admin modal',
+                        ))
             logger.info(f"Customer {customer_id} updated")
             return True
         except Exception as e:

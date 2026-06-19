@@ -130,6 +130,11 @@
                         onclick="openQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
                   <i class="bi bi-qr-code"></i>
                 </button>
+                <a href="/customers/{{ c['id'] }}/loyalty"
+                   class="btn btn-sm btn-outline-warning py-0 px-2 me-1"
+                   title="Riwayat poin loyalty">
+                  <i class="bi bi-star-fill"></i>
+                </a>
                 <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
                         style="font-size:.78rem;"
                         onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}', {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">

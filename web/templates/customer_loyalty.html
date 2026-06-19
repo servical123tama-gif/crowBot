@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Loyalty Audit — {{ customer.Name }}{% endblock %}
+{% block page_title %}Audit Poin — {{ customer.Name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <a href="/customers" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Daftar Customer
+  </a>
+  <small class="text-muted">
+    Saldo poin sekarang:
+    <strong class="text-warning"><i class="bi bi-star-fill"></i> {{ customer.PointBalance }}</strong>
+    &nbsp;·&nbsp; Kunjungan: <strong>{{ customer.VisitCount }}</strong>
+  </small>
+</div>
+
+<div class="card border-0 shadow-sm" style="border-radius:14px;">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:170px;">Waktu</th>
+            <th style="width:90px;" class="text-center">Delta</th>
+            <th style="width:120px;" class="text-center">Saldo</th>
+            <th>Alasan</th>
+            <th>Aktor</th>
+            <th class="text-end">Tx</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if audit %}
+            {% for a in audit %}
+            <tr>
+              <td>
+                <small class="text-muted">
+                  {{ a.created_at.strftime('%d %b %Y, %H:%M') if a.created_at else '-' }}
+                </small>
+              </td>
+              <td class="text-center">
+                {% if a.delta > 0 %}
+                <span class="badge rounded-pill"
+                      style="background:#d1fae5;color:#065f46;font-size:.78rem;">
+                  +{{ a.delta }}
+                </span>
+                {% elif a.delta < 0 %}
+                <span class="badge rounded-pill"
+                      style="background:#fee2e2;color:#991b1b;font-size:.78rem;">
+                  {{ a.delta }}
+                </span>
+                {% else %}
+                <span class="text-muted" style="font-size:.78rem;">0</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <small class="text-muted">{{ a.before }} → <strong>{{ a.after }}</strong></small>
+              </td>
+              <td>
+                {% set badges = {
+                  'transaction': ('bi-receipt', '#0f3460', '#e8f4fd', 'Transaksi'),
+                  'claim_50pct': ('bi-gift-fill', '#92400e', '#fef3c7', 'Klaim 50%'),
+                  'claim_free': ('bi-gift-fill', '#92400e', '#fef3c7', 'Klaim Gratis'),
+                  'manual_edit': ('bi-pencil-square', '#1e40af', '#dbeafe', 'Edit Manual'),
+                  'sync': ('bi-arrow-repeat', '#374151', '#e5e7eb', 'Sync System'),
+                } %}
+                {% set b = badges.get(a.reason, ('bi-question-circle', '#6b7280', '#f3f4f6', a.reason)) %}
+                <span class="badge rounded-pill px-2"
+                      style="background:{{ b[2] }};color:{{ b[1] }};font-size:.76rem;">
+                  <i class="bi {{ b[0] }} me-1"></i>{{ b[3] }}
+                </span>
+                {% if a.note %}
+                <div class="text-muted" style="font-size:.7rem;margin-top:.15rem;">{{ a.note }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <small>{{ a.actor or '—' }}</small>
+              </td>
+              <td class="text-end">
+                {% if a.transaction_id %}
+                <span class="text-muted" style="font-size:.78rem;">#{{ a.transaction_id }}</span>
+                {% else %}
+                <span class="text-muted" style="font-size:.78rem;">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size:2.5rem;opacity:.3;"></i>
+                <p class="mt-2 mb-0">Belum ada audit log untuk customer ini.</p>
+                <small>Audit mulai tercatat sejak commit ini di-deploy. Klaim atau transaksi sebelumnya tidak ke-track.</small>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
