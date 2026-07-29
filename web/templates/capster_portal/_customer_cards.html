@@ -38,7 +38,7 @@
       <!-- Tombol QR -->
       <button class="btn btn-sm btn-outline-primary flex-shrink-0"
               style="border-radius:8px;"
-              onclick="showQR({{ c.id }}, '{{ c.Name|replace("'", "\\'") }}', {{ c.VisitCount }}, '{{ c.Phone }}')">
+              onclick="showQR({{ c.id }}, {{ c.Name|tojson|forceescape }}, {{ c.VisitCount }}, {{ c.Phone|tojson|forceescape }})">
         <i class="bi bi-qr-code me-1"></i>QR Code
       </button>
     </div>

@@ -1,9 +1,8 @@
 # Barbershop Management
 
-Sistem manajemen barbershop multi-cabang. Terdiri dari dua channel:
+Sistem manajemen barbershop multi-cabang. Satu web dashboard:
 
 - **Web dashboard** — admin (laporan, kelola data) dan capster (self-service portal)
-- **Bot Telegram** — laporan ringkasan untuk owner/admin (read-only)
 
 ## Tech Stack
 
@@ -14,7 +13,6 @@ Sistem manajemen barbershop multi-cabang. Terdiri dari dua channel:
 - **SQLAlchemy 2.0** — ORM
 - **Alembic** — database migrations
 - **PostgreSQL** (production) / **SQLite** (dev) — pilih lewat `DATABASE_URL`
-- **python-telegram-bot 21.7** — bot
 - **pandas** — kalkulasi laporan
 - **Werkzeug** — `check_password_hash` (admin & capster login)
 
@@ -22,7 +20,7 @@ Sistem manajemen barbershop multi-cabang. Terdiri dari dua channel:
 
 ```
 bot_barber_2/
-├── app/                       # SHARED CORE — dipakai web & bot
+├── app/                       # SHARED CORE
 │   ├── config/                # constants, settings env
 │   ├── db/                    # SQLAlchemy models, repository, engine
 │   └── services/              # business logic (profit calc, dll.)
@@ -30,26 +28,16 @@ bot_barber_2/
 ├── web/                       # Flask web dashboard
 │   ├── __init__.py            # create_app()
 │   ├── auth.py                # @login_required admin
-│   ├── routes/                # 15 blueprints (home, profit, transactions, dll.)
+│   ├── routes/                # blueprints (home, profit, transactions, dll.)
 │   ├── static/                # CSS, JS, QR member
 │   └── templates/             # Jinja2 templates
 │
-├── bot/                       # Telegram bot (admin reports only)
-│   ├── __init__.py            # re-export run, build_app
-│   ├── bot.py                 # Application wiring
-│   ├── auth.py                # @admin_only decorator
-│   ├── formatters.py          # fmt_idr, fmt_date
-│   ├── reports.py             # text builder laporan
-│   ├── handlers.py            # command + callback handlers
-│   └── scheduler.py           # auto-push 23:00 WIB
-│
 ├── alembic/                   # DB migrations
 ├── scripts/                   # one-off scripts & arsip migrasi
-├── docs/                      # API.md, SETUP.md, DEPLOYMENT.md
+├── docs/                      # API.md, SETUP.md, DEPLOYMENT.md (legacy)
 ├── backups/                   # DB dumps (gitignored)
 │
 ├── run_dashboard.py           # entry point web
-├── run_bot.py                 # entry point bot
 ├── alembic.ini
 ├── requirements.txt
 └── .env.example
@@ -58,12 +46,10 @@ bot_barber_2/
 ### Aturan import
 
 - `web/` boleh impor dari `app/`
-- `bot/` boleh impor dari `app/`
-- `app/` **TIDAK** boleh impor dari `web/` atau `bot/`
-- `web/` dan `bot/` **TIDAK** saling impor
+- `app/` **TIDAK** boleh impor dari `web/`
 
-Business logic ditaruh di `app/services/`. Route web dan handler bot
-ideally cuma tipis — terima input, panggil service, format output.
+Business logic ditaruh di `app/services/`. Route web ideally cuma tipis —
+terima input, panggil service, format output.
 
 ## Setup
 
@@ -90,10 +76,6 @@ Edit `.env`. Variabel penting:
 | `DATABASE_URL` | ✅ | `sqlite:///./barbershop.db` (dev) atau `postgresql://...` (prod) |
 | `DASHBOARD_PASSWORD_HASH` | ✅ | Hash admin password. Generate: `py -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('YOUR_PWD'))"` |
 | `DASHBOARD_SECRET_KEY` | ✅ | Random 32-byte hex. Generate: `py -c "import secrets; print(secrets.token_hex(32))"` |
-| `TELEGRAM_BOT_TOKEN` | ⚠️ | Wajib kalau pakai bot. Dapat dari [@BotFather](https://t.me/BotFather) |
-| `OWNER_IDS` | ⚠️ | Telegram user IDs owner (koma-separated). Bot auth & notifikasi 23:00 |
-| `ADMIN_IDS` | ⚠️ | Telegram user IDs admin (koma-separated) |
-| `TIMEZONE` | – | Default `Asia/Jakarta` (untuk scheduler bot) |
 | `FONNTE_TOKEN` | – | WhatsApp gateway (kirim QR member otomatis) |
 | `BASE_URL` | – | Untuk link QR ke aplikasi |
 | `DEBUG` | – | `True` untuk dev (cookie SECURE off). Default `False` |
@@ -123,30 +105,10 @@ python run_dashboard.py
 Login admin: `/login` (pakai `DASHBOARD_PASSWORD`).
 Portal capster: `/portal/login` (pakai `username` + `password` dari DB).
 
-### Bot Telegram
-
-```bash
-python run_bot.py
-```
-
-Kirim `/start` ke bot di Telegram (akun harus terdaftar di
-`OWNER_IDS` atau `ADMIN_IDS`).
-
-Command yang tersedia:
-- `/harian` — laporan hari ini
-- `/mingguan` — 7 hari terakhir
-- `/bulanan` — bulan ini
-- `/profit` — profit per cabang (full calc + komisi)
-- `/capster` — breakdown per capster
-- `/help` — bantuan
-
-Notifikasi otomatis ringkasan harian dikirim ke semua `OWNER_IDS` setiap
-**23:00 WIB** (lewat JobQueue python-telegram-bot).
-
 ## Deploy
 
 Production = **laptop owner + Cloudflare Tunnel**. Tidak ada cloud
-deploy. Web + bot + PostgreSQL semua di mesin yang sama.
+deploy. Web + PostgreSQL semua di mesin yang sama.
 
 ### Cloudflare Tunnel (web)
 
@@ -164,15 +126,6 @@ cloudflared tunnel run <tunnel-name>
 Atau pakai Cloudflare Tunnel service (cloudflared di-install sebagai
 Windows service via `cloudflared service install`), supaya tunnel
 auto-start saat boot.
-
-### Bot Telegram
-
-```bash
-python run_bot.py
-```
-
-Saat ini dijalankan manual saat dibutuhkan. Rencananya auto-start
-lewat Windows Task Scheduler atau NSSM (lihat TODO.md).
 
 ### Backup DB
 

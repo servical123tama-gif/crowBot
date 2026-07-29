@@ -71,7 +71,7 @@
               <td>
                 <div class="d-flex align-items-center gap-2"
                      style="cursor:pointer;"
-                     onclick="openProfile({{ c['id'] }}, '{{ c['Name']|replace("'","\\'") }}', '{{ c['Phone'] }}', {{ c['VisitCount'] }}, '{{ c['AddedBy']|replace("'","\\'") }}', '{{ c['CreatedAt'].strftime('%d %b %Y') if c.get('CreatedAt') else '-' }}')">
+                     onclick="openProfile({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['Phone']|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c['AddedBy']|tojson|forceescape }}, {{ (c['CreatedAt'].strftime('%d %b %Y') if c.get('CreatedAt') else '-')|tojson|forceescape }})">
                   <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
                        style="width:34px;height:34px;flex-shrink:0;font-size:.8rem;
                               background:{{ ['#e94560','#0f3460','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
@@ -121,13 +121,13 @@
                 {% if c['Phone'] %}
                 <button class="btn btn-sm btn-success py-0 px-2 me-1"
                         title="Kirim QR via WhatsApp"
-                        onclick="sendQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}')">
+                        onclick="sendQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }})">
                   <i class="bi bi-whatsapp"></i>
                 </button>
                 {% endif %}
                 <button class="btn btn-sm btn-outline-success py-0 px-2 me-1"
                         title="QR Code"
-                        onclick="openQR({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', {{ c['VisitCount'] }})">
+                        onclick="openQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['VisitCount'] }})">
                   <i class="bi bi-qr-code"></i>
                 </button>
                 <a href="/customers/{{ c['id'] }}/loyalty"
@@ -137,12 +137,12 @@
                 </a>
                 <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
                         style="font-size:.78rem;"
-                        onclick="openEdit({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}', '{{ c['Phone'] }}', '{{ c['AddedBy']|replace("'", "\\'") }}', {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
+                        onclick="openEdit({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['Phone']|tojson|forceescape }}, {{ c['AddedBy']|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger py-0 px-2"
                         style="font-size:.78rem;"
-                        onclick="openDelete({{ c['id'] }}, '{{ c['Name']|replace("'", "\\'") }}')">
+                        onclick="openDelete({{ c['id'] }}, {{ c['Name']|tojson|forceescape }})">
                   <i class="bi bi-trash"></i>
                 </button>
               </td>
@@ -587,6 +587,11 @@
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = '/customers/' + id + '/send-qr';
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrf_token';
+    csrf.value = '{{ csrf_token() }}';
+    form.appendChild(csrf);
     document.body.appendChild(form);
     form.submit();
   }

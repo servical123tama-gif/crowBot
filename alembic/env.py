@@ -8,6 +8,9 @@ from alembic import context
 # Make project root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv  # noqa: E402
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+
 from app.db.models import Base  # noqa: E402
 
 config = context.config

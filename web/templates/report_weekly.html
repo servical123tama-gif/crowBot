@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Laporan Mingguan — Dashboard{% endblock %}
+{% block page_title %}Laporan Mingguan{% endblock %}
+
+{% block content %}
+<!-- Week Navigator -->
+<div class="card stat-card p-3 mb-4">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <a href="/report/weekly?week={{ prev_week }}" class="btn btn-sm btn-outline-secondary">&#8592; Minggu Lalu</a>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="date" name="week" class="form-control form-control-sm" value="{{ date_str }}"
+             style="width:160px">
+      <button type="submit" class="btn btn-sm" style="background:#e94560; color:#fff;">Tampilkan</button>
+    </form>
+    {% if not is_current_week %}
+    <a href="/report/weekly?week={{ next_week }}" class="btn btn-sm btn-outline-secondary">Minggu Depan &#8594;</a>
+    {% endif %}
+    <a href="/report/weekly" class="btn btn-sm btn-outline-primary">Minggu Ini</a>
+    <span class="ms-auto fw-semibold text-muted small">
+      Senin, {{ range_label }}
+    </span>
+  </div>
+</div>
+
+{% if total_tx == 0 %}
+<div class="alert alert-info">Tidak ada transaksi pada minggu ini ({{ range_label }}).</div>
+{% else %}
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fw-bold fs-5 text-success">{{ total_revenue|idr }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Total Transaksi</div>
+      <div class="fw-bold fs-5">{{ total_tx }} tx</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Rata-rata / Hari Aktif</div>
+      <div class="fw-bold fs-5">{{ avg_daily_revenue|idr }}</div>
+      <div class="text-muted small">{{ active_days }} dari 7 hari</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Capster Aktif</div>
+      <div class="fw-bold fs-5">{{ by_capster|length }} orang</div>
+    </div>
+  </div>
+</div>
+
+<!-- Breakdown per Hari (Senin - Minggu) -->
+<div class="card stat-card p-3 mb-4">
+  <div class="fw-semibold mb-3">📅 Per Hari (Senin — Minggu)</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Hari</th>
+          <th>Tanggal</th>
+          <th class="text-center">Transaksi</th>
+          <th class="text-end">Revenue</th>
+          <th class="text-end" style="width:30%">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in by_day %}
+        <tr {% if d.count == 0 %}class="text-muted"{% endif %}>
+          <td class="fw-semibold">{{ d.day_name }}</td>
+          <td>
+            <a href="/report/daily?date={{ d.date_str }}" class="text-decoration-none text-muted small">
+              {{ d.date_label }}
+            </a>
+          </td>
+          <td class="text-center">{{ d.count }}x</td>
+          <td class="text-end fw-semibold {% if d.revenue > 0 %}text-success{% endif %}">{{ d.revenue|idr }}</td>
+          <td class="text-end">
+            <div class="d-flex align-items-center justify-content-end gap-2">
+              <div class="progress" style="width:100px; height:6px;">
+                <div class="progress-bar" style="width:{{ d.pct }}%; background:#e94560;"></div>
+              </div>
+              <span class="small text-muted" style="min-width:32px; text-align:right">{{ d.pct }}%</span>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td colspan="2" class="text-end">Total minggu ini</td>
+          <td class="text-center">{{ total_tx }}x</td>
+          <td class="text-end text-success">{{ total_revenue|idr }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- Breakdown Row -->
+<div class="row g-3 mb-4">
+
+  <!-- Per Layanan -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">✂️ Per Layanan</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Layanan</th><th class="text-center">Jumlah</th><th class="text-end">Revenue</th><th class="text-end">%</th></tr></thead>
+        <tbody>
+        {% for s in by_service %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td class="text-center">{{ s.count }}x</td>
+            <td class="text-end fw-semibold">{{ s.revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ s.pct }}%</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Capster -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">💈 Per Capster</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Capster</th><th class="text-center">Transaksi</th><th class="text-end">Revenue</th></tr></thead>
+        <tbody>
+        {% for c in by_capster %}
+          <tr>
+            <td class="fw-semibold">{{ c.name }}</td>
+            <td class="text-center">{{ c.count }}x</td>
+            <td class="text-end fw-semibold">{{ c.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Metode Bayar -->
+  <div class="col-lg-6">
+    <div class="card stat-card p-3">
+      <div class="fw-semibold mb-3">💳 Metode Pembayaran</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Metode</th><th class="text-center">Jumlah</th><th class="text-end">Revenue</th><th class="text-end">%</th></tr></thead>
+        <tbody>
+        {% for p in by_payment %}
+          <tr>
+            <td>
+              {% if 'cash' in p.name|lower %}💵{% elif 'qris' in p.name|lower %}📲{% endif %}
+              {{ p.name }}
+            </td>
+            <td class="text-center">{{ p.count }}x</td>
+            <td class="text-end fw-semibold">{{ p.revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ p.pct }}%</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per Cabang -->
+  {% if by_branch|length > 1 %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3">
+      <div class="fw-semibold mb-3">🏢 Per Cabang</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Cabang</th><th class="text-center">Transaksi</th><th class="text-end">Revenue</th></tr></thead>
+        <tbody>
+        {% for b in by_branch %}
+          <tr>
+            <td>{{ b.name }}</td>
+            <td class="text-center">{{ b.count }}x</td>
+            <td class="text-end fw-semibold">{{ b.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endif %}
+{% endblock %}

@@ -2,6 +2,7 @@
 import hmac as _hmac
 import hashlib
 import os
+import re
 
 import requests as _requests
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort
@@ -10,6 +11,14 @@ from web.auth import login_required
 from app.db.repository import Repository
 
 _QR_SECRET = os.getenv('SECRET_KEY', 'barbershop-qr-secret-2026')
+
+# Phone hanya boleh digit, +, -, spasi. Anti stored XSS via nomor HP.
+_PHONE_RE = re.compile(r'^[\d\+\-\s]{0,30}$')
+
+
+def _is_valid_phone(phone: str) -> bool:
+    """Return True kalau phone kosong atau match format aman (digit/+-space, max 30)."""
+    return not phone or bool(_PHONE_RE.match(phone))
 
 
 def _qr_token(cid: int) -> str:
@@ -117,6 +126,10 @@ def customer_add():
         flash('Nama customer wajib diisi.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
+    if not _is_valid_phone(phone):
+        flash('Nomor HP tidak valid. Hanya boleh angka, +, -, dan spasi (maks 30 karakter).', 'danger')
+        return redirect(url_for('customers.customers_list'))
+
     repo = Repository()
 
     if phone:
@@ -165,6 +178,10 @@ def customer_edit(cid):
 
     if not name:
         flash('Nama customer wajib diisi.', 'danger')
+        return redirect(url_for('customers.customers_list'))
+
+    if not _is_valid_phone(phone):
+        flash('Nomor HP tidak valid. Hanya boleh angka, +, -, dan spasi (maks 30 karakter).', 'danger')
         return redirect(url_for('customers.customers_list'))
 
     repo = Repository()

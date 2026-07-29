@@ -4,13 +4,12 @@
 
 ## Apa proyek ini
 
-**Barbershop Management System** — sistem manajemen barbershop multi-cabang. Dua channel terpisah, satu shared core:
+**Barbershop Management System** — sistem manajemen barbershop multi-cabang. Satu web app + shared core:
 
 - **Web dashboard** (`web/`) — admin & capster portal.
-- **Bot Telegram** (`bot/`) — read-only laporan untuk admin.
 - **Shared core** (`app/`) — config, db (SQLAlchemy), services (business logic).
 
-**Production = laptop owner + Cloudflare Tunnel.** Tidak ada cloud deploy. Web & bot keduanya jalan dari mesin lokal yang sama. Bot saat ini jarang dinyalakan tapi rencananya rutin.
+**Production = laptop owner + Cloudflare Tunnel.** Tidak ada cloud deploy.
 
 Owner: arsybejo@gmail.com. Bisnis aktif (bukan sandbox).
 
@@ -18,25 +17,23 @@ Owner: arsybejo@gmail.com. Bisnis aktif (bukan sandbox).
 
 ```
 app/   → boleh diimpor semua
-web/   → impor dari app/, TIDAK boleh impor bot/
-bot/   → impor dari app/, TIDAK boleh impor web/
+web/   → impor dari app/
 ```
 
-Business logic letakkan di `app/services/`. Route web & handler bot harus **tipis**: terima input → panggil service → format output. Jangan duplikasi logic antar channel.
+Business logic letakkan di `app/services/`. Route web harus **tipis**: terima input → panggil service → format output.
 
 ## Entry points
 
 | File | Untuk apa |
 |------|-----------|
 | `run_dashboard.py` | Jalankan Flask dashboard (`python run_dashboard.py`) |
-| `run_bot.py` | Jalankan Telegram bot (`python run_bot.py`) |
 
 Jangan buat entry point baru di root. Tambahkan script one-off ke `scripts/`.
 
 ## Stack & versi
 
 - Python 3.11+ (venv di `venv/`)
-- Flask 2.3, SQLAlchemy 2.0, Alembic, python-telegram-bot 21.7
+- Flask 2.3, SQLAlchemy 2.0, Alembic
 - Flask-Limiter 3.8 (rate limit login), Flask-WTF 1.2 (CSRF)
 - DB: PostgreSQL 18 (prod & local), SQLite (fallback dev) — pilih lewat `DATABASE_URL`
 - Pandas (laporan), Werkzeug (auth hashing + check_password_hash), Fonnte (WhatsApp gateway)
@@ -46,7 +43,6 @@ Jangan buat entry point baru di root. Tambahkan script one-off ke `scripts/`.
 ```bash
 # Run
 python run_dashboard.py       # web, port 5000
-python run_bot.py             # bot polling
 
 # DB
 alembic upgrade head          # apply migrations
@@ -96,7 +92,7 @@ single-developer & no CI.
 2. **Jangan commit `.env` atau `credentials.json`** — sudah di-gitignore, tapi jangan iseng `git add -f`.
 3. **Jangan delete `backups/`** — dump DB lokal, kalau hilang tidak bisa dikembalikan.
 4. **Jangan hidupkan kembali Google Sheets** — sudah dimigrasi ke SQLAlchemy, balik = downgrade.
-5. **Jangan rename `run_dashboard.py` / `run_bot.py`** — Cloudflare Tunnel config & shortcut owner mengasumsikan nama ini.
+5. **Jangan rename `run_dashboard.py`** — Cloudflare Tunnel config & shortcut owner mengasumsikan nama ini.
 
 ## Security — semua audit findings sudah di-fix
 
@@ -135,5 +131,5 @@ Memori itu untuk preferensi user. CLAUDE.md ini untuk konteks proyek (commit ke 
 
 - Arsitektur detail: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Pekerjaan pending: [TODO.md](TODO.md)
-- Setup awal & cara jalankan (web + bot + tunnel): [README.md](README.md)
-- `docs/*.md` — semua versi v1 (Telegram bot + Google Sheets era), abaikan / tunggu dihapus
+- Setup awal & cara jalankan (web + tunnel): [README.md](README.md)
+- `docs/*.md` — semua versi v1 (era Telegram bot + Google Sheets), abaikan / tunggu dihapus

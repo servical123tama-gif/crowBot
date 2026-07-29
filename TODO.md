@@ -45,15 +45,6 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 
 ## 🟠 High Priority — Operational
 
-- [ ] **Bot Telegram jarang nyala — bikin auto-start di Windows**
-  - Status: jalan di laptop owner yang sama dengan web, tapi cuma dinyalakan manual.
-  - Opsi (pilih satu):
-    - **Windows Task Scheduler** — trigger "At log on" → `python run_bot.py`. Paling gampang, no extra tool.
-    - **NSSM** (Non-Sucking Service Manager) — wrap `run_bot.py` jadi Windows Service. Auto-restart kalau crash. Recommended.
-    - **PowerShell startup script** — taruh di Startup folder, sederhana tapi log management manual.
-  - Sebelum auto-start: pastikan log rotation di place (lihat item logging di bawah).
-  - Bukan target deploy ke cloud — single-host adalah keputusan desain.
-
 - [ ] **`.env.example` masih punya legacy var**
   - File: `.env.example`
   - Hapus: `AUTHORIZED_CAPSTERS` (bot lama), `GOOGLE_SHEET_ID`, `GEMINI_API_KEY`, `DB_DUAL_WRITE`, `DB_ONLY`
@@ -95,8 +86,9 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
   - Konsider: pindahkan `BRANCHES`, `SERVICES_MAIN`, dll ke DB-only access (jangan mutate constants in-memory)
 
 - [ ] **`telegram_id` constraint di tabel `Capster`**
-  - Saat ini `NOT NULL` + `UNIQUE`. Login pakai `username`+`password_hash`, jadi `telegram_id` legacy.
-  - Migration: bikin `nullable=True`. Atau hapus column (perlu cek importer).
+  - Saat ini `NOT NULL` + `UNIQUE`. Bot Telegram sudah dihapus, login pakai `username`+`password_hash`.
+  - `telegram_id` masih dipakai sebagai foreign-key ke `salary_withdrawals` dan sebagai identifier di beberapa route.
+  - Migration: bikin `nullable=True` supaya capster baru tanpa Telegram tidak perlu dummy ID. Atau audit + hapus column sepenuhnya (kompleks, banyak importer).
 
 - [ ] **`add_transaction_legacy` placeholder di Repository**
   - File: `app/db/repository.py` line ~33
@@ -121,9 +113,6 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 - [ ] **`scripts/` butuh README**
   - Tiap script kasih comment di header: kapan terakhir dijalankan, masih relevan atau arsip.
 
-- [ ] **Re-enable AI `/tanya` di bot** (kalau owner mau)
-  - Pakai Gemini atau Claude. Read-only query: "berapa pendapatan minggu ini?" → SQL aggregate → natural answer.
-
 - [ ] **Multi-tenancy** (kalau scale ke barbershop lain)
   - Saat ini single-tenant. Untuk multi: tambah `org_id` FK ke semua tabel, scope query.
 
@@ -139,17 +128,17 @@ Verifikasi dulu mana yang sudah di-patch sebelum mulai kerja. Lihat juga memori 
 
 Hitung manual setelah update:
 - Critical: ☑ 5 / ☐ 0 — semua selesai 🎉
-- High: ☐ 6
+- High: ☐ 5
 - Medium: ☐ 6
-- Low: ☐ 5
+- Low: ☐ 4
 
-Total: **22 item** (5 selesai).
+Total: **20 item** (5 selesai).
 
 ---
 
 ## Catatan kebiasaan update
 
-1. Saat mulai item, **buat branch** `fix/security-#1-secret-key` atau `feat/bot-deploy` dari `dev`.
+1. Saat mulai item, **buat branch** `fix/security-#1-secret-key` atau `feat/xxx` dari `dev`.
 2. **Centang `[x]`** sebelum merge PR.
 3. **Pindahkan ke "Done & archived"** kalau item terlalu lama tidak relevan.
 4. **Tambah konteks WHY** di setiap item baru — jangan cuma "fix X". Format:

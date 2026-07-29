@@ -13,9 +13,21 @@ profit_bp = Blueprint('profit', __name__)
 @profit_bp.route('/profit')
 @login_required
 def profit():
-    now   = datetime.now()
-    year  = int(request.args.get('year',  now.year))
-    month = int(request.args.get('month', now.month))
+    now = datetime.now()
+
+    # Parse & validasi year/month — fallback ke bulan berjalan kalau input invalid
+    try:
+        year = int(request.args.get('year', now.year))
+    except (ValueError, TypeError):
+        year = now.year
+    try:
+        month = int(request.args.get('month', now.month))
+    except (ValueError, TypeError):
+        month = now.month
+    if not (1 <= month <= 12):
+        month = now.month
+    if not (2000 <= year <= 2100):
+        year = now.year
 
     db   = Repository()
     data = calc_profit(db, year, month)

@@ -1,13 +1,12 @@
 """
-Report calculations — shared between web dashboard and Telegram bot.
+Report calculations untuk web dashboard.
 
 Pure functions: terima Repository sebagai parameter, return data dict.
-Tidak boleh impor Flask atau telegram.
+Tidak boleh impor Flask.
 """
 from typing import Dict, Any
 
 from app.db.repository import Repository
-from app.config.constants import BRANCHES
 
 
 def build_capster_lookup(repo: Repository) -> Dict[str, Dict[str, Any]]:
@@ -38,6 +37,11 @@ def calc_profit(repo: Repository, year: int, month: int) -> Dict[str, Any]:
     """
     Hitung profit per cabang untuk bulan tertentu.
 
+    Sumber data:
+      - Branches config (nama, biaya operasional) → DB tabel `branches`
+      - Capster salary (tetap) → DB tabel `capsters`
+      - Transaksi → DB tabel `transactions`
+
     Return:
         {
           'branches': { short_name: { revenue, fixed_ops, tetap_lines,
@@ -60,16 +64,21 @@ def calc_profit(repo: Repository, year: int, month: int) -> Dict[str, Any]:
     results: Dict[str, Dict[str, Any]] = {}
     overall = {'revenue': 0, 'fixed': 0, 'salary': 0, 'commission': 0}
 
-    for branch_id, branch_cfg in BRANCHES.items():
-        short     = branch_cfg.get('short', branch_id)
+    # Iterate branches dari DB (bukan constants) → biaya operasional live per edit UI
+    for branch_cfg in repo.get_all_branches_config():
+        branch_id = branch_cfg.get('BranchID', '')
+        short     = branch_cfg.get('Short') or branch_id
         branch_df = monthly_df[monthly_df['Branch'] == branch_id]
         revenue   = int(branch_df['Price'].sum())
 
-        # Fixed operational (non-karyawan)
-        costs_cfg = branch_cfg.get('operational_cost', {})
-        fixed_ops = int(sum(v for k, v in costs_cfg.items() if k != 'karyawan'))
+        # Fixed operational (non-karyawan) — dari kolom DB, admin bisa edit via /branches
+        fixed_ops = (
+            int(branch_cfg.get('Cost_tempat', 0) or 0)
+            + int(branch_cfg.get('Cost_listrik_air', 0) or 0)
+            + int(branch_cfg.get('Cost_wifi', 0) or 0)
+        )
 
-        # Tetap salary for this branch
+        # Tetap salary for this branch — dari capster.monthly_salary
         seen = set()
         tetap_lines = []
         tetap_total = 0
@@ -107,7 +116,7 @@ def calc_profit(repo: Repository, year: int, month: int) -> Dict[str, Any]:
 
         results[short] = {
             'branch_id':    branch_id,
-            'name':         branch_cfg.get('name', short),
+            'name':         branch_cfg.get('Name', short),
             'short':        short,
             'revenue':      revenue,
             'fixed_ops':    fixed_ops,

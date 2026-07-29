@@ -67,7 +67,7 @@
               Edit
             </button>
             <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
-                  onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+                  onsubmit="return confirm('Hapus layanan ' + {{ s.name|tojson|forceescape }} + '?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>
@@ -124,7 +124,7 @@
               Edit
             </button>
             <form method="post" action="/services/delete/{{ s.service_id }}" class="d-inline"
-                  onsubmit="return confirm('Hapus layanan \'{{ s.name }}\'?');">
+                  onsubmit="return confirm('Hapus layanan ' + {{ s.name|tojson|forceescape }} + '?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Hapus</button>
             </form>

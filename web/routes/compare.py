@@ -37,8 +37,9 @@ def compare():
         bname = b['Name']
         short = b.get('Short', bid)
 
+        # NB: df['Branch'] berisi branch_id (lowercase) — bukan field 'Short'
         if not month_df.empty and 'Branch' in month_df.columns:
-            bdf = month_df[month_df['Branch'] == short]
+            bdf = month_df[month_df['Branch'] == bid]
         else:
             bdf = pd.DataFrame()
 
@@ -105,9 +106,9 @@ def compare():
     )
 
     for b in branch_stats:
-        short = b['short']
+        bid = b['branch_id']
         if not prev_month_df.empty and 'Branch' in prev_month_df.columns:
-            prev_rev = int(prev_month_df[prev_month_df['Branch'] == short]['Price'].sum())
+            prev_rev = int(prev_month_df[prev_month_df['Branch'] == bid]['Price'].sum())
         else:
             prev_rev = 0
         if prev_rev:

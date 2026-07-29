@@ -104,7 +104,7 @@ def capsters():
             earned_all = distinct_months * salary
 
         # ── Withdrawals ─────────────────────────────────────────────
-        withdrawals = db.get_withdrawals(c.get('TelegramID', 0))
+        withdrawals = db.get_withdrawals(c.get('id', 0))
         withdrawn_month = 0
         withdrawn_all   = 0
         for w in withdrawals:
@@ -115,21 +115,27 @@ def capsters():
                 withdrawn_month += amt
 
         product_commission = db.get_product_sales_commission_total(name)
-        balance = earned_all + product_commission - withdrawn_all
+        saldo_adj = int(c.get('SaldoAdjustment', 0) or 0)
+        balance = earned_all + product_commission - withdrawn_all + saldo_adj
 
         cap_stats.append({
-            'name':           name,
-            'alias':          alias,
-            'type':           etype,
-            'pay_info':       pay_info,
-            'branch_name':    branch_name,
-            'revenue':        revenue,
-            'tx_count':       tx_count,
-            'earned':         earned,        # this month
-            'withdrawn':      withdrawn_month,  # this month
-            'withdrawn_all':  withdrawn_all,    # all time
-            'balance':        balance,           # all time
-            'telegram_id':    c.get('TelegramID', ''),
+            'id':               c.get('id', 0),
+            'name':             name,
+            'alias':            alias,
+            'type':             etype,
+            'pay_info':         pay_info,
+            'branch_name':      branch_name,
+            'branch_id':        branch_id,
+            'commission_rate':  rate,
+            'monthly_salary':   salary,
+            'saldo_adjustment': saldo_adj,
+            'revenue':          revenue,
+            'tx_count':         tx_count,
+            'earned':           earned,          # this month
+            'withdrawn':        withdrawn_month, # this month
+            'withdrawn_all':    withdrawn_all,   # all time
+            'balance':          balance,         # all time
+            'telegram_id':      c.get('TelegramID', ''),  # kept for display only
         })
 
     # Sort: by revenue desc
@@ -168,15 +174,17 @@ def capster_manage():
         bid    = c.get('BranchID', '') or ''
         bname = BRANCHES.get(bid, {}).get('name', bid) if bid else '-'
         capsters.append({
-            'name':           c.get('Name', ''),
-            'alias':          c.get('Alias', ''),
-            'type':           etype,
-            'commission_pct': int(rate * 100),
-            'monthly_salary': salary,
-            'branch_id':      bid,
-            'branch_name':    bname,
-            'telegram_id':    c.get('TelegramID', ''),
-            'username':       c.get('Username', ''),
+            'id':               c.get('id', 0),
+            'name':             c.get('Name', ''),
+            'alias':            c.get('Alias', ''),
+            'type':             etype,
+            'commission_pct':   int(rate * 100),
+            'monthly_salary':   salary,
+            'saldo_adjustment': int(c.get('SaldoAdjustment', 0) or 0),
+            'branch_id':        bid,
+            'branch_name':      bname,
+            'telegram_id':      c.get('TelegramID', ''),  # display only
+            'username':         c.get('Username', ''),
         })
     return render_template(
         'capster_manage.html',
@@ -196,17 +204,20 @@ def capster_add():
         flash('Nama capster tidak boleh kosong.', 'danger')
         return redirect(url_for('capsters.capster_manage'))
 
-    try:
-        telegram_id = int(request.form.get('telegram_id', '').strip())
-    except ValueError:
-        flash('Telegram ID harus berupa angka.', 'danger')
-        return redirect(url_for('capsters.capster_manage'))
-
-    # Duplicate check
-    for c in db.get_all_capsters():
-        if c.get('TelegramID') == telegram_id:
-            flash(f"Telegram ID {telegram_id} sudah terdaftar sebagai '{c['Name']}'.", 'warning')
+    # Telegram ID sekarang OPTIONAL — bot sudah dihapus. Kalau kosong, isi None.
+    raw_tid = request.form.get('telegram_id', '').strip()
+    telegram_id = None
+    if raw_tid:
+        try:
+            telegram_id = int(raw_tid)
+        except ValueError:
+            flash('Telegram ID harus berupa angka (atau kosongkan).', 'danger')
             return redirect(url_for('capsters.capster_manage'))
+        # Duplicate check kalau di-isi
+        for c in db.get_all_capsters():
+            if c.get('TelegramID') == telegram_id:
+                flash(f"Telegram ID {telegram_id} sudah terdaftar sebagai '{c['Name']}'.", 'warning')
+                return redirect(url_for('capsters.capster_manage'))
 
     alias = request.form.get('alias', '').strip()
     etype = request.form.get('employment_type', 'mitra').strip().lower()
@@ -240,9 +251,9 @@ def capster_add():
     return redirect(url_for('capsters.capster_manage'))
 
 
-@capsters_bp.route('/capsters/edit/<int:telegram_id>', methods=['POST'])
+@capsters_bp.route('/capsters/edit/<int:capster_id>', methods=['POST'])
 @login_required
-def capster_edit(telegram_id):
+def capster_edit(capster_id):
     db = Repository()
 
     name = request.form.get('name', '').strip() or None
@@ -262,14 +273,25 @@ def capster_edit(telegram_id):
     if branch_id and branch_id not in BRANCHES:
         branch_id = ''
 
+    # Saldo adjustment — bisa negatif (mis. koreksi setelah switch tipe)
+    raw_adj = request.form.get('saldo_adjustment', '').strip()
+    if raw_adj == '':
+        saldo_adjustment = None  # jangan overwrite
+    else:
+        try:
+            saldo_adjustment = int(float(raw_adj.replace('.', '').replace(',', '')))
+        except (ValueError, TypeError):
+            saldo_adjustment = None
+
     if db.update_capster(
-        telegram_id,
+        capster_id,
         name=name,
         alias=alias,
         employment_type=etype,
         commission_rate=commission_rate,
         monthly_salary=monthly_salary,
         branch_id=branch_id,
+        saldo_adjustment=saldo_adjustment,
     ):
         flash('Capster berhasil diperbarui.', 'success')
     else:
@@ -277,9 +299,9 @@ def capster_edit(telegram_id):
     return redirect(url_for('capsters.capster_manage'))
 
 
-@capsters_bp.route('/capsters/<int:telegram_id>/set-password', methods=['POST'])
+@capsters_bp.route('/capsters/<int:capster_id>/set-password', methods=['POST'])
 @login_required
-def capster_set_password(telegram_id):
+def capster_set_password(capster_id):
     db       = Repository()
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '').strip()
@@ -292,7 +314,7 @@ def capster_set_password(telegram_id):
         flash('Password minimal 6 karakter.', 'danger')
         return redirect(url_for('capsters.capster_manage'))
 
-    ok, err = db.set_capster_credentials(telegram_id, username, password)
+    ok, err = db.set_capster_credentials(capster_id, username, password)
     if ok:
         flash(f'Akun portal untuk capster berhasil diset. Username: {username}', 'success')
     else:
@@ -300,15 +322,15 @@ def capster_set_password(telegram_id):
     return redirect(url_for('capsters.capster_manage'))
 
 
-@capsters_bp.route('/capsters/delete/<int:telegram_id>', methods=['POST'])
+@capsters_bp.route('/capsters/delete/<int:capster_id>', methods=['POST'])
 @login_required
-def capster_delete(telegram_id):
+def capster_delete(capster_id):
     db = Repository()
     name = next(
-        (c['Name'] for c in db.get_all_capsters() if c.get('TelegramID') == telegram_id),
+        (c['Name'] for c in db.get_all_capsters() if c.get('id') == capster_id),
         'Unknown',
     )
-    if db.remove_capster(telegram_id):
+    if db.remove_capster(capster_id):
         flash(f"Capster '{name}' berhasil dihapus.", 'success')
     else:
         flash('Gagal menghapus capster.', 'danger')

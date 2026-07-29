@@ -41,7 +41,7 @@ class Capster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
-    telegram_id = Column(BigInteger, nullable=False)
+    telegram_id = Column(BigInteger, nullable=True)  # legacy dari era bot; sekarang optional. Auth pakai username.
     alias = Column(String(100), nullable=True, default='')
     username = Column(String(50), nullable=True, unique=True)
     password_hash = Column(String(255), nullable=True)
@@ -49,14 +49,14 @@ class Capster(Base):
     commission_rate = Column(Float, nullable=False, default=0.5)
     monthly_salary = Column(Integer, nullable=False, default=0)
     branch_id = Column(String(50), nullable=True, default='')
+    saldo_adjustment = Column(Integer, nullable=False, default=0)  # kompensasi saat tipe/gaji berubah
 
     __table_args__ = (
-        UniqueConstraint('telegram_id', name='uq_capsters_telegram_id'),
         CheckConstraint("employment_type IN ('mitra', 'tetap')", name='ck_capsters_employment_type'),
     )
 
     def __repr__(self):
-        return f"<Capster id={self.id} name={self.name} telegram_id={self.telegram_id}>"
+        return f"<Capster id={self.id} name={self.name}>"
 
 
 class Customer(Base):
@@ -227,16 +227,17 @@ class SalaryWithdrawal(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(DateTime, nullable=False)
-    capster_name = Column(String(100), nullable=False)
-    telegram_id = Column(BigInteger, nullable=False)
+    capster_id = Column(Integer, nullable=True)              # FK ke capsters.id (identifier utama sejak refactor)
+    capster_name = Column(String(100), nullable=False)       # denormalized supaya tetap ada nama kalau capster dihapus
+    telegram_id = Column(BigInteger, nullable=True)          # legacy — tetap disimpan untuk data historis
     amount = Column(Integer, nullable=False, default=0)
     period_start = Column(Date, nullable=True)
     period_end = Column(Date, nullable=True)
     note = Column(Text, nullable=True, default='')
 
     __table_args__ = (
-        Index('ix_salary_telegram_period', 'telegram_id', 'period_start', 'period_end'),
+        Index('ix_salary_capster_period', 'capster_id', 'period_start', 'period_end'),
     )
 
     def __repr__(self):
-        return f"<SalaryWithdrawal id={self.id} capster={self.capster_name} amount={self.amount}>"
+        return f"<SalaryWithdrawal id={self.id} capster_id={self.capster_id} amount={self.amount}>"

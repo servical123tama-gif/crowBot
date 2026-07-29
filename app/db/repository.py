@@ -660,6 +660,7 @@ class Repository:
                 rows = db.query(Capster).all()
             return [
                 {
+                    'id': r.id,
                     'Name': r.name,
                     'TelegramID': r.telegram_id,
                     'Alias': r.alias or '',
@@ -668,6 +669,7 @@ class Repository:
                     'MonthlySalary': int(r.monthly_salary or 0),
                     'BranchID': r.branch_id or '',
                     'Username': r.username or '',
+                    'SaldoAdjustment': int(getattr(r, 'saldo_adjustment', 0) or 0),
                 }
                 for r in rows
             ]
@@ -694,27 +696,28 @@ class Repository:
                 'BranchID': row.branch_id or '',
                 'Username': row.username or '',
                 'password_hash': row.password_hash or '',
+                'SaldoAdjustment': int(getattr(row, 'saldo_adjustment', 0) or 0),
             }
         except Exception as e:
             logger.error(f"Failed to get capster by username: {e}")
             return None
 
-    def set_capster_credentials(self, telegram_id: int, username: str, password: str) -> tuple:
+    def set_capster_credentials(self, capster_id: int, username: str, password: str) -> tuple:
         """Set username + password for a capster. Returns (ok, error_message)."""
         try:
             with get_db() as db:
                 conflict = db.query(Capster).filter(
                     Capster.username == username,
-                    Capster.telegram_id != telegram_id,
+                    Capster.id != capster_id,
                 ).first()
                 if conflict:
                     return False, f'Username "{username}" sudah dipakai capster lain.'
-                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                row = db.query(Capster).filter(Capster.id == capster_id).first()
                 if not row:
                     return False, 'Capster tidak ditemukan.'
                 row.username = username
                 row.password_hash = generate_password_hash(password)
-            logger.info(f"Credentials set for capster {telegram_id} → username={username}")
+            logger.info(f"Credentials set for capster id={capster_id} → username={username}")
             return True, ''
         except Exception as e:
             logger.error(f"Failed to set capster credentials: {e}", exc_info=True)
@@ -729,14 +732,14 @@ class Repository:
             return capster
         return None
 
-    def update_capster_password(self, telegram_id: int, new_password: str) -> bool:
+    def update_capster_password(self, capster_id: int, new_password: str) -> bool:
         try:
             with get_db() as db:
-                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                row = db.query(Capster).filter(Capster.id == capster_id).first()
                 if not row:
                     return False
                 row.password_hash = generate_password_hash(new_password)
-            logger.info(f"Password updated for capster {telegram_id}")
+            logger.info(f"Password updated for capster id={capster_id}")
             return True
         except Exception as e:
             logger.error(f"Failed to update capster password: {e}", exc_info=True)
@@ -800,28 +803,29 @@ class Repository:
             logger.error(f"Failed to get capster product sales: {e}")
             return []
 
-    def remove_capster(self, telegram_id: int) -> bool:
+    def remove_capster(self, capster_id: int) -> bool:
         try:
             with get_db() as db:
-                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                row = db.query(Capster).filter(Capster.id == capster_id).first()
                 if row is None:
-                    logger.warning(f"Capster {telegram_id} not found for removal.")
+                    logger.warning(f"Capster id={capster_id} not found for removal.")
                     return False
                 db.delete(row)
-            logger.info(f"Capster {telegram_id} removed.")
+            logger.info(f"Capster id={capster_id} removed.")
             return True
         except Exception as e:
             logger.error(f"Failed to remove capster: {e}", exc_info=True)
             return False
 
-    def update_capster(self, telegram_id: int, name: str = None, alias: str = None,
+    def update_capster(self, capster_id: int, name: str = None, alias: str = None,
                        employment_type: str = None, commission_rate: float = None,
-                       monthly_salary: int = None, branch_id: str = None) -> bool:
+                       monthly_salary: int = None, branch_id: str = None,
+                       saldo_adjustment: int = None) -> bool:
         try:
             with get_db() as db:
-                row = db.query(Capster).filter(Capster.telegram_id == telegram_id).first()
+                row = db.query(Capster).filter(Capster.id == capster_id).first()
                 if row is None:
-                    logger.warning(f"Capster {telegram_id} not found for update.")
+                    logger.warning(f"Capster id={capster_id} not found for update.")
                     return False
                 if name is not None:
                     row.name = name
@@ -835,7 +839,9 @@ class Repository:
                     row.monthly_salary = int(monthly_salary)
                 if branch_id is not None:
                     row.branch_id = branch_id
-            logger.info(f"Capster {telegram_id} updated.")
+                if saldo_adjustment is not None:
+                    row.saldo_adjustment = int(saldo_adjustment)
+            logger.info(f"Capster id={capster_id} updated.")
             return True
         except Exception as e:
             logger.error(f"Failed to update capster: {e}", exc_info=True)
@@ -1235,9 +1241,28 @@ class Repository:
 
     def add_product_sale(self, capster_name: str, product_id: str, product_name: str,
                          price_each: int, quantity: int,
-                         commission_rate: float, branch_id: str) -> bool:
-        """Record a product sale and reduce stock."""
+                         commission_rate: float, branch_id: str) -> tuple:
+        """Record a product sale and reduce stock.
+
+        Returns:
+          (True, '')                 kalau sukses
+          (False, 'stok tidak cukup: X') kalau stok < quantity
+          (False, 'error: ...')      kalau DB error
+        """
         try:
+            # GUARD: cek stok tersedia dulu
+            with get_db() as db:
+                stock_row = db.query(ProductStock).filter_by(
+                    product_id=product_id, branch_id=branch_id
+                ).first()
+                available = stock_row.quantity if stock_row else 0
+            if available < int(quantity):
+                logger.warning(
+                    f"add_product_sale REJECTED: {capster_name} tried to sell "
+                    f"{quantity}x{product_name}@{branch_id} but stock only {available}"
+                )
+                return (False, f'Stok {product_name} di cabang ini cuma {available}, tidak cukup untuk {quantity}')
+
             commission_earned = int(price_each * quantity * commission_rate)
             with get_db() as db:
                 db.add(ProductSale(
@@ -1254,10 +1279,10 @@ class Repository:
             # Reduce stock
             self.adjust_stock(product_id, branch_id, -quantity)
             logger.info(f"ProductSale: {capster_name} sold {quantity}x{product_name}")
-            return True
+            return (True, '')
         except Exception as e:
             logger.error(f"Failed to record product sale: {e}", exc_info=True)
-            return False
+            return (False, f'error DB: {e}')
 
     def get_product_sales_commission_total(self, capster_name: str) -> int:
         """Total commission earned from product sales (all-time) for a capster."""
@@ -1394,7 +1419,7 @@ class Repository:
     # Salary Withdrawals                                                   #
     # ------------------------------------------------------------------ #
 
-    def add_withdrawal(self, capster_name: str, telegram_id: int, amount: int,
+    def add_withdrawal(self, capster_id: int, capster_name: str, amount: int,
                        period_start: str, period_end: str, note: str = '') -> bool:
         try:
             ps = datetime.strptime(period_start, DATE_FORMAT).date() if period_start else None
@@ -1402,25 +1427,25 @@ class Repository:
             with get_db() as db:
                 db.add(SalaryWithdrawal(
                     date=datetime.now(),
+                    capster_id=int(capster_id),
                     capster_name=capster_name,
-                    telegram_id=telegram_id,
                     amount=int(amount),
                     period_start=ps,
                     period_end=pe,
                     note=note or '',
                 ))
-            logger.info(f"Withdrawal recorded: {capster_name} Rp {amount:,}")
+            logger.info(f"Withdrawal recorded: capster_id={capster_id} ({capster_name}) Rp {amount:,}")
             return True
         except Exception as e:
             logger.error(f"Failed to add withdrawal: {e}", exc_info=True)
             return False
 
-    def get_withdrawals(self, telegram_id: int, start_date: str = None,
+    def get_withdrawals(self, capster_id: int, start_date: str = None,
                         end_date: str = None) -> List[Dict[str, Any]]:
         try:
             with get_db() as db:
                 q = db.query(SalaryWithdrawal).filter(
-                    SalaryWithdrawal.telegram_id == telegram_id
+                    SalaryWithdrawal.capster_id == capster_id
                 )
                 if start_date and end_date:
                     # period overlap: withdrawal.period_start <= end_date AND withdrawal.period_end >= start_date
@@ -1434,8 +1459,9 @@ class Repository:
             return [
                 {
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
+                    'CapsterID': r.capster_id,
                     'CapsterName': r.capster_name,
-                    'TelegramID': r.telegram_id,
+                    'TelegramID': r.telegram_id,  # legacy
                     'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',
@@ -1455,8 +1481,9 @@ class Repository:
             return [
                 {
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
+                    'CapsterID': r.capster_id,
                     'CapsterName': r.capster_name,
-                    'TelegramID': r.telegram_id,
+                    'TelegramID': r.telegram_id,  # legacy field, biarkan untuk backward compat
                     'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',
@@ -1468,8 +1495,8 @@ class Repository:
             logger.error(f"Failed to get all withdrawals: {e}")
             return []
 
-    def get_total_withdrawn(self, telegram_id: int, start_date: str, end_date: str) -> int:
-        records = self.get_withdrawals(telegram_id, start_date, end_date)
+    def get_total_withdrawn(self, capster_id: int, start_date: str, end_date: str) -> int:
+        records = self.get_withdrawals(capster_id, start_date, end_date)
         total = 0
         for r in records:
             total += r.get('Amount', 0)

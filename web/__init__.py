@@ -70,6 +70,7 @@ def create_app():
     from web.routes.products import products_bp
     from web.routes.withdraw import withdraw_bp
     from web.routes.report_daily import report_daily_bp
+    from web.routes.report_weekly import report_weekly_bp
     from web.routes.compare import compare_bp
     from web.routes.api import api_bp
     from web.routes.customers import customers_bp
@@ -86,6 +87,7 @@ def create_app():
     app.register_blueprint(products_bp)
     app.register_blueprint(withdraw_bp)
     app.register_blueprint(report_daily_bp)
+    app.register_blueprint(report_weekly_bp)
     app.register_blueprint(compare_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(customers_bp)

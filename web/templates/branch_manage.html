@@ -58,7 +58,7 @@
             Edit
           </button>
           <form method="post" action="/branches/delete/{{ b.branch_id }}"
-                onsubmit="return confirm('Hapus cabang \'{{ b.name }}\'?\n\nData capster yang ter-assign ke cabang ini tidak ikut terhapus.');">
+                onsubmit="return confirm('Hapus cabang ' + {{ b.name|tojson|forceescape }} + '?\n\nData capster yang ter-assign ke cabang ini tidak ikut terhapus.');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
           </form>

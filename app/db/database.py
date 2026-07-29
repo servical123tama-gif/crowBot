@@ -53,8 +53,10 @@ def _migrate_capster_auth_columns():
     is_sqlite = DATABASE_URL.startswith('sqlite')
     # (table, column, type)
     migrations = [
-        ('capsters',      'username',       'VARCHAR(50)'),
-        ('capsters',      'password_hash',  'VARCHAR(255)'),
+        ('capsters',           'username',        'VARCHAR(50)'),
+        ('capsters',           'password_hash',   'VARCHAR(255)'),
+        ('capsters',           'saldo_adjustment','INTEGER DEFAULT 0'),
+        ('salary_withdrawals', 'capster_id',      'INTEGER'),
         ('customers',     'visit_count',    'INTEGER DEFAULT 0'),
         ('customers',     'added_by',       "VARCHAR(100) DEFAULT ''"),
         ('customers',     'created_at',     'TIMESTAMP'),

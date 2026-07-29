@@ -37,8 +37,9 @@ def capster_login_required(f):
 
 def _current_capster():
     return {
+        'id':        session.get('capster_id'),
         'name':      session.get('capster_name', ''),
-        'telegram_id': session.get('capster_telegram_id'),
+        'telegram_id': session.get('capster_telegram_id'),  # legacy display only
         'alias':     session.get('capster_alias', ''),
         'type':      session.get('capster_type', 'mitra'),
         'rate':      session.get('capster_rate', 0.5),
@@ -71,8 +72,9 @@ def login():
         capster = repo.verify_capster_login(username, password)
         if capster:
             session['capster_logged_in']   = True
+            session['capster_id']          = capster['id']
             session['capster_name']        = capster['Name']
-            session['capster_telegram_id'] = capster['TelegramID']
+            session['capster_telegram_id'] = capster.get('TelegramID')  # legacy
             session['capster_alias']       = capster['Alias']
             session['capster_type']        = capster['EmploymentType']
             session['capster_rate']        = capster['CommissionRate']
@@ -87,7 +89,7 @@ def login():
 
 @capster_portal_bp.route('/logout')
 def logout():
-    keys = [k for k in session if k.startswith('capster_')]
+    keys = [k for k in session if k.startswith('capster_') or k.startswith('daily_')]
     for k in keys:
         session.pop(k, None)
     return redirect(url_for('capster_portal.login'))
@@ -105,7 +107,8 @@ def dashboard():
 
     # Ambil salary/rate terbaru dari DB
     all_caps  = repo.get_all_capsters()
-    fresh_cap = next((c for c in all_caps if c.get('TelegramID') == cap['telegram_id']), None)
+    fresh_cap = next((c for c in all_caps if c.get('id') == cap['id']), None)
+    saldo_adj = int(fresh_cap.get('SaldoAdjustment', 0) or 0) if fresh_cap else 0
     if fresh_cap:
         cap = dict(cap)
         cap['salary'] = fresh_cap.get('MonthlySalary', cap['salary'])
@@ -129,7 +132,7 @@ def dashboard():
         earned = cap['salary'] + prod_commission
 
     # All-time balance
-    withdrawals = repo.get_withdrawals(cap['telegram_id'])
+    withdrawals = repo.get_withdrawals(cap['id'])
     withdrawn_all = sum(w.get('Amount', 0) for w in withdrawals)
 
     all_years = list(range(2024, now.year + 1))
@@ -147,7 +150,7 @@ def dashboard():
     # Tambah komisi produk all-time
     earned_all += repo.get_product_sales_commission_total(cap['name'])
 
-    balance = earned_all - withdrawn_all
+    balance = earned_all - withdrawn_all + saldo_adj
 
     return render_template(
         'capster_portal/dashboard.html',
@@ -218,14 +221,15 @@ def earnings():
 
     # Ambil salary/rate terbaru dari DB (bukan dari session yang bisa stale)
     all_caps   = repo.get_all_capsters()
-    fresh_cap  = next((c for c in all_caps if c.get('TelegramID') == cap['telegram_id']), None)
+    fresh_cap  = next((c for c in all_caps if c.get('id') == cap['id']), None)
+    saldo_adj  = int(fresh_cap.get('SaldoAdjustment', 0) or 0) if fresh_cap else 0
     if fresh_cap:
         cap = dict(cap)
         cap['salary'] = fresh_cap.get('MonthlySalary', cap['salary'])
         cap['rate']   = fresh_cap.get('CommissionRate', cap['rate'])
 
     # Ambil withdrawals sekali di luar loop (bug fix: sebelumnya dipanggil tiap iterasi)
-    withdrawals = repo.get_withdrawals(cap['telegram_id'])
+    withdrawals = repo.get_withdrawals(cap['id'])
 
     monthly_stats = []
     for year in range(2024, now.year + 1):
@@ -277,7 +281,7 @@ def earnings():
 
     total_earned    = sum(s['earned']    for s in monthly_stats)
     total_withdrawn = sum(s['withdrawn'] for s in monthly_stats)
-    total_balance   = total_earned - total_withdrawn
+    total_balance   = total_earned - total_withdrawn + saldo_adj
 
     return render_template(
         'capster_portal/earnings.html',
@@ -300,7 +304,7 @@ def withdraw():
     repo = Repository()
     now  = datetime.now()
 
-    records = repo.get_withdrawals(cap['telegram_id'])
+    records = repo.get_withdrawals(cap['id'])
 
     return render_template(
         'capster_portal/withdraw.html',
@@ -402,12 +406,18 @@ def add_transaction():
         # Trigger: ada new_customer_name DAN tidak ada customer_id pilihan.
         # Cek duplikasi nomor HP supaya tidak double-register.
         if new_cust_name and not cid:
+            # Sanitize: phone hanya boleh digit/+-space, max 30 char. Anti stored XSS.
+            from web.routes.customers import _is_valid_phone
+            if not _is_valid_phone(new_cust_phone):
+                flash('Nomor HP customer tidak valid — customer tidak didaftarkan, transaksi lanjut sebagai walk-in.', 'warning')
+                new_cust_phone = ''
+                new_cust_name = ''
             existing = repo.get_customer_by_phone(new_cust_phone) if new_cust_phone else None
             if existing:
                 cid = existing['id']
                 flash(f"Nomor HP {new_cust_phone} sudah terdaftar atas nama "
                       f"{existing['Name']} — transaksi dilink ke customer tersebut.", 'info')
-            else:
+            elif new_cust_name:
                 from types import SimpleNamespace
                 new_c = SimpleNamespace(name=new_cust_name, phone=new_cust_phone)
                 new_id = repo.add_customer(new_c, added_by=cap.get('name', ''))
@@ -489,6 +499,7 @@ def add_transaction():
             all_products = repo.get_all_products()
             prod_map = {p['ProductID']: p for p in all_products}
             products_summary = []
+            product_errors   = []
             for pid in sold_ids:
                 if pid not in prod_map:
                     continue
@@ -500,7 +511,7 @@ def add_transaction():
                 price_each = p.get('Price', 0)
                 comm_rate  = p.get('CommissionRate', 0.0)
                 prod_comm  = int(price_each * qty * comm_rate)
-                repo.add_product_sale(
+                ok_sale, err = repo.add_product_sale(
                     capster_name=cap['name'],
                     product_id=pid,
                     product_name=p['Name'],
@@ -509,11 +520,17 @@ def add_transaction():
                     commission_rate=comm_rate,
                     branch_id=branch,
                 )
-                products_summary.append({
-                    'name':       p['Name'],
-                    'qty':        qty,
-                    'commission': prod_comm,
-                })
+                if ok_sale:
+                    products_summary.append({
+                        'name':       p['Name'],
+                        'qty':        qty,
+                        'commission': prod_comm,
+                    })
+                else:
+                    product_errors.append(err)
+            if product_errors:
+                # Show all stock/error issues sekaligus supaya capster tahu
+                flash('Sebagian produk gagal dijual: ' + ' | '.join(product_errors), 'warning')
 
             # ── Loyalty: catat klaim atau tambah poin ────────────────────
             # Kalau klaim → poin BERKURANG (subtract threshold). Visit ini tidak +1 poin.
@@ -705,11 +722,10 @@ def change_password():
 
     repo = Repository()
 
-    # Verify old password
+    # Verify old password — lookup capster by id, ambil username, verify hash
     all_caps = repo.get_all_capsters()
     username = next(
-        (c['Username'] for c in all_caps
-         if str(c.get('TelegramID')) == str(cap['telegram_id'])),
+        (c['Username'] for c in all_caps if c.get('id') == cap['id']),
         ''
     )
     capster_auth = repo.get_capster_by_username(username) if username else None
@@ -725,7 +741,7 @@ def change_password():
         flash('Konfirmasi password tidak cocok.', 'danger')
         return redirect(url_for('capster_portal.profile'))
 
-    if repo.update_capster_password(cap['telegram_id'], new_pwd):
+    if repo.update_capster_password(cap['id'], new_pwd):
         flash('Password berhasil diubah.', 'success')
     else:
         flash('Gagal mengubah password.', 'danger')

@@ -72,7 +72,7 @@
               data-bs-toggle="modal" data-bs-target="#withdrawModal"
               data-name="{{ c.name }}"
               data-balance="{{ c.balance }}"
-              data-tid="{{ c.telegram_id }}"
+              data-cid="{{ c.id }}"
               {% endif %}>
         {% if c.balance > 0 %}
           <i class="bi bi-cash-coin me-1"></i> Tarik Saldo
@@ -199,6 +199,7 @@
             </div>
           </div>
 
+          <input type="hidden" name="capster_id" id="modal_capster_id_input">
           <input type="hidden" name="capster_name" id="modal_capster_input">
 
           <div class="mb-3">
@@ -254,9 +255,11 @@ document.getElementById('withdrawModal').addEventListener('show.bs.modal', funct
   const btn = e.relatedTarget;
   const name    = btn.dataset.name;
   const balance = parseInt(btn.dataset.balance);
+  const cid     = btn.dataset.cid;
 
   document.getElementById('modal_capster_name').textContent = name;
   document.getElementById('modal_balance').textContent      = formatIdr(balance);
+  document.getElementById('modal_capster_id_input').value   = cid;
   document.getElementById('modal_capster_input').value      = name;
   document.getElementById('modal_amount').value             = '';
   document.getElementById('modal_amount').max               = balance;

@@ -72,7 +72,7 @@
           </td>
           <td class="text-end">
             <button class="btn btn-sm btn-outline-primary py-0 px-2"
-                    onclick="openStockModal('{{ p.product_id }}', '{{ p.name|e }}', {{ p.quantity }}, '{{ b.id }}')">
+                    onclick="openStockModal({{ p.product_id|tojson|forceescape }}, {{ p.name|tojson|forceescape }}, {{ p.quantity }}, {{ b.id|tojson|forceescape }})">
               <i class="bi bi-pencil-square"></i> Set
             </button>
           </td>
