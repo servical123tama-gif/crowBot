@@ -1,0 +1,163 @@
+{% extends "capster_portal/base.html" %}
+{% block title %}Laporan Harian{% endblock %}
+{% block page_title %}Laporan Harian Saya{% endblock %}
+
+{% block content %}
+<!-- Date Navigator -->
+<div class="card stat-card p-3 mb-4">
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <a href="/portal/daily?date={{ prev_date }}" class="btn btn-sm btn-outline-secondary">&larr; Kemarin</a>
+    <form method="get" class="d-flex align-items-center gap-2 flex-grow-1">
+      <input type="date" name="date" class="form-control form-control-sm" value="{{ date_str }}"
+             style="width:160px">
+      <button type="submit" class="btn btn-sm text-white" style="background:#0f3460;">Tampilkan</button>
+    </form>
+    {% if not is_today %}
+    <a href="/portal/daily?date={{ next_date }}" class="btn btn-sm btn-outline-secondary">Besok &rarr;</a>
+    {% endif %}
+    <a href="/portal/daily" class="btn btn-sm btn-outline-primary">Hari Ini</a>
+  </div>
+  <div class="text-muted small mt-2 fw-semibold">{{ day_label }}</div>
+</div>
+
+{% if svc_count == 0 and prod_qty == 0 %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-1"></i>Belum ada transaksi kamu pada tanggal ini.
+</div>
+{% else %}
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Total Pendapatan</div>
+      <div class="fw-bold fs-5 text-success">{{ total_revenue|idr }}</div>
+      <div class="text-muted" style="font-size:.72rem">Layanan + Produk</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">{{ pay_label }}</div>
+      <div class="fw-bold fs-5" style="color:#e94560;">{{ earned|idr }}</div>
+      <div class="text-muted" style="font-size:.72rem">Estimasi hari ini</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Transaksi Layanan</div>
+      <div class="fw-bold fs-5">{{ svc_count }}x</div>
+      <div class="text-muted" style="font-size:.72rem">{{ svc_revenue|idr }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card p-3">
+      <div class="text-muted small">Produk Terjual</div>
+      <div class="fw-bold fs-5">{{ prod_qty }}x</div>
+      <div class="text-muted" style="font-size:.72rem">{{ prod_revenue|idr }} · komisi {{ prod_commission|idr }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Breakdown Row -->
+<div class="row g-3 mb-4">
+
+  <!-- Per Layanan -->
+  {% if by_service %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">✂️ Per Layanan</div>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Layanan</th>
+            <th class="text-center">Jumlah</th>
+            <th class="text-end">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in by_service %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td class="text-center">{{ s.count }}x</td>
+            <td class="text-end fw-semibold">{{ s.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Per Metode Bayar -->
+  {% if by_payment %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">💳 Metode Pembayaran</div>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Metode</th>
+            <th class="text-center">Jumlah</th>
+            <th class="text-end">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in by_payment %}
+          <tr>
+            <td>
+              {% if 'cash' in p.name|lower %}💵{% elif 'qris' in p.name|lower %}📲{% endif %}
+              {{ p.name }}
+            </td>
+            <td class="text-center">{{ p.count }}x</td>
+            <td class="text-end fw-semibold">{{ p.revenue|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Detail Transaksi -->
+{% if tx_detail %}
+<div class="card stat-card p-3">
+  <div class="fw-semibold mb-3">📋 Detail Transaksi ({{ tx_detail|length }})</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Waktu</th>
+          <th>Layanan</th>
+          <th>Cabang</th>
+          <th>Bayar</th>
+          <th class="text-end">Harga</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for t in tx_detail %}
+        <tr>
+          <td class="font-monospace small">{{ t.time }}</td>
+          <td>{{ t.service }}</td>
+          <td class="text-muted small">{{ t.branch }}</td>
+          <td class="small">
+            {% if 'cash' in t.payment|lower %}💵{% elif 'qris' in t.payment|lower %}📲{% endif %}
+            {{ t.payment }}
+          </td>
+          <td class="text-end fw-semibold text-success">{{ t.price|idr }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td colspan="4" class="text-end">Total Layanan</td>
+          <td class="text-end text-success">{{ svc_revenue|idr }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

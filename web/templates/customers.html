@@ -3,20 +3,30 @@
 {% block page_title %}Daftar Customer{% endblock %}
 
 {% block content %}
+<h1 class="visually-hidden">Daftar Customer</h1>
+
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <div>
-    <h5 class="fw-bold mb-0">Customer</h5>
-    <small class="text-muted">Total: <strong>{{ total }}</strong> customer</small>
+    <h2 class="fw-bold mb-0 fs-5">Customer</h2>
+    <small class="text-muted">
+      {% if search %}
+        Menampilkan <strong>{{ total_filtered }}</strong> dari <strong>{{ total_all }}</strong> customer
+      {% else %}
+        Total: <strong>{{ total_all }}</strong> customer
+      {% endif %}
+    </small>
   </div>
   <div class="d-flex gap-2">
     <button class="btn btn-sm btn-outline-success"
             data-bs-toggle="modal" data-bs-target="#modalWASettings"
-            title="Pengaturan Kirim QR via WhatsApp">
-      <i class="bi bi-whatsapp me-1"></i>Pengaturan WA
+            title="Pengaturan Kirim QR via WhatsApp"
+            aria-label="Pengaturan Kirim QR via WhatsApp">
+      <i class="bi bi-whatsapp me-1" aria-hidden="true"></i>Pengaturan Kirim QR
     </button>
     <button class="btn btn-sm text-white" style="background:#e94560;"
-            data-bs-toggle="modal" data-bs-target="#modalAdd">
-      <i class="bi bi-person-plus me-1"></i>Tambah Customer
+            data-bs-toggle="modal" data-bs-target="#modalAdd"
+            aria-label="Tambah customer baru">
+      <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Tambah Customer
     </button>
   </div>
 </div>
@@ -30,18 +40,20 @@
   {% endfor %}
 {% endwith %}
 
-<!-- Search -->
-<form method="get" class="mb-3">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div class="input-group input-group-sm" style="max-width:320px;">
-    <span class="input-group-text bg-white border-end-0">
-      <i class="bi bi-search text-muted"></i>
+{# Search — method=get, TIDAK ada csrf_token supaya tidak bocor di URL #}
+<form method="get" class="mb-3" role="search" id="searchForm">
+  <div class="input-group input-group-sm" style="max-width:360px;">
+    <span class="input-group-text border-end-0">
+      <i class="bi bi-search text-muted" aria-hidden="true"></i>
     </span>
-    <input type="text" name="q" class="form-control border-start-0 ps-0"
-           placeholder="Cari nama atau nomor HP..." value="{{ search }}">
+    <label for="searchInput" class="visually-hidden">Cari customer</label>
+    <input id="searchInput" type="text" name="q"
+           class="form-control border-start-0 ps-0"
+           placeholder="Cari nama atau nomor HP…"
+           value="{{ search }}" autocomplete="off" aria-label="Cari customer">
     {% if search %}
-      <a href="/customers" class="btn btn-outline-secondary">
-        <i class="bi bi-x"></i>
+      <a href="/customers" class="btn btn-outline-secondary" aria-label="Reset pencarian">
+        <i class="bi bi-x" aria-hidden="true"></i>
       </a>
     {% endif %}
   </div>
@@ -50,115 +62,150 @@
 <!-- Table -->
 <div class="card border-0 shadow-sm" style="border-radius:14px;">
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead>
+    <div class="table-responsive" style="max-height:70vh; overflow-y:auto;">
+      <table class="table table-hover align-middle mb-0" style="min-width:800px;">
+        <caption class="visually-hidden">Daftar {{ total_all }} customer terdaftar</caption>
+        <thead style="position:sticky; top:0; z-index:5; background:var(--table-head-bg);">
           <tr>
-            <th style="width:50px;">No</th>
-            <th>Nama</th>
-            <th>No. Telepon</th>
-            <th class="text-center">Kunjungan</th>
-            <th class="text-center">Poin</th>
-            <th>Ditambah oleh</th>
-            <th style="width:150px; text-align:right;">Aksi</th>
+            <th scope="col">Nama</th>
+            <th scope="col">No. HP</th>
+            <th scope="col" class="text-center">Kunjungan</th>
+            <th scope="col" class="text-center">Poin</th>
+            <th scope="col">Ditambah</th>
+            <th scope="col" class="text-end" style="width:180px;">Aksi</th>
           </tr>
         </thead>
         <tbody>
           {% if customers %}
             {% for c in customers %}
+            {% set av_colors = ['#e94560','#0f3460','#16213e','#533483','#2b9348'] %}
+            {% set av_bg = av_colors[c['Name']|length % 5] %}
             <tr>
-              <td class="text-muted" style="font-size:.8rem;">{{ loop.index }}</td>
               <td>
-                <div class="d-flex align-items-center gap-2"
-                     style="cursor:pointer;"
-                     onclick="openProfile({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['Phone']|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c['AddedBy']|tojson|forceescape }}, {{ (c['CreatedAt'].strftime('%d %b %Y') if c.get('CreatedAt') else '-')|tojson|forceescape }})">
+                <div class="d-flex align-items-center gap-2">
                   <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                       style="width:34px;height:34px;flex-shrink:0;font-size:.8rem;
-                              background:{{ ['#e94560','#0f3460','#16213e','#533483','#2b9348'][loop.index0 % 5] }};">
+                       style="width:34px;height:34px;flex-shrink:0;font-size:.8rem;background:{{ av_bg }};"
+                       aria-hidden="true">
                     {{ c['Name'][0].upper() }}
                   </div>
-                  <span class="fw-500 text-primary" style="text-decoration:underline dotted;">{{ c['Name'] }}</span>
+                  <button type="button" class="btn btn-link p-0 fw-500 text-decoration-none text-body"
+                          style="border:0;background:none;"
+                          onclick="openProfile({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ (c['PhoneDisplay'] or c['Phone'])|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c['AddedBy']|tojson|forceescape }}, {{ (c['CreatedAt'].strftime('%d %b %Y') if c.get('CreatedAt') else '-')|tojson|forceescape }})"
+                          aria-label="Lihat detail {{ c['Name'] }}">
+                    {{ c['Name'] }}
+                  </button>
                 </div>
               </td>
               <td>
-                {% if c['Phone'] %}
-                  <a href="https://wa.me/{{ c['Phone']|replace('+','') }}" target="_blank"
-                     class="text-decoration-none text-dark">
-                    <i class="bi bi-whatsapp text-success me-1"></i>{{ c['Phone'] }}
+                {% if c['PhoneWaUrl'] %}
+                  <a href="{{ c['PhoneWaUrl'] }}" target="_blank" rel="noopener"
+                     class="text-decoration-none text-body"
+                     aria-label="Chat WhatsApp {{ c['Name'] }}">
+                    <i class="bi bi-whatsapp text-success me-1" aria-hidden="true"></i>{{ c['PhoneDisplay'] }}
                   </a>
+                {% elif c['Phone'] %}
+                  <span class="text-warning small" title="Nomor tidak valid untuk WhatsApp">
+                    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> {{ c['Phone'] }}
+                  </span>
                 {% else %}
-                  <span class="text-muted fst-italic" style="font-size:.82rem;">-</span>
+                  <span class="text-muted fst-italic small">—</span>
                 {% endif %}
               </td>
               <td class="text-center">
-                <span class="badge rounded-pill px-2"
-                      style="background:#e8f4fd;color:#0f3460;font-size:.8rem;">
-                  <i class="bi bi-scissors me-1"></i>{{ c['VisitCount'] }}x
+                <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis" style="font-size:.8rem;">
+                  <i class="bi bi-scissors me-1" aria-hidden="true"></i>{{ c['VisitCount'] }}x
                 </span>
               </td>
               <td class="text-center">
                 {% set pts = c.get('PointBalance', 0) %}
                 {% if pts > 0 %}
-                <span class="badge rounded-pill px-2"
-                      style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;font-size:.8rem;">
-                  <i class="bi bi-star-fill me-1"></i>{{ pts }}
+                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis" style="font-size:.8rem;"
+                      title="Threshold: 5=Diskon 50%, 10=Potong Gratis">
+                  <i class="bi bi-star-fill me-1" aria-hidden="true"></i>{{ pts }}
                 </span>
                 {% else %}
-                <span class="text-muted" style="font-size:.8rem;">—</span>
+                <span class="text-muted small">0</span>
                 {% endif %}
               </td>
-              <td>
+              <td class="small">
                 {% if c['AddedBy'] %}
-                  <div class="d-flex align-items-center gap-1">
-                    <i class="bi bi-person-badge text-muted" style="font-size:.8rem;"></i>
-                    <span style="font-size:.82rem;">{{ c['AddedBy'] }}</span>
-                  </div>
+                  <i class="bi bi-person-badge text-muted me-1" aria-hidden="true"></i>{{ c['AddedBy'] }}
                 {% else %}
-                  <span class="text-muted fst-italic" style="font-size:.78rem;">—</span>
+                  <span class="text-muted fst-italic">—</span>
                 {% endif %}
               </td>
               <td class="text-end">
-                {% if c['Phone'] %}
-                <button class="btn btn-sm btn-success py-0 px-2 me-1"
-                        title="Kirim QR via WhatsApp"
-                        onclick="sendQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }})">
-                  <i class="bi bi-whatsapp"></i>
-                </button>
-                {% endif %}
-                <button class="btn btn-sm btn-outline-success py-0 px-2 me-1"
-                        title="QR Code"
-                        onclick="openQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['VisitCount'] }})">
-                  <i class="bi bi-qr-code"></i>
-                </button>
-                <a href="/customers/{{ c['id'] }}/loyalty"
-                   class="btn btn-sm btn-outline-warning py-0 px-2 me-1"
-                   title="Riwayat poin loyalty">
-                  <i class="bi bi-star-fill"></i>
-                </a>
-                <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1"
-                        style="font-size:.78rem;"
-                        onclick="openEdit({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['Phone']|tojson|forceescape }}, {{ c['AddedBy']|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger py-0 px-2"
-                        style="font-size:.78rem;"
-                        onclick="openDelete({{ c['id'] }}, {{ c['Name']|tojson|forceescape }})">
-                  <i class="bi bi-trash"></i>
-                </button>
+                <div class="d-inline-flex gap-1 align-items-center">
+                  {# Aksi utama: WhatsApp send-QR (kalau ada nomor) #}
+                  {% if c['PhoneWaUrl'] %}
+                  <button class="btn btn-sm btn-success py-1 px-2"
+                          title="Kirim QR ke WhatsApp"
+                          aria-label="Kirim QR ke WhatsApp {{ c['Name'] }}"
+                          onclick="sendQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }})">
+                    <i class="bi bi-whatsapp" aria-hidden="true"></i>
+                  </button>
+                  {% endif %}
+                  {# Dropdown untuk aksi sekunder #}
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary py-1 px-2" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-label="Menu aksi untuk {{ c['Name'] }}">
+                      <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li>
+                        <button class="dropdown-item" type="button"
+                                onclick="openQR({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['VisitCount'] }})">
+                          <i class="bi bi-qr-code me-2" aria-hidden="true"></i>Tampilkan QR
+                        </button>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="/customers/{{ c['id'] }}/loyalty">
+                          <i class="bi bi-star-fill me-2 text-warning" aria-hidden="true"></i>Riwayat Poin
+                        </a>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <button class="dropdown-item" type="button"
+                                onclick="openEdit({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ c['Phone']|tojson|forceescape }}, {{ c['AddedBy']|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
+                          <i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit
+                        </button>
+                      </li>
+                      <li>
+                        <button class="dropdown-item text-danger" type="button"
+                                onclick="openDelete({{ c['id'] }}, {{ c['Name']|tojson|forceescape }}, {{ (c['PhoneDisplay'] or c['Phone'])|tojson|forceescape }}, {{ c['VisitCount'] }}, {{ c.get('PointBalance', 0) }})">
+                          <i class="bi bi-trash me-2" aria-hidden="true"></i>Hapus…
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </td>
             </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="7" class="text-center py-5 text-muted">
-                <i class="bi bi-person-x" style="font-size:2.5rem;opacity:.3;"></i>
-                <p class="mt-2 mb-0">
+              <td colspan="6" class="text-center py-5">
+                <i class="bi bi-person-x text-muted" style="font-size:2.5rem;opacity:.3;" aria-hidden="true"></i>
+                <p class="mt-2 mb-2 text-muted">
                   {% if search %}
                     Tidak ada customer dengan kata kunci "<strong>{{ search }}</strong>"
                   {% else %}
                     Belum ada data customer
                   {% endif %}
                 </p>
+                {% if search %}
+                <div class="d-flex justify-content-center gap-2">
+                  <a href="/customers" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset Pencarian
+                  </a>
+                  <button class="btn btn-sm text-white" style="background:#e94560;"
+                          data-bs-toggle="modal" data-bs-target="#modalAdd"
+                          onclick="document.querySelector('#modalAdd input[name=name]').value = {{ search|tojson }};">
+                    <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Tambah "{{ search }}"
+                  </button>
+                </div>
+                {% endif %}
               </td>
             </tr>
           {% endif %}
@@ -167,6 +214,41 @@
     </div>
   </div>
 </div>
+
+{# ── Pagination ── #}
+{% if total_pages > 1 %}
+<nav class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2" aria-label="Halaman customer">
+  <small class="text-muted">
+    Halaman <strong>{{ page }}</strong> dari <strong>{{ total_pages }}</strong>
+    · {{ per_page }} per halaman
+  </small>
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+      <a class="page-link" href="?{% if search %}q={{ search }}&{% endif %}per_page={{ per_page }}&page={{ page - 1 }}"
+         aria-label="Halaman sebelumnya">&laquo;</a>
+    </li>
+    {% set start_page = [1, page - 2]|max %}
+    {% set end_page   = [total_pages, page + 2]|min %}
+    {% if start_page > 1 %}
+      <li class="page-item"><a class="page-link" href="?{% if search %}q={{ search }}&{% endif %}per_page={{ per_page }}&page=1">1</a></li>
+      {% if start_page > 2 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+    {% endif %}
+    {% for p in range(start_page, end_page + 1) %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link" href="?{% if search %}q={{ search }}&{% endif %}per_page={{ per_page }}&page={{ p }}">{{ p }}</a>
+      </li>
+    {% endfor %}
+    {% if end_page < total_pages %}
+      {% if end_page < total_pages - 1 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+      <li class="page-item"><a class="page-link" href="?{% if search %}q={{ search }}&{% endif %}per_page={{ per_page }}&page={{ total_pages }}">{{ total_pages }}</a></li>
+    {% endif %}
+    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+      <a class="page-link" href="?{% if search %}q={{ search }}&{% endif %}per_page={{ per_page }}&page={{ page + 1 }}"
+         aria-label="Halaman berikutnya">&raquo;</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
 
 <!-- Modal Tambah -->
 <div class="modal fade" id="modalAdd" tabindex="-1">
@@ -284,25 +366,33 @@
 </div>
 
 <!-- Modal Hapus -->
-<div class="modal fade" id="modalDelete" tabindex="-1">
+<div class="modal fade" id="modalDelete" tabindex="-1" aria-labelledby="deleteTitle">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header border-0 pb-0">
-        <h6 class="modal-title fw-bold text-danger">
-          <i class="bi bi-exclamation-triangle me-2"></i>Hapus Customer
-        </h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title fw-bold text-danger" id="deleteTitle">
+          <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>Hapus Customer
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
       </div>
       <div class="modal-body pt-2">
-        <p class="mb-0">Yakin ingin menghapus customer <strong id="deleteName"></strong>?</p>
-        <small class="text-muted">Tindakan ini tidak bisa dibatalkan.</small>
+        <p class="mb-3">Yakin ingin menghapus customer berikut?</p>
+        <div class="p-3 rounded" style="background:var(--table-head-bg); border:1px solid var(--border);">
+          <div class="fw-semibold" id="deleteName" style="font-size:1.05rem;"></div>
+          <div class="text-muted small mt-1" id="deleteMeta"></div>
+        </div>
+        <div class="alert alert-danger mt-3 mb-0 py-2 small" role="alert">
+          <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+          <strong>Peringatan:</strong> Riwayat kunjungan, poin loyalty, dan audit trail
+          customer ini akan hilang <strong>permanen</strong>. Tindakan tidak bisa dibatalkan.
+        </div>
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
         <form method="post" id="formDelete" style="display:inline;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-sm btn-danger">
-            <i class="bi bi-trash me-1"></i>Hapus
+            <i class="bi bi-trash me-1" aria-hidden="true"></i>Ya, Hapus Permanen
           </button>
         </form>
       </div>
@@ -367,19 +457,19 @@
         <div class="p-3">
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <div class="p-2 rounded-3" style="background:#f8fafc;">
+              <div class="p-2 rounded-3" style="background:var(--table-head-bg);">
                 <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">No. HP</div>
                 <div id="profPhone" style="font-size:.85rem;font-weight:600;"></div>
               </div>
             </div>
             <div class="col-6">
-              <div class="p-2 rounded-3" style="background:#f8fafc;">
+              <div class="p-2 rounded-3" style="background:var(--table-head-bg);">
                 <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Ditambah oleh</div>
                 <div id="profAddedBy" style="font-size:.85rem;font-weight:600;"></div>
               </div>
             </div>
             <div class="col-12">
-              <div class="p-2 rounded-3" style="background:#f8fafc;">
+              <div class="p-2 rounded-3" style="background:var(--table-head-bg);">
                 <div class="text-muted mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">Member sejak</div>
                 <div id="profCreatedAt" style="font-size:.85rem;font-weight:600;"></div>
               </div>
@@ -390,7 +480,7 @@
           <div class="text-center mb-3">
             <div class="text-muted mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">QR Code Member</div>
             <img id="profQR" src="" alt="QR"
-                 style="width:160px;height:160px;border-radius:12px;border:3px solid #e2e8f0;">
+                 style="width:160px;height:160px;border-radius:12px;border:3px solid var(--border);">
           </div>
 
           <!-- Actions -->
@@ -576,8 +666,13 @@
     new bootstrap.Modal(document.getElementById('modalEdit')).show();
   }
 
-  function openDelete(id, name) {
+  function openDelete(id, name, phone, visits, points) {
     document.getElementById('deleteName').textContent = name;
+    const meta = [];
+    if (phone) meta.push('<i class="bi bi-telephone me-1"></i>' + phone);
+    if (visits !== undefined) meta.push('<i class="bi bi-scissors me-1"></i>' + visits + ' kunjungan');
+    if (points) meta.push('<i class="bi bi-star-fill text-warning me-1"></i>' + points + ' poin');
+    document.getElementById('deleteMeta').innerHTML = meta.join(' &nbsp;·&nbsp; ') || '<em class="text-muted">Tidak ada info tambahan</em>';
     document.getElementById('formDelete').action = '/customers/' + id + '/delete';
     new bootstrap.Modal(document.getElementById('modalDelete')).show();
   }
@@ -595,5 +690,59 @@
     document.body.appendChild(form);
     form.submit();
   }
+
+  // ── Debounced live search (auto-submit setelah 400ms ketikan berhenti) ──
+  (function() {
+    const input = document.getElementById('searchInput');
+    if (!input) return;
+    let timer = null;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => document.getElementById('searchForm').submit(), 400);
+    });
+  })();
+
+  // ── AJAX duplicate check saat ketik nomor HP di modal Tambah ──
+  (function() {
+    const addForm  = document.querySelector('#modalAdd form');
+    if (!addForm) return;
+    const phoneInp = addForm.querySelector('input[name="phone"]');
+    if (!phoneInp) return;
+
+    // Warning banner (disisipkan sekali)
+    let warnBox = document.createElement('div');
+    warnBox.className = 'alert alert-warning py-2 small mt-2 d-none';
+    warnBox.role = 'alert';
+    phoneInp.parentElement.parentElement.appendChild(warnBox);
+
+    let timer = null;
+    phoneInp.addEventListener('input', () => {
+      clearTimeout(timer);
+      const val = phoneInp.value.trim();
+      if (val.length < 6) { warnBox.classList.add('d-none'); return; }
+      timer = setTimeout(async () => {
+        try {
+          const r = await fetch('/customers/check-phone?phone=' + encodeURIComponent(val));
+          const j = await r.json();
+          if (j.exists) {
+            warnBox.classList.remove('d-none');
+            warnBox.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>
+              Nomor ini sudah terdaftar sebagai <strong>${j.existing.name}</strong>
+              (${j.existing.visits} kunjungan). Kalau tetap ditambahkan, akan ditolak server.`;
+          } else {
+            warnBox.classList.add('d-none');
+          }
+        } catch (e) { /* silent */ }
+      }, 500);
+    });
+  })();
+
+  // ── Focus field pertama saat modal terbuka (WCAG) ──
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('shown.bs.modal', () => {
+      const first = m.querySelector('input:not([type="hidden"]):not([disabled])');
+      if (first) first.focus();
+    });
+  });
 </script>
 {% endblock %}

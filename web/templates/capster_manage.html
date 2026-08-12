@@ -30,15 +30,14 @@
     <table class="table table-sm table-hover mb-0">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Nama</th>
-          <th>Alias</th>
-          <th>Tipe</th>
-          <th>Gaji Tetap</th>
-          <th>Branch</th>
-          <th>Telegram ID</th>
-          <th>Akun Portal</th>
-          <th class="text-end">Aksi</th>
+          <th scope="col">#</th>
+          <th scope="col">Nama</th>
+          <th scope="col">Alias</th>
+          <th scope="col">Tipe</th>
+          <th scope="col">Gaji Tetap</th>
+          <th scope="col">Branch</th>
+          <th scope="col">Akun Portal</th>
+          <th scope="col" class="text-end">Aksi</th>
         </tr>
       </thead>
       <tbody>
@@ -63,7 +62,6 @@
             {% endif %}
           </td>
           <td class="text-muted small">{{ c.branch_name }}</td>
-          <td class="font-monospace small text-muted">{{ c.telegram_id or '—' }}</td>
           <td>
             {% if c.username %}
               <span class="badge bg-success bg-opacity-10 text-success" style="font-size:.75rem;">
@@ -101,7 +99,7 @@
         </tr>
         {% endfor %}
       {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">Belum ada capster terdaftar.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Belum ada capster terdaftar.</td></tr>
       {% endif %}
       </tbody>
     </table>
@@ -127,15 +125,10 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label form-label-sm fw-semibold">Telegram ID <span class="text-muted fw-normal">(opsional)</span></label>
-            <input name="telegram_id" type="number" class="form-control form-control-sm"
-                   placeholder="Kosongkan jika tidak pakai Telegram">
-            <div class="form-text">Legacy field — dulu dipakai untuk bot. Sekarang opsional.</div>
-          </div>
-
-          <div class="mb-3">
             <label class="form-label form-label-sm fw-semibold">Alias <span class="text-muted fw-normal">(opsional)</span></label>
-            <input name="alias" class="form-control form-control-sm" placeholder="Nama di transaksi lama / username Telegram">
+            <input name="alias" class="form-control form-control-sm"
+                   placeholder="Nama alternatif untuk transaksi lama">
+            <div class="form-text">Dipakai untuk match transaksi lama kalau nama tersimpan berbeda.</div>
           </div>
 
           <div class="mb-3">
@@ -328,11 +321,11 @@ function toggleEditFields() {
   document.getElementById('edit_tetap_fields').style.display = t === 'tetap' ? '' : 'none';
 }
 
-function openSetPwd(telegramId, name, currentUsername) {
+function openSetPwd(capsterId, name, currentUsername) {
   document.getElementById('setPwd_capster').value  = name;
   document.getElementById('setPwd_username').value = currentUsername || '';
   document.getElementById('setPwd_password').value = '';
-  document.getElementById('setPwdForm').action = '/capsters/' + telegramId + '/set-password';
+  document.getElementById('setPwdForm').action = '/capsters/' + capsterId + '/set-password';
   new bootstrap.Modal(document.getElementById('setPwdModal')).show();
 }
 

@@ -10,7 +10,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <script>
+    // Apply saved theme BEFORE body renders (mencegah flash-of-wrong-theme)
+    // Shared preference key dgn admin — kalau user set dark di admin, portal juga dark.
+    (function() {
+      const saved = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-bs-theme', saved);
+      document.documentElement.setAttribute('data-theme', saved);
+    })();
+  </script>
   <style>
+    /* ── Design Tokens (Light — default) ── */
     :root {
       --primary:       #0f3460;
       --primary-light: #16213e;
@@ -19,18 +29,61 @@
       --sidebar-hover: #0a2647;
       --sidebar-active:#e94560;
       --body-bg:       #f0f4f8;
+      --card-bg:       #ffffff;
       --card-radius:   14px;
       --topbar-h:      56px;
       --sidebar-w:     220px;
       --ease:          cubic-bezier(.4,0,.2,1);
       --dur:           .18s;
+      /* Semantic colors */
+      --text-primary:  #1e293b;
+      --text-muted:    #64748b;
+      --border:        #e2e8f0;
+      --topbar-bg:     rgba(255,255,255,.88);
+      --table-head-bg: #f8fafc;
+      --table-hover:   #f0f4ff;
+      --input-bg:      #ffffff;
+      --shadow-sm:     0 1px 4px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+      --shadow-md:     0 4px 8px rgba(0,0,0,.07), 0 12px 28px rgba(0,0,0,.08);
     }
+
+    /* ── Dark theme overrides ── */
+    [data-theme="dark"] {
+      --body-bg:       #0f1420;
+      --card-bg:       #1a1f2e;
+      --sidebar-bg:    #08111f;
+      --sidebar-hover: #1a2540;
+      --text-primary:  #e2e8f0;
+      --text-muted:    #94a3b8;
+      --border:        #2d3548;
+      --topbar-bg:     rgba(20,25,40,.88);
+      --table-head-bg: #232939;
+      --table-hover:   #232b3f;
+      --input-bg:      #232939;
+      --shadow-sm:     0 1px 4px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.25);
+      --shadow-md:     0 4px 8px rgba(0,0,0,.45), 0 12px 28px rgba(0,0,0,.35);
+    }
+
+    /* Force Bootstrap utility classes visible di dark mode */
+    [data-theme="dark"] .text-muted,
+    [data-theme="dark"] .text-secondary { color: var(--text-muted) !important; }
+    [data-theme="dark"] .text-dark      { color: var(--text-primary) !important; }
+    [data-theme="dark"] .bg-light       { background-color: var(--table-head-bg) !important; }
+    [data-theme="dark"] .bg-white       { background-color: var(--card-bg) !important; }
+    [data-theme="dark"] .badge.bg-light { color: var(--text-primary) !important; }
+    [data-theme="dark"] .card           { background: var(--card-bg); color: var(--text-primary); }
+    [data-theme="dark"] .modal-content  { background: var(--card-bg); color: var(--text-primary); }
+    [data-theme="dark"] hr              { border-color: var(--border); }
+    [data-theme="dark"] .progress       { background: var(--table-head-bg); }
+    [data-theme="dark"] .font-monospace { color: var(--text-muted); }
+
     *, *::before, *::after { box-sizing: border-box; }
     body {
       font-family: 'Inter', system-ui, sans-serif;
       background: var(--body-bg);
-      color: #1e293b;
+      color: var(--text-primary);
       font-size: .9rem;
+      transition: background .25s var(--ease), color .25s var(--ease);
     }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: #3a5a8c; border-radius: 99px; }
@@ -94,41 +147,57 @@
     /* Main */
     .main-content { margin-left: var(--sidebar-w); min-height: 100vh; }
     .topbar {
-      background: rgba(255,255,255,.88);
+      background: var(--topbar-bg);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(0,0,0,.07);
+      border-bottom: 1px solid var(--border);
       padding: 0 1.5rem;
       height: var(--topbar-h);
       display: flex; align-items: center; justify-content: space-between;
       position: sticky; top: 0; z-index: 900;
-      transition: box-shadow var(--dur) var(--ease);
+      transition: box-shadow var(--dur) var(--ease), background .25s var(--ease);
     }
-    .topbar.scrolled { box-shadow: 0 2px 16px rgba(0,0,0,.08); }
-    .topbar .page-title { font-size: .95rem; font-weight: 600; color: #1e293b; }
+    .topbar.scrolled { box-shadow: 0 2px 16px rgba(0,0,0,.12); }
+    .topbar .page-title { font-size: .95rem; font-weight: 600; color: var(--text-primary); }
     .hamburger-btn {
       display: none; background: none; border: none;
-      font-size: 1.35rem; color: #0f3460; cursor: pointer;
+      font-size: 1.35rem; color: var(--text-primary); cursor: pointer;
       padding: 0; margin-right: .75rem;
     }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      background: none; border: none; padding: 4px 8px;
+      cursor: pointer; color: var(--text-muted);
+      border-radius: 8px; font-size: 1.05rem;
+      transition: background .15s, color .15s;
+    }
+    .theme-toggle:hover { background: rgba(128,128,128,.15); color: var(--accent); }
+
     .page-content { padding: 1.25rem 1.5rem; }
 
     /* Cards */
     .stat-card {
       border: none; border-radius: var(--card-radius);
-      background: #fff;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
-      transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+      background: var(--card-bg);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background .25s var(--ease);
     }
-    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,.07), 0 12px 28px rgba(0,0,0,.08); }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
     /* Tables */
+    .table {
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
     .table thead th {
-      background: #f8fafc; font-size: .73rem;
+      background: var(--table-head-bg); font-size: .73rem;
       text-transform: uppercase; letter-spacing: .06em;
-      color: #64748b; border-bottom: 1.5px solid #e9ecef;
+      color: var(--text-muted); border-bottom: 1.5px solid var(--border);
       font-weight: 600; white-space: nowrap;
     }
-    .table-hover tbody tr:hover { background: #f0f4ff; }
+    .table-hover tbody tr:hover { background: var(--table-hover) !important; }
+    .table td, .table th { border-color: var(--border); }
 
     /* Buttons */
     .btn { font-weight: 500; font-size: .845rem; border-radius: 8px; }
@@ -136,22 +205,33 @@
 
     /* Forms */
     .form-control, .form-select {
-      border-radius: 8px; border: 1.5px solid #e2e8f0;
+      border-radius: 8px; border: 1.5px solid var(--border);
+      background: var(--input-bg); color: var(--text-primary);
       font-size: .855rem;
-      transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+      transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background .25s var(--ease);
     }
     .form-control:focus, .form-select:focus {
       border-color: var(--primary);
+      background: var(--input-bg); color: var(--text-primary);
       box-shadow: 0 0 0 3px rgba(15,52,96,.12);
+    }
+    .input-group-text {
+      background: var(--table-head-bg);
+      border-color: var(--border);
+      color: var(--text-muted);
     }
 
     /* Alert */
     .alert { border-radius: 10px; border: none; font-size: .855rem; }
 
     /* Modal */
-    .modal-content { border: none; border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
-    .modal-header { border-bottom: 1px solid #f1f5f9; }
-    .modal-footer { border-top: 1px solid #f1f5f9; }
+    .modal-content {
+      border: none; border-radius: 16px;
+      background: var(--card-bg); color: var(--text-primary);
+      box-shadow: 0 24px 64px rgba(0,0,0,.18);
+    }
+    .modal-header { border-bottom: 1px solid var(--border); }
+    .modal-footer { border-top: 1px solid var(--border); }
 
     /* Overlay mobile */
     .sidebar-overlay {
@@ -219,6 +299,11 @@
       </a>
     </li>
     <li class="nav-item">
+      <a href="/portal/daily" class="nav-link {% if active_page=='daily' %}active{% endif %}">
+        <i class="bi bi-calendar-day"></i> Laporan Harian
+      </a>
+    </li>
+    <li class="nav-item">
       <a href="/portal/earnings" class="nav-link {% if active_page=='earnings' %}active{% endif %}">
         <i class="bi bi-graph-up"></i> Pendapatan
       </a>
@@ -247,9 +332,15 @@
       <button class="hamburger-btn" id="hamburgerBtn"><i class="bi bi-list"></i></button>
       <span class="page-title">{% block page_title %}Portal Capster{% endblock %}</span>
     </div>
-    <small class="text-muted d-none d-sm-inline" style="font-size:.78rem;">
-      {{ now.strftime('%d %b %Y, %H:%M') if now is defined else '' }}
-    </small>
+    <div class="d-flex align-items-center gap-2">
+      <small class="text-muted d-none d-sm-inline" style="font-size:.78rem;">
+        {{ now.strftime('%d %b %Y, %H:%M') if now is defined else '' }}
+      </small>
+      <button id="themeToggleBtn" class="theme-toggle" onclick="toggleTheme()"
+              aria-label="Ganti mode siang/malam" title="Ganti mode siang/malam">
+        <i class="bi bi-moon-stars-fill" id="themeIcon"></i>
+      </button>
+    </div>
   </div>
 
   <div class="page-content">
@@ -268,6 +359,21 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  // ── Theme toggle siang/malam ──
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+  }
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(current === 'light' ? 'dark' : 'light');
+  }
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+
+  // ── Sidebar toggle (mobile) ──
   const sidebar   = document.getElementById('sidebar');
   const overlay   = document.getElementById('sidebarOverlay');
   const hamburger = document.getElementById('hamburgerBtn');

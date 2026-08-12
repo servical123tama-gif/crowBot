@@ -125,7 +125,7 @@
               {% if r.type == 'produk' %}
               <span class="badge bg-warning bg-opacity-15 text-warning me-1" style="font-size:.7rem;">🛍️ Produk</span>
               {% endif %}
-              {{ r.service }}
+              <span class="text-capitalize">{{ r.service }}</span>
               {% if r.type == 'produk' and r.commission %}
               <span class="text-success ms-1" style="font-size:.75rem;" title="Komisi capster">+{{ r.commission|idr }}</span>
               {% endif %}
@@ -133,11 +133,20 @@
             <td><span class="badge bg-light text-dark">{{ r.branch }}</span></td>
             <td>
               {% if r.type == 'layanan' %}
-              <span class="badge {{ 'bg-success' if r.payment == 'Cash' else ('bg-info text-dark' if r.payment == 'Transfer' else 'bg-purple') }}">
-                {{ r.payment }}
-              </span>
+                {% set pay = (r.payment or '').strip() %}
+                {% if pay|lower == 'cash' %}
+                  <span class="badge bg-success">💵 Cash</span>
+                {% elif pay|lower == 'qris' %}
+                  <span class="badge" style="background:#533483;color:#fff;">📲 QRIS</span>
+                {% elif pay|lower == 'transfer' %}
+                  <span class="badge bg-info text-dark">🏦 Transfer</span>
+                {% elif pay %}
+                  <span class="badge bg-secondary">{{ pay }}</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted">—</span>
+                {% endif %}
               {% else %}
-              <span class="text-muted small">—</span>
+                <span class="badge bg-secondary bg-opacity-25 text-muted">—</span>
               {% endif %}
             </td>
             <td>
@@ -153,11 +162,11 @@
             </td>
             <td class="text-end fw-semibold">{{ r.price|idr }}</td>
             <td class="text-center">
-              <div class="d-flex justify-content-center gap-1">
+              <div class="d-flex justify-content-center gap-2">
                 {% if r.type == 'layanan' %}
                 <!-- Edit (layanan only) -->
-                <button class="btn btn-xs btn-outline-primary p-1 lh-1"
-                        title="Edit"
+                <button class="btn btn-sm btn-outline-primary px-2 py-1"
+                        title="Edit transaksi"
                         data-bs-toggle="modal" data-bs-target="#editModal"
                         data-id="{{ r.id }}"
                         data-date="{{ r.date_input }}"
@@ -166,19 +175,19 @@
                         data-price="{{ r.price }}"
                         data-payment="{{ r.payment }}"
                         data-branch-id="{{ r.branch_id }}">
-                  <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                  <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-xs btn-outline-danger p-1 lh-1"
-                        title="Hapus"
+                <button class="btn btn-sm btn-outline-danger px-2 py-1"
+                        title="Hapus transaksi"
                         data-bs-toggle="modal" data-bs-target="#deleteModal"
                         data-id="{{ r.id }}"
                         data-type="layanan"
                         data-info="{{ r.date }} · {{ r.capster }} · {{ r.service }}">
-                  <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                  <i class="bi bi-trash"></i>
                 </button>
                 {% else %}
                 <!-- Edit produk sale -->
-                <button class="btn btn-xs btn-outline-primary p-1 lh-1"
+                <button class="btn btn-sm btn-outline-primary px-2 py-1"
                         title="Edit penjualan produk"
                         data-bs-toggle="modal" data-bs-target="#editProdukModal"
                         data-id="{{ r.id }}"
@@ -187,16 +196,16 @@
                         data-product-id="{{ r.product_id }}"
                         data-qty="{{ r.qty }}"
                         data-branch-id="{{ r.branch_id }}">
-                  <i class="bi bi-pencil" style="font-size:.75rem;"></i>
+                  <i class="bi bi-pencil"></i>
                 </button>
                 <!-- Hapus produk sale -->
-                <button class="btn btn-xs btn-outline-danger p-1 lh-1"
+                <button class="btn btn-sm btn-outline-danger px-2 py-1"
                         title="Hapus penjualan produk"
                         data-bs-toggle="modal" data-bs-target="#deleteModal"
                         data-id="{{ r.id }}"
                         data-type="produk"
                         data-info="{{ r.date }} · {{ r.capster }} · {{ r.service }}">
-                  <i class="bi bi-trash" style="font-size:.75rem;"></i>
+                  <i class="bi bi-trash"></i>
                 </button>
                 {% endif %}
               </div>

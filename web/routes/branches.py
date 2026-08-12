@@ -137,7 +137,7 @@ def branch_edit(branch_id):
 
     commission_pct = request.form.get('commission_rate', '').strip()
     if commission_pct:
-        fields['CommissionRate'] = _parse_float(commission_pct) / 100.0
+        fields['commission_rate'] = _parse_float(commission_pct) / 100.0
 
     cost_tempat = request.form.get('cost_tempat', '').strip()
     if cost_tempat:

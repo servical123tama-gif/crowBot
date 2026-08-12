@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 @dataclass
 class CapsterModel:
     name: str
-    telegram_id: int
     alias: str = ''
     employment_type: str = 'mitra'
     commission_rate: float = 0.5
@@ -135,7 +134,6 @@ def capsters():
             'withdrawn':        withdrawn_month, # this month
             'withdrawn_all':    withdrawn_all,   # all time
             'balance':          balance,         # all time
-            'telegram_id':      c.get('TelegramID', ''),  # kept for display only
         })
 
     # Sort: by revenue desc
@@ -183,7 +181,6 @@ def capster_manage():
             'saldo_adjustment': int(c.get('SaldoAdjustment', 0) or 0),
             'branch_id':        bid,
             'branch_name':      bname,
-            'telegram_id':      c.get('TelegramID', ''),  # display only
             'username':         c.get('Username', ''),
         })
     return render_template(
@@ -204,21 +201,6 @@ def capster_add():
         flash('Nama capster tidak boleh kosong.', 'danger')
         return redirect(url_for('capsters.capster_manage'))
 
-    # Telegram ID sekarang OPTIONAL — bot sudah dihapus. Kalau kosong, isi None.
-    raw_tid = request.form.get('telegram_id', '').strip()
-    telegram_id = None
-    if raw_tid:
-        try:
-            telegram_id = int(raw_tid)
-        except ValueError:
-            flash('Telegram ID harus berupa angka (atau kosongkan).', 'danger')
-            return redirect(url_for('capsters.capster_manage'))
-        # Duplicate check kalau di-isi
-        for c in db.get_all_capsters():
-            if c.get('TelegramID') == telegram_id:
-                flash(f"Telegram ID {telegram_id} sudah terdaftar sebagai '{c['Name']}'.", 'warning')
-                return redirect(url_for('capsters.capster_manage'))
-
     alias = request.form.get('alias', '').strip()
     etype = request.form.get('employment_type', 'mitra').strip().lower()
     if etype not in ('mitra', 'tetap'):
@@ -237,14 +219,13 @@ def capster_add():
 
     capster = CapsterModel(
         name=name,
-        telegram_id=telegram_id,
         alias=alias,
         employment_type=etype,
         commission_rate=commission_rate,
         monthly_salary=monthly_salary,
         branch_id=branch_id,
     )
-    if db.add_capster(capster):
+    if db.add_capster(capster) is not None:
         flash(f"Capster '{name}' berhasil ditambahkan.", 'success')
     else:
         flash('Gagal menambahkan capster.', 'danger')

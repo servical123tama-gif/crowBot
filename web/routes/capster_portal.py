@@ -39,7 +39,6 @@ def _current_capster():
     return {
         'id':        session.get('capster_id'),
         'name':      session.get('capster_name', ''),
-        'telegram_id': session.get('capster_telegram_id'),  # legacy display only
         'alias':     session.get('capster_alias', ''),
         'type':      session.get('capster_type', 'mitra'),
         'rate':      session.get('capster_rate', 0.5),
@@ -74,7 +73,6 @@ def login():
             session['capster_logged_in']   = True
             session['capster_id']          = capster['id']
             session['capster_name']        = capster['Name']
-            session['capster_telegram_id'] = capster.get('TelegramID')  # legacy
             session['capster_alias']       = capster['Alias']
             session['capster_type']        = capster['EmploymentType']
             session['capster_rate']        = capster['CommissionRate']
@@ -292,6 +290,126 @@ def earnings():
         total_withdrawn=total_withdrawn,
         total_balance=total_balance,
         active_page='earnings',
+    )
+
+
+# ── Laporan Harian ────────────────────────────────────────────────────────── #
+
+@capster_portal_bp.route('/daily')
+@capster_login_required
+def daily_report():
+    """Laporan harian capster — filter transaksi + produk per tanggal."""
+    from datetime import timedelta
+    cap  = _current_capster()
+    repo = Repository()
+    now  = datetime.now()
+
+    # Ambil salary/rate terbaru dari DB (session bisa stale)
+    all_caps = repo.get_all_capsters()
+    fresh_cap = next((c for c in all_caps if c.get('id') == cap['id']), None)
+    if fresh_cap:
+        cap = dict(cap)
+        cap['salary'] = fresh_cap.get('MonthlySalary', cap['salary'])
+        cap['rate']   = fresh_cap.get('CommissionRate', cap['rate'])
+
+    date_str = request.args.get('date', now.strftime('%Y-%m-%d'))
+    try:
+        selected = datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        selected = now
+
+    prev_date = (selected - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (selected + timedelta(days=1)).strftime('%Y-%m-%d')
+    is_today  = selected.date() == now.date()
+
+    # Ambil txs bulan itu, lalu filter ke tanggal spesifik
+    txs_month = repo.get_transactions_by_capster_month(
+        cap['name'], cap['alias'], selected.year, selected.month
+    )
+    prod_month = repo.get_product_sales_by_capster_month(
+        cap['name'], cap['alias'], selected.year, selected.month
+    )
+
+    def _same_day(d):
+        if hasattr(d, 'date'): return d.date() == selected.date()
+        return str(d)[:10] == date_str
+
+    txs_day  = [t for t in txs_month  if _same_day(t.get('date'))]
+    prod_day = [p for p in prod_month if _same_day(p.get('date'))]
+
+    # Ringkasan layanan
+    svc_revenue = sum(t.get('price', 0) for t in txs_day)
+    svc_count   = len(txs_day)
+
+    # Ringkasan produk
+    prod_revenue    = sum(p.get('price', 0) for p in prod_day)
+    prod_qty        = sum(p.get('quantity', 1) for p in prod_day)
+    prod_commission = sum(p.get('commission', 0) for p in prod_day)
+
+    # Komisi/gaji hari ini
+    if cap['type'] == 'mitra':
+        earned = int(svc_revenue * cap['rate']) + prod_commission
+        pay_label = f"Komisi {int(cap['rate']*100)}%"
+    else:
+        # Untuk tetap: gaji bulanan tidak dibagi per hari — tampilkan saja komisi produk
+        earned = prod_commission
+        pay_label = f"Gaji tetap Rp {cap['salary']:,}/bln".replace(',', '.')
+
+    # Breakdown per layanan
+    by_service = {}
+    for t in txs_day:
+        s = t.get('service', '-')
+        if s not in by_service:
+            by_service[s] = {'name': s, 'count': 0, 'revenue': 0}
+        by_service[s]['count'] += 1
+        by_service[s]['revenue'] += t.get('price', 0)
+    by_service = sorted(by_service.values(), key=lambda x: x['revenue'], reverse=True)
+
+    # Breakdown per metode bayar
+    by_payment = {}
+    for t in txs_day:
+        p = t.get('payment', '-')
+        if p not in by_payment:
+            by_payment[p] = {'name': p, 'count': 0, 'revenue': 0}
+        by_payment[p]['count'] += 1
+        by_payment[p]['revenue'] += t.get('price', 0)
+    by_payment = sorted(by_payment.values(), key=lambda x: x['revenue'], reverse=True)
+
+    # Detail transaksi (waktu, layanan, cabang, harga)
+    tx_detail = []
+    for t in sorted(txs_day, key=lambda t: t.get('date', datetime.min)):
+        d = t.get('date')
+        time_str = d.strftime('%H:%M') if hasattr(d, 'strftime') else str(d)[11:16]
+        tx_detail.append({
+            'time':    time_str,
+            'service': t.get('service', '-'),
+            'branch':  BRANCHES.get(t.get('branch', ''), {}).get('short', t.get('branch', '') or '-'),
+            'payment': t.get('payment', '-'),
+            'price':   t.get('price', 0),
+        })
+
+    return render_template(
+        'capster_portal/daily.html',
+        cap=cap,
+        now=now,
+        selected=selected,
+        date_str=date_str,
+        prev_date=prev_date,
+        next_date=next_date,
+        is_today=is_today,
+        day_label=f"{selected.strftime('%A')}, {selected.day} {MONTHS_ID[selected.month]} {selected.year}",
+        svc_revenue=svc_revenue,
+        svc_count=svc_count,
+        prod_revenue=prod_revenue,
+        prod_qty=prod_qty,
+        prod_commission=prod_commission,
+        total_revenue=svc_revenue + prod_revenue,
+        earned=earned,
+        pay_label=pay_label,
+        by_service=by_service,
+        by_payment=by_payment,
+        tx_detail=tx_detail,
+        active_page='daily',
     )
 
 

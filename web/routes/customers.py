@@ -5,10 +5,11 @@ import os
 import re
 
 import requests as _requests
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, Response, abort, jsonify
 
 from web.auth import login_required
 from app.db.repository import Repository
+from app.utils.phone import normalize_id_phone, display_id_phone, wa_me_url
 
 _QR_SECRET = os.getenv('SECRET_KEY', 'barbershop-qr-secret-2026')
 
@@ -41,7 +42,7 @@ def _auto_send_welcome_wa(cid: int, name: str, phone: str, repo: Repository) -> 
     if not fonnte_token:
         return False, 'no_token'
 
-    clean_phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+    clean_phone = normalize_id_phone(phone)
 
     template = repo.get_setting(
         'wa_template',
@@ -88,55 +89,113 @@ def customers_list():
     all_capsters  = repo.get_all_capsters()
 
     search = request.args.get('q', '').strip().lower()
+    total_all = len(all_customers)   # sebelum filter — untuk "Menampilkan X dari Y"
+
     if search:
         all_customers = [
             c for c in all_customers
             if search in c['Name'].lower() or search in c['Phone'].lower()
         ]
+    total_filtered = len(all_customers)
 
-    repo2 = Repository()
+    # ── Paginasi server-side ──
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per_page = int(request.args.get('per_page', 50))
+    except (ValueError, TypeError):
+        per_page = 50
+    per_page = min(max(per_page, 10), 200)
+
+    total_pages = max(1, (total_filtered + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    start = (page - 1) * per_page
+    page_customers = all_customers[start:start + per_page]
+
+    # Enrich display phone + wa link untuk template
+    for c in page_customers:
+        raw = c.get('Phone', '') or ''
+        c['PhoneDisplay'] = display_id_phone(raw) if raw else ''
+        c['PhoneWaUrl']   = wa_me_url(raw)
+
     wa_settings = {
-        'fonnte_token': repo2.get_setting('fonnte_token'),
-        'wa_template':  repo2.get_setting(
+        'fonnte_token': repo.get_setting('fonnte_token'),
+        'wa_template':  repo.get_setting(
             'wa_template',
             'Halo {nama}, selamat datang di barbershop kami! Berikut QR Code membership kamu. Tunjukkan saat kunjungan ya! ✂️'
         ),
-        'app_base_url':  repo2.get_setting('app_base_url'),
-        'wa_auto_send':  repo2.get_setting('wa_auto_send', '0'),
+        'app_base_url':  repo.get_setting('app_base_url'),
+        'wa_auto_send':  repo.get_setting('wa_auto_send', '0'),
     }
 
     return render_template(
         'customers.html',
-        customers=all_customers,
+        customers=page_customers,
         capsters=all_capsters,
         search=search,
-        total=len(all_customers),
+        total_all=total_all,
+        total_filtered=total_filtered,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
         wa_settings=wa_settings,
         active_page='customers',
     )
+
+
+@customers_bp.route('/customers/check-phone')
+@login_required
+def customers_check_phone():
+    """AJAX endpoint: cek apakah nomor sudah terdaftar. Return JSON."""
+    raw = request.args.get('phone', '').strip()
+    normalized = normalize_id_phone(raw)
+    if not normalized:
+        return jsonify({'valid': False, 'reason': 'empty'})
+    repo = Repository()
+    dup = repo.get_customer_by_phone(normalized)
+    if not dup:
+        # Coba raw (data lama belum di-normalize)
+        dup = repo.get_customer_by_phone(raw)
+    return jsonify({
+        'valid': True,
+        'normalized': normalized,
+        'display':    display_id_phone(normalized),
+        'exists':     bool(dup),
+        'existing':   {
+            'id':      dup['id'],
+            'name':    dup['Name'],
+            'visits':  dup.get('VisitCount', 0),
+        } if dup else None,
+    })
 
 
 @customers_bp.route('/customers/add', methods=['POST'])
 @login_required
 def customer_add():
     name = request.form.get('name', '').strip()
-    phone = request.form.get('phone', '').strip()
+    phone_raw = request.form.get('phone', '').strip()
 
     if not name:
         flash('Nama customer wajib diisi.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
-    if not _is_valid_phone(phone):
+    if not _is_valid_phone(phone_raw):
         flash('Nomor HP tidak valid. Hanya boleh angka, +, -, dan spasi (maks 30 karakter).', 'danger')
         return redirect(url_for('customers.customers_list'))
+
+    # Normalize phone ke format E.164 (628xxx) sebelum simpan/dedup check.
+    phone = normalize_id_phone(phone_raw)
 
     repo = Repository()
 
     if phone:
-        dup = repo.get_customer_by_phone(phone)
+        # Dedup check pakai raw + normalized (backward compat data lama)
+        dup = repo.get_customer_by_phone(phone) or repo.get_customer_by_phone(phone_raw)
         if dup:
             flash(
-                f'Nomor HP {phone} sudah terdaftar atas nama "{dup["Name"]}" '
+                f'Nomor HP {display_id_phone(phone)} sudah terdaftar atas nama "{dup["Name"]}" '
                 f'({dup["VisitCount"]} kunjungan). Customer tidak ditambahkan.',
                 'warning'
             )
@@ -169,7 +228,7 @@ def customer_add():
 @login_required
 def customer_edit(cid):
     name      = request.form.get('name', '').strip()
-    phone     = request.form.get('phone', '').strip()
+    phone_raw = request.form.get('phone', '').strip()
     added_by  = request.form.get('added_by', '').strip()
     visit_count_str = request.form.get('visit_count', '').strip()
     visit_count = int(visit_count_str) if visit_count_str.isdigit() else None
@@ -180,9 +239,12 @@ def customer_edit(cid):
         flash('Nama customer wajib diisi.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
-    if not _is_valid_phone(phone):
+    if not _is_valid_phone(phone_raw):
         flash('Nomor HP tidak valid. Hanya boleh angka, +, -, dan spasi (maks 30 karakter).', 'danger')
         return redirect(url_for('customers.customers_list'))
+
+    # Normalize phone ke format E.164 (628xxx) — konsisten dgn add.
+    phone = normalize_id_phone(phone_raw)
 
     repo = Repository()
     ok = repo.update_customer(cid, name, phone, added_by=added_by,
@@ -243,7 +305,7 @@ def customer_send_qr(cid):
         flash('Customer tidak ditemukan.', 'danger')
         return redirect(url_for('customers.customers_list'))
 
-    phone = (cust.get('Phone') or '').replace('+', '').replace(' ', '').replace('-', '')
+    phone = normalize_id_phone(cust.get('Phone') or '')
     if not phone:
         flash(f'Customer "{cust["Name"]}" tidak punya nomor HP.', 'warning')
         return redirect(url_for('customers.customers_list'))

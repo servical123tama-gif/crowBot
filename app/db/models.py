@@ -1,9 +1,18 @@
 """
-SQLAlchemy ORM Models — 7 tables
+SQLAlchemy ORM Models — 13 tables. Schema lengkap di /DB_SCHEMA.md.
+
+Tables:
+  capsters, customers, transactions,
+  services, branches, products, product_stocks, product_sales,
+  loyalty_claims, loyalty_audits,
+  promos, settings, salary_withdrawals.
+
+Design note: relations soft (tidak pakai ForeignKey). Delete tidak cascade.
+Lihat K-8 di TODO / audit report kalau perlu proper FK.
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, BigInteger, String, Float, Date, DateTime,
+    Column, Integer, String, Float, Date, DateTime,
     Text, Index, CheckConstraint, UniqueConstraint, Boolean
 )
 from sqlalchemy.orm import declarative_base
@@ -41,7 +50,6 @@ class Capster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
-    telegram_id = Column(BigInteger, nullable=True)  # legacy dari era bot; sekarang optional. Auth pakai username.
     alias = Column(String(100), nullable=True, default='')
     username = Column(String(50), nullable=True, unique=True)
     password_hash = Column(String(255), nullable=True)
@@ -227,9 +235,8 @@ class SalaryWithdrawal(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(DateTime, nullable=False)
-    capster_id = Column(Integer, nullable=True)              # FK ke capsters.id (identifier utama sejak refactor)
-    capster_name = Column(String(100), nullable=False)       # denormalized supaya tetap ada nama kalau capster dihapus
-    telegram_id = Column(BigInteger, nullable=True)          # legacy — tetap disimpan untuk data historis
+    capster_id = Column(Integer, nullable=True)              # FK logical ke capsters.id
+    capster_name = Column(String(100), nullable=False)       # denormalized — nama tetap ada kalau capster dihapus
     amount = Column(Integer, nullable=False, default=0)
     period_start = Column(Date, nullable=True)
     period_end = Column(Date, nullable=True)

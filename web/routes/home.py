@@ -63,12 +63,18 @@ def index():
         if not lm_year.empty else pd.DataFrame()
     )
     last_month_revenue = int(lm_df['Price'].sum()) if not lm_df.empty else 0
+    last_month_count   = len(lm_df) if not lm_df.empty else 0
+    last_month_avg     = int(last_month_revenue / last_month_count) if last_month_count else 0
 
     # Month growth %
-    if last_month_revenue > 0:
-        growth = round((month_revenue - last_month_revenue) / last_month_revenue * 100, 1)
-    else:
-        growth = None
+    def _pct(now_v, prev_v):
+        if prev_v > 0:
+            return round((now_v - prev_v) / prev_v * 100, 1)
+        return None
+
+    growth       = _pct(month_revenue, last_month_revenue)
+    count_growth = _pct(0, last_month_count)   # placeholder — dihitung setelah month_count tersedia
+    avg_growth   = _pct(0, last_month_avg)
 
     # ── Per branch today ───────────────────────────────────────────
     branch_today = {}
@@ -112,6 +118,11 @@ def index():
     # ── Extra quick stats ─────────────────────────────────────────
     today_avg     = int(today_revenue / today_count) if today_count else 0
     month_avg     = int(month_revenue / month_count) if month_count else 0
+
+    # Hitung ulang growth avg & count sekarang (setelah month_avg/count tersedia)
+    count_growth = _pct(month_count, last_month_count)
+    avg_growth   = _pct(month_avg, last_month_avg)
+
     month_top_svc = ''
     if not month_df.empty and 'Service' in month_df.columns:
         svc_counts = month_df['Service'].value_counts()
@@ -142,6 +153,8 @@ def index():
         month_top_svc=month_top_svc,
         last_month_revenue=last_month_revenue,
         growth=growth,
+        avg_growth=avg_growth,
+        count_growth=count_growth,
         branch_today=branch_today,
         branch_month=branch_month,
         branch_growth=branch_growth,

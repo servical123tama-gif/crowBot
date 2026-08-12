@@ -47,7 +47,7 @@
         {% for s in main_services %}
         <tr>
           <td class="text-muted">{{ loop.index }}</td>
-          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="fw-semibold text-capitalize">{{ s.name }}</td>
           <td class="font-monospace small text-muted">{{ s.service_id }}</td>
           <td class="text-end fw-semibold text-success">{{ s.price|idr }}</td>
           <td class="text-center">
@@ -75,7 +75,7 @@
         </tr>
         {% endfor %}
       {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-3">Belum ada layanan utama.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-3">Belum ada layanan utama.</td></tr>
       {% endif %}
       </tbody>
     </table>
@@ -96,6 +96,7 @@
           <th>Nama Layanan</th>
           <th>Service ID</th>
           <th class="text-end">Harga</th>
+          <th class="text-center">Komisi Mitra</th>
           <th class="text-end">Aksi</th>
         </tr>
       </thead>
@@ -104,7 +105,7 @@
         {% for s in coloring_services %}
         <tr>
           <td class="text-muted">{{ loop.index }}</td>
-          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="fw-semibold text-capitalize">{{ s.name }}</td>
           <td class="font-monospace small text-muted">{{ s.service_id }}</td>
           <td class="text-end fw-semibold text-success">{{ s.price|idr }}</td>
           <td class="text-center">

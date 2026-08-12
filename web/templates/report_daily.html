@@ -23,37 +23,92 @@
   </div>
 </div>
 
-{% if total_tx == 0 %}
-<div class="alert alert-info">Tidak ada transaksi pada tanggal ini.</div>
+{% if total_tx == 0 and product_transactions|length == 0 %}
+<div class="alert alert-info">Tidak ada transaksi (layanan/produk) pada tanggal ini.</div>
 {% else %}
 
 <!-- Stat Cards -->
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
     <div class="card stat-card p-3">
-      <div class="text-muted small">Total Revenue</div>
+      <div class="text-muted small">Revenue Layanan</div>
       <div class="fw-bold fs-5 text-success">{{ total_revenue|idr }}</div>
+      <div class="text-muted small">{{ total_tx }} tx</div>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
     <div class="card stat-card p-3">
-      <div class="text-muted small">Total Transaksi</div>
-      <div class="fw-bold fs-5">{{ total_tx }} tx</div>
+      <div class="text-muted small">Revenue Produk</div>
+      <div class="fw-bold fs-5 text-primary">{{ prod_total_revenue|idr }}</div>
+      <div class="text-muted small">{{ prod_total_qty }} unit terjual</div>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
     <div class="card stat-card p-3">
-      <div class="text-muted small">Rata-rata / Transaksi</div>
-      <div class="fw-bold fs-5">{{ (total_revenue // total_tx)|idr }}</div>
+      <div class="text-muted small">Total (Layanan + Produk)</div>
+      <div class="fw-bold fs-5" style="color:#e94560">{{ grand_total|idr }}</div>
+      <div class="text-muted small">Komisi produk: {{ prod_total_comm|idr }}</div>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
     <div class="card stat-card p-3">
       <div class="text-muted small">Capster Aktif</div>
       <div class="fw-bold fs-5">{{ by_capster|length }} orang</div>
+      {% if total_tx > 0 %}
+      <div class="text-muted small">Avg/layanan: {{ (total_revenue // total_tx)|idr }}</div>
+      {% endif %}
     </div>
   </div>
 </div>
+
+<!-- Per Cabang: Cash | QRIS | Produk | Total -->
+{% if branch_detail %}
+<div class="card stat-card p-3 mb-4">
+  <div class="fw-semibold mb-3">🏢 Pendapatan Per Cabang (Cash · QRIS · Produk)</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Cabang</th>
+          <th class="text-center">Tx Layanan</th>
+          <th class="text-end">💵 Cash</th>
+          <th class="text-end">📲 QRIS</th>
+          <th class="text-end">Subtotal Layanan</th>
+          <th class="text-center">Unit Produk</th>
+          <th class="text-end">🛍️ Produk</th>
+          <th class="text-end">Total Cabang</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in branch_detail %}
+        <tr>
+          <td class="fw-semibold">{{ b.name }}</td>
+          <td class="text-center">{{ b.svc_tx }}x</td>
+          <td class="text-end">{{ b.svc_cash|idr }}</td>
+          <td class="text-end">{{ b.svc_qris|idr }}</td>
+          <td class="text-end fw-semibold text-success">{{ b.svc_total|idr }}</td>
+          <td class="text-center">{{ b.prod_qty }}x</td>
+          <td class="text-end fw-semibold text-primary">{{ b.prod_revenue|idr }}</td>
+          <td class="text-end fw-bold" style="color:#e94560">{{ b.grand_total|idr }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td>TOTAL</td>
+          <td class="text-center">{{ branch_detail|sum(attribute='svc_tx') }}x</td>
+          <td class="text-end">{{ branch_detail|sum(attribute='svc_cash')|idr }}</td>
+          <td class="text-end">{{ branch_detail|sum(attribute='svc_qris')|idr }}</td>
+          <td class="text-end text-success">{{ branch_detail|sum(attribute='svc_total')|idr }}</td>
+          <td class="text-center">{{ branch_detail|sum(attribute='prod_qty') }}x</td>
+          <td class="text-end text-primary">{{ branch_detail|sum(attribute='prod_revenue')|idr }}</td>
+          <td class="text-end" style="color:#e94560">{{ branch_detail|sum(attribute='grand_total')|idr }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <!-- Breakdown Row -->
 <div class="row g-3 mb-4">
@@ -141,11 +196,49 @@
   </div>
   {% endif %}
 
+  <!-- Per Produk -->
+  {% if by_product %}
+  <div class="col-lg-6">
+    <div class="card stat-card p-3 h-100">
+      <div class="fw-semibold mb-3">🛍️ Per Produk Terjual</div>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Produk</th>
+            <th class="text-center">Qty</th>
+            <th class="text-end">Revenue</th>
+            <th class="text-end">Komisi</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in by_product %}
+          <tr>
+            <td>{{ p.name }}</td>
+            <td class="text-center">{{ p.qty }}x</td>
+            <td class="text-end fw-semibold">{{ p.revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ p.commission|idr }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="fw-bold">
+            <td>Total</td>
+            <td class="text-center">{{ prod_total_qty }}x</td>
+            <td class="text-end text-primary">{{ prod_total_revenue|idr }}</td>
+            <td class="text-end text-muted small">{{ prod_total_comm|idr }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 
-<!-- Detail Transaksi -->
-<div class="card stat-card p-3">
-  <div class="fw-semibold mb-3">📋 Detail Transaksi ({{ total_tx }})</div>
+<!-- Detail Transaksi Layanan -->
+{% if transactions %}
+<div class="card stat-card p-3 mb-4">
+  <div class="fw-semibold mb-3">📋 Detail Transaksi Layanan ({{ total_tx }})</div>
   <div class="table-responsive">
     <table class="table table-sm table-hover mb-0">
       <thead>
@@ -184,6 +277,53 @@
     </table>
   </div>
 </div>
+{% endif %}
+
+<!-- Detail Penjualan Produk -->
+{% if product_transactions %}
+<div class="card stat-card p-3">
+  <div class="fw-semibold mb-3">🛍️ Detail Penjualan Produk ({{ product_transactions|length }})</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Waktu</th>
+          <th>Capster</th>
+          <th>Produk</th>
+          <th class="text-center">Qty</th>
+          <th class="text-end">@Harga</th>
+          <th class="text-end">Total</th>
+          <th class="text-end">Komisi</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in product_transactions %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="font-monospace small">{{ p.time }}</td>
+          <td class="fw-semibold">{{ p.capster }}</td>
+          <td>{{ p.product }}</td>
+          <td class="text-center">{{ p.qty }}x</td>
+          <td class="text-end text-muted small">{{ p.price_each|idr }}</td>
+          <td class="text-end fw-semibold text-primary">{{ p.total|idr }}</td>
+          <td class="text-end text-muted small">{{ p.commission|idr }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td colspan="4" class="text-end">Total</td>
+          <td class="text-center">{{ prod_total_qty }}x</td>
+          <td></td>
+          <td class="text-end text-primary">{{ prod_total_revenue|idr }}</td>
+          <td class="text-end text-muted small">{{ prod_total_comm|idr }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 {% endif %}
 {% endblock %}

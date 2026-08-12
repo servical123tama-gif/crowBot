@@ -44,11 +44,12 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expi
 def init_db():
     """Create all tables (dev / first-run without Alembic)."""
     Base.metadata.create_all(bind=engine)
-    _migrate_capster_auth_columns()
+    _migrate_extra_columns()
+    _drop_legacy_columns()
     logger.info(f"Database initialized: {DATABASE_URL}")
 
 
-def _migrate_capster_auth_columns():
+def _migrate_extra_columns():
     """Add new columns to existing tables if not yet exist (safe to re-run)."""
     is_sqlite = DATABASE_URL.startswith('sqlite')
     # (table, column, type)
@@ -81,6 +82,49 @@ def _migrate_capster_auth_columns():
                 logger.info(f"Migration: added {table}.{col}")
             except Exception:
                 # Column already exists — normal on second run
+                conn.rollback()
+
+
+def _drop_legacy_columns():
+    """Drop kolom legacy yang sudah tidak dipakai. Safe to re-run (IF EXISTS).
+
+    Catatan: bot Telegram sudah dihapus. Kolom telegram_id di capsters +
+    salary_withdrawals di-drop supaya schema bersih. Data historis (nama capster
+    di withdrawal) tetap terjaga karena capster_name di-denormalize.
+    """
+    is_sqlite = DATABASE_URL.startswith('sqlite')
+    # SQLite baru support DROP COLUMN sejak 3.35 (2021) — asumsi user pakai versi baru
+    drops = [
+        ('capsters',           'telegram_id'),
+        ('salary_withdrawals', 'telegram_id'),
+    ]
+    # Drop unique constraint dulu (PostgreSQL only — SQLite ignore)
+    if not is_sqlite:
+        with engine.connect() as conn:
+            for constraint in ('uq_capsters_telegram_id',):
+                try:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f'ALTER TABLE capsters DROP CONSTRAINT IF EXISTS {constraint}'
+                    ))
+                    conn.commit()
+                    logger.info(f"Migration: dropped constraint {constraint}")
+                except Exception:
+                    conn.rollback()
+    with engine.connect() as conn:
+        for table, col in drops:
+            try:
+                if is_sqlite:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f'ALTER TABLE {table} DROP COLUMN {col}'
+                    ))
+                else:
+                    conn.execute(__import__('sqlalchemy').text(
+                        f'ALTER TABLE {table} DROP COLUMN IF EXISTS {col}'
+                    ))
+                conn.commit()
+                logger.info(f"Migration: dropped {table}.{col}")
+            except Exception:
+                # Column already dropped or doesn't exist — normal on repeated run
                 conn.rollback()
     # Catatan: dulu di sini ada auto-sync `point_balance = visit_count` setiap startup.
     # Sudah dihapus karena re-trigger setelah klaim Free (point=0) bikin balance balik

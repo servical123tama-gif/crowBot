@@ -179,35 +179,33 @@
             <div class="col-12 mt-2">
               <div class="fw-semibold small text-muted mb-2">💸 Biaya Operasional / Bulan</div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">Sewa Tempat</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
                 <input name="cost_tempat" type="number" min="0" value="0" class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">Listrik & Air</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
                 <input name="cost_listrik_air" type="number" min="0" value="0" class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">WiFi</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
                 <input name="cost_wifi" type="number" min="0" value="0" class="form-control form-control-sm">
               </div>
             </div>
-          </div>
-          <div class="col-12">
-            <div class="form-text text-info">
-              ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
+            <div class="col-12">
+              <div class="form-text text-info">
+                ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -221,16 +219,15 @@
 
 <!-- ═══ MODAL: Edit Cabang ═══ -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
     <div class="modal-content">
-      <form method="post" id="editForm">
+      <form method="post" id="editForm" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="editModalLabel">Edit Cabang</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-
           <div class="row g-3">
             <!-- Info Dasar -->
             <div class="col-12">
@@ -267,7 +264,7 @@
             <div class="col-12 mt-2">
               <div class="fw-semibold small text-muted mb-2">💸 Biaya Operasional / Bulan</div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">Sewa Tempat</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
@@ -275,7 +272,7 @@
                        class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">Listrik & Air</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
@@ -283,7 +280,7 @@
                        class="form-control form-control-sm">
               </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
               <label class="form-label form-label-sm fw-semibold">WiFi</label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">Rp</span>
@@ -291,14 +288,12 @@
                        class="form-control form-control-sm">
               </div>
             </div>
-          </div>
-          <div class="col-12">
-            <div class="form-text text-info">
-              ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
+            <div class="col-12">
+              <div class="form-text text-info">
+                ℹ️ Gaji karyawan tetap dihitung otomatis dari data capster yang ter-assign ke cabang ini.
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -314,18 +309,19 @@
 <script>
 document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
   const btn = e.relatedTarget;
+  if (!btn) return;
   const bid = btn.dataset.id;
 
   document.getElementById('editForm').action = '/branches/edit/' + bid;
   document.getElementById('edit_branch_id_display').textContent = bid;
-  document.getElementById('edit_name').value         = btn.dataset.name;
-  document.getElementById('edit_short').value        = btn.dataset.short;
-  document.getElementById('edit_location').value     = btn.dataset.location;
-  document.getElementById('edit_employees').value    = btn.dataset.employees;
-  document.getElementById('edit_commission').value   = btn.dataset.commission;
-  document.getElementById('edit_cost_tempat').value  = btn.dataset.costTempat;
-  document.getElementById('edit_cost_listrik').value = btn.dataset.costListrik;
-  document.getElementById('edit_cost_wifi').value    = btn.dataset.costWifi;
+  document.getElementById('edit_name').value         = btn.dataset.name || '';
+  document.getElementById('edit_short').value        = btn.dataset.short || '';
+  document.getElementById('edit_location').value     = btn.dataset.location || '';
+  document.getElementById('edit_employees').value    = btn.dataset.employees || '';
+  document.getElementById('edit_commission').value   = btn.dataset.commission || '';
+  document.getElementById('edit_cost_tempat').value  = btn.dataset.costTempat || '';
+  document.getElementById('edit_cost_listrik').value = btn.dataset.costListrik || '';
+  document.getElementById('edit_cost_wifi').value    = btn.dataset.costWifi || '';
 });
 </script>
 {% endblock %}

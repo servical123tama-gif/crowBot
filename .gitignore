@@ -53,3 +53,10 @@ backups/
 
 # Export files
 docs/exports/
+
+# HTTP debug / session artifacts (jangan commit — bisa bocor cookie session)
+cookies*.txt
+login*.html
+
+# QR customer PNG — auto-generated dari customer_id, tidak perlu track
+web/static/qr/member_*.png

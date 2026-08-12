@@ -635,26 +635,30 @@ class Repository:
     # Capsters                                                             #
     # ------------------------------------------------------------------ #
 
-    def add_capster(self, capster) -> bool:
+    def add_capster(self, capster) -> Optional[int]:
+        """Insert capster. Return new capster.id atau None kalau gagal."""
         try:
             with get_db() as db:
-                db.add(Capster(
+                row = Capster(
                     name=capster.name,
-                    telegram_id=capster.telegram_id,
                     alias=capster.alias or '',
                     employment_type=capster.employment_type or 'mitra',
                     commission_rate=float(capster.commission_rate or 0.5),
                     monthly_salary=int(getattr(capster, 'monthly_salary', 0) or 0),
                     branch_id=getattr(capster, 'branch_id', '') or '',
-                ))
-            logger.info(f"Capster added: {capster.name} ({capster.telegram_id})")
-            return True
+                )
+                db.add(row)
+                db.flush()
+                new_id = row.id
+            logger.info(f"Capster added: {capster.name} (id={new_id})")
+            return new_id
         except Exception as e:
             logger.error(f"Failed to add capster: {e}", exc_info=True)
-            return False
+            return None
 
     def get_all_capsters(self) -> List[Dict[str, Any]]:
-        """Return list of dicts with keys matching SheetsService: Name, TelegramID, Alias, EmploymentType, CommissionRate, MonthlySalary, BranchID."""
+        """Return list of capsters — id, Name, Alias, EmploymentType, CommissionRate,
+        MonthlySalary, BranchID, Username, SaldoAdjustment."""
         try:
             with get_db() as db:
                 rows = db.query(Capster).all()
@@ -662,7 +666,6 @@ class Repository:
                 {
                     'id': r.id,
                     'Name': r.name,
-                    'TelegramID': r.telegram_id,
                     'Alias': r.alias or '',
                     'EmploymentType': r.employment_type,
                     'CommissionRate': float(r.commission_rate or 0.5),
@@ -688,7 +691,6 @@ class Repository:
             return {
                 'id': row.id,
                 'Name': row.name,
-                'TelegramID': row.telegram_id,
                 'Alias': row.alias or '',
                 'EmploymentType': row.employment_type,
                 'CommissionRate': float(row.commission_rate or 0.5),
@@ -1461,7 +1463,6 @@ class Repository:
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
                     'CapsterID': r.capster_id,
                     'CapsterName': r.capster_name,
-                    'TelegramID': r.telegram_id,  # legacy
                     'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',
@@ -1483,7 +1484,6 @@ class Repository:
                     'Date': r.date.strftime(DATETIME_FORMAT) if r.date else '',
                     'CapsterID': r.capster_id,
                     'CapsterName': r.capster_name,
-                    'TelegramID': r.telegram_id,  # legacy field, biarkan untuk backward compat
                     'Amount': int(r.amount),
                     'PeriodStart': r.period_start.strftime(DATE_FORMAT) if r.period_start else '',
                     'PeriodEnd': r.period_end.strftime(DATE_FORMAT) if r.period_end else '',

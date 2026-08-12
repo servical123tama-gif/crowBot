@@ -1,4 +1,4 @@
-"""Laporan harian detail — breakdown per layanan, capster, metode bayar."""
+"""Laporan harian detail — breakdown per layanan, capster, metode bayar, produk."""
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -30,8 +30,68 @@ def report_daily():
     start_dt = selected.replace(hour=0, minute=0, second=0, microsecond=0)
     end_dt   = selected.replace(hour=23, minute=59, second=59, microsecond=999999)
     df = db.get_transactions_by_range(start_dt, end_dt)
+    product_sales = db.get_product_sales_by_range(start_dt, end_dt)
+    branches_cfg = db.get_all_branches_config()
+
+    # ── Ringkasan produk ─────────────────────────────────────
+    prod_total_revenue = sum(ps.get('Total', 0) for ps in product_sales)
+    prod_total_qty     = sum(ps.get('Quantity', 0) for ps in product_sales)
+    prod_total_comm    = sum(ps.get('CommissionEarned', 0) for ps in product_sales)
+
+    # ── Ringkasan produk per cabang ──────────────────────────
+    prod_per_branch = {}   # {branch_id: {'revenue', 'qty', 'commission'}}
+    for ps in product_sales:
+        bid = ps.get('BranchID') or ''
+        if bid not in prod_per_branch:
+            prod_per_branch[bid] = {'revenue': 0, 'qty': 0, 'commission': 0}
+        prod_per_branch[bid]['revenue']    += ps.get('Total', 0)
+        prod_per_branch[bid]['qty']        += ps.get('Quantity', 0)
+        prod_per_branch[bid]['commission'] += ps.get('CommissionEarned', 0)
+
+    # Breakdown per produk
+    by_product = {}
+    for ps in product_sales:
+        key = ps.get('ProductName', '-')
+        if key not in by_product:
+            by_product[key] = {'name': key, 'qty': 0, 'revenue': 0, 'commission': 0}
+        by_product[key]['qty']        += ps.get('Quantity', 0)
+        by_product[key]['revenue']    += ps.get('Total', 0)
+        by_product[key]['commission'] += ps.get('CommissionEarned', 0)
+    by_product = sorted(by_product.values(), key=lambda x: x['revenue'], reverse=True)
+
+    # Detail transaksi produk (row per sale)
+    product_transactions = []
+    for ps in product_sales:
+        raw_date = ps.get('DateObj') or ps.get('Date')
+        time_str = raw_date.strftime('%H:%M') if hasattr(raw_date, 'strftime') else str(raw_date)[11:16]
+        product_transactions.append({
+            'time':       time_str,
+            'capster':    ps.get('CapsterName', ''),
+            'product':    ps.get('ProductName', ''),
+            'qty':        ps.get('Quantity', 1),
+            'price_each': ps.get('PriceEach', 0),
+            'total':      ps.get('Total', 0),
+            'commission': ps.get('CommissionEarned', 0),
+            'branch':     ps.get('BranchID', ''),
+        })
+    product_transactions.sort(key=lambda x: x['time'])
 
     if df.empty or 'Price' not in df.columns:
+        # Kalau tidak ada layanan tapi ada produk, tetap tampilkan branch detail (produk-only)
+        branch_detail_empty = []
+        for bid, p in prod_per_branch.items():
+            cfg = next((b for b in branches_cfg if b.get('BranchID') == bid), {})
+            display_name = cfg.get('Short') or cfg.get('Name') or bid or '(tanpa cabang)'
+            branch_detail_empty.append({
+                'branch_id':      bid,
+                'name':           display_name,
+                'svc_cash': 0, 'svc_qris': 0, 'svc_other': 0, 'svc_total': 0, 'svc_tx': 0,
+                'prod_revenue':   p['revenue'],
+                'prod_qty':       p['qty'],
+                'prod_commission':p['commission'],
+                'grand_total':    p['revenue'],
+            })
+        branch_detail_empty.sort(key=lambda x: x['grand_total'], reverse=True)
         return render_template(
             'report_daily.html',
             date_str=date_str,
@@ -41,14 +101,22 @@ def report_daily():
             is_today=is_today,
             total_revenue=0, total_tx=0,
             by_service=[], by_capster=[], by_payment=[], by_branch=[],
+            branch_detail=branch_detail_empty,
             transactions=[],
+            # produk
+            prod_total_revenue=prod_total_revenue,
+            prod_total_qty=prod_total_qty,
+            prod_total_comm=prod_total_comm,
+            by_product=by_product,
+            product_transactions=product_transactions,
+            grand_total=prod_total_revenue,
             active_page='report_daily',
             now=now,
         )
 
     df['Price'] = pd.to_numeric(df['Price'], errors='coerce').fillna(0)
 
-    # ── Ringkasan ────────────────────────────────────────────
+    # ── Ringkasan layanan ────────────────────────────────────
     total_revenue = int(df['Price'].sum())
     total_tx      = len(df)
 
@@ -98,6 +166,24 @@ def report_daily():
                 'revenue': int(row['revenue']),
             })
 
+    # ── Per cabang detail: Cash | QRIS | Produk | Total ──────
+    # Service payment split per branch
+    svc_per_branch = {}   # {branch_id: {'cash': X, 'qris': Y, 'other': Z, 'tx': N}}
+    if 'Branch' in df.columns and 'Payment_Method' in df.columns:
+        for (bid, pm), grp in df.groupby(['Branch', 'Payment_Method']):
+            if bid not in svc_per_branch:
+                svc_per_branch[bid] = {'cash': 0, 'qris': 0, 'other': 0, 'tx': 0}
+            rev = int(grp['Price'].sum())
+            cnt = len(grp)
+            svc_per_branch[bid]['tx'] += cnt
+            pm_l = (pm or '').lower()
+            if 'cash' in pm_l:
+                svc_per_branch[bid]['cash'] += rev
+            elif 'qris' in pm_l:
+                svc_per_branch[bid]['qris'] += rev
+            else:
+                svc_per_branch[bid]['other'] += rev
+
     # Detail transaksi (tabel bawah)
     transactions = []
     for _, row in df.sort_values('Date').iterrows():
@@ -109,6 +195,32 @@ def report_daily():
             'payment': row.get('Payment_Method', ''),
             'price':   int(row['Price']),
         })
+
+    # ── Merge svc_per_branch + prod_per_branch → branch_detail ──
+    all_branch_ids = set(svc_per_branch.keys()) | set(prod_per_branch.keys())
+    branch_detail = []
+    for bid in all_branch_ids:
+        # cari display name dari config
+        cfg = next((b for b in branches_cfg if b.get('BranchID') == bid), {})
+        display_name = cfg.get('Short') or cfg.get('Name') or bid or '(tanpa cabang)'
+        s = svc_per_branch.get(bid, {'cash': 0, 'qris': 0, 'other': 0, 'tx': 0})
+        p = prod_per_branch.get(bid, {'revenue': 0, 'qty': 0, 'commission': 0})
+        svc_total = s['cash'] + s['qris'] + s['other']
+        grand = svc_total + p['revenue']
+        branch_detail.append({
+            'branch_id':      bid,
+            'name':           display_name,
+            'svc_cash':       s['cash'],
+            'svc_qris':       s['qris'],
+            'svc_other':      s['other'],
+            'svc_total':      svc_total,
+            'svc_tx':         s['tx'],
+            'prod_revenue':   p['revenue'],
+            'prod_qty':       p['qty'],
+            'prod_commission':p['commission'],
+            'grand_total':    grand,
+        })
+    branch_detail.sort(key=lambda x: x['grand_total'], reverse=True)
 
     return render_template(
         'report_daily.html',
@@ -123,7 +235,15 @@ def report_daily():
         by_capster=by_capster,
         by_payment=by_payment,
         by_branch=by_branch,
+        branch_detail=branch_detail,
         transactions=transactions,
+        # produk
+        prod_total_revenue=prod_total_revenue,
+        prod_total_qty=prod_total_qty,
+        prod_total_comm=prod_total_comm,
+        by_product=by_product,
+        product_transactions=product_transactions,
+        grand_total=total_revenue + prod_total_revenue,
         active_page='report_daily',
         now=now,
     )
